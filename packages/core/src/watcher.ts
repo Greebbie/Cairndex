@@ -40,7 +40,13 @@ export function createWatcher(input: WatcherInput): Watcher {
       if (fsw) return;
       const root = vaultPath(input.repoRoot);
       fsw = chokidar.watch(root, {
-        ignored: [/(^|[\\/])\.sync-conflicts/, /(^|[\\/])\.sync-baseline\.json$/],
+        ignored: [
+          /(^|[\\/])\.sync-conflicts/,
+          /(^|[\\/])\.sync-baseline\.json$/,
+          // Derived layer is written by the cascade; ignoring here prevents the
+          // chokidar→watcherActions→regen loop from firing in the first place.
+          /[\\/]\.cairndex[\\/]indexes(?:[\\/]|$)/,
+        ],
         persistent: true,
         ignoreInitial: true,
         awaitWriteFinish: { stabilityThreshold: 50, pollInterval: 25 },

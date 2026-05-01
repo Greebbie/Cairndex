@@ -1,10 +1,15 @@
 import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { applyCairndexBlock } from "./claudeMd.js";
 import { archiveIfNeeded } from "./archive.js";
 import type { Config } from "./config.js";
 import { parseFrontmatter, serializeFrontmatter } from "./frontmatter.js";
+import { buildMemoryHealth } from "./indexes/memoryHealth.js";
+import { regenerateAllIndexes } from "./indexes/regenerate.js";
+import { renderAgentSurface } from "./agentSurface/template.js";
 import { normalizeFrontmatter } from "./normalize.js";
-import { vaultPath } from "./paths.js";
+import { INDEXES_DIR, vaultPath } from "./paths.js";
 import { applyAutoFixes } from "./validate/fix.js";
 import { runValidation } from "./validate/index.js";
 
@@ -13,6 +18,10 @@ export interface HandleVaultChangeResult {
   fixed: number;
   timestampRefreshed: boolean;
   indexUpdated: boolean;
+  /** Whether one or more `.cairndex/indexes/*` files were rewritten. */
+  indexesUpdated: boolean;
+  /** Whether the cairndex region of CLAUDE.md was rewritten. */
+  claudeMdUpdated: boolean;
 }
 
 const REFRESHABLE_DIRS = ["specs/", "decisions/", "plans/", "tasks/", "goals/", "questions/"];
@@ -24,6 +33,13 @@ function todayUtc(): string {
 function inVault(repoRoot: string, changedPath: string): boolean {
   const v = vaultPath(repoRoot);
   return changedPath.startsWith(v);
+}
+
+/** True if `changedPath` is the derived index layer that the cascade itself writes —
+ *  used to break the regen→write→watch→regen loop. */
+function inIndexesLayer(repoRoot: string, changedPath: string): boolean {
+  const indexesRoot = join(vaultPath(repoRoot), INDEXES_DIR);
+  return changedPath.startsWith(indexesRoot);
 }
 
 function isRefreshableNode(changedPath: string): boolean {
@@ -52,9 +68,16 @@ export async function handleVaultChange(
     fixed: 0,
     timestampRefreshed: false,
     indexUpdated: false,
+    indexesUpdated: false,
+    claudeMdUpdated: false,
   };
 
   if (!inVault(repoRoot, changedPath)) return result;
+
+  // Loop guard: changes inside the derived layer are written by the cascade itself.
+  // Re-running the cascade for those would deadlock on identical-content writes (idempotent
+  // regenerators report changed=false, but we still don't want to spend the work).
+  if (inIndexesLayer(repoRoot, changedPath)) return result;
 
   // 1. Archive if status flipped to removed/archived/abandoned. Must run before validation
   // because archived files no longer live at their original path.
@@ -106,6 +129,42 @@ export async function handleVaultChange(
     }
   } catch {
     // indexUpdate may not exist in older builds; treat as best-effort.
+  }
+
+  // 4. Regenerate the .cairndex/indexes/ derived layer.
+  let activeContextChanged = false;
+  let memoryHealthChanged = false;
+  try {
+    const r = await regenerateAllIndexes(repoRoot, cfg);
+    result.indexesUpdated = r.anyChanged;
+    activeContextChanged = r.changed.activeContext;
+    memoryHealthChanged = r.changed.memoryHealth;
+  } catch {
+    // best-effort; indexes regen is idempotent and will catch up on the next event.
+  }
+
+  // 5. Regenerate the cairndex region of CLAUDE.md when active-context or memory-health
+  //    actually changed. Skipping when nothing changed avoids the chokidar loop on
+  //    untouched runs (CLAUDE.md is at repo root, not under .cairndex/, so a write
+  //    here doesn't itself fire the watcher — but skipping no-op writes keeps mtime stable).
+  if (activeContextChanged || memoryHealthChanged) {
+    try {
+      const ctx = (
+        await import("./indexes/activeContext.js")
+      ).buildActiveContext;
+      const ac = await ctx(repoRoot, cfg);
+      const health = await buildMemoryHealth(repoRoot, cfg);
+      const body = renderAgentSurface(ac, health);
+      const claudeMdPath = join(repoRoot, "CLAUDE.md");
+      const existing = existsSync(claudeMdPath)
+        ? await readFile(claudeMdPath, "utf8")
+        : undefined;
+      const applied = applyCairndexBlock(existing, body);
+      await writeFile(claudeMdPath, applied.updated, "utf8");
+      result.claudeMdUpdated = true;
+    } catch {
+      // best-effort; never block on CLAUDE.md regen.
+    }
   }
 
   return result;

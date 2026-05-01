@@ -1,18 +1,20 @@
+import { AgentContextPanel } from "@/components/cockpit/AgentContextPanel";
+import { InboxPanel } from "@/components/cockpit/InboxPanel";
+import { MemoryHealthPanel } from "@/components/cockpit/MemoryHealthPanel";
+import { ProjectStatePanel } from "@/components/cockpit/ProjectStatePanel";
 import { DoctorBadge } from "@/components/DoctorBadge";
-import { PhaseTracker } from "@/components/PhaseTracker";
-import { useProjects, useVaultOverview } from "@/lib/api";
+import { useDashboard, useProjects } from "@/lib/api";
 import { useWatcherEvents } from "@/lib/sse";
 import { useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 
 export default function Dashboard() {
   const { alias } = useParams<{ alias: string }>();
   const navigate = useNavigate();
   const projects = useProjects();
-  const overview = useVaultOverview(alias);
+  const dashboard = useDashboard(alias);
   useWatcherEvents(alias);
 
-  // If no alias selected and projects exist, redirect to first project
   useEffect(() => {
     if (!alias && projects.data && projects.data.length > 0) {
       navigate(`/p/${projects.data[0]?.alias}`, { replace: true });
@@ -30,36 +32,54 @@ export default function Dashboard() {
     );
   }
 
+  const data = dashboard.data;
+
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-8 space-y-4 max-w-3xl">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-semibold">{alias}</h2>
         <DoctorBadge alias={alias} />
       </div>
 
-      <div>
-        <div className="text-xs uppercase text-muted-foreground mb-2">Phase</div>
-        <PhaseTracker phase={overview.data?.phase ?? null} />
-      </div>
-
-      {overview.data?.nextAction && (
-        <div className="bg-muted/50 rounded p-3">
-          <div className="text-xs uppercase text-muted-foreground">Next action</div>
-          <div className="text-sm">{overview.data.nextAction}</div>
+      {dashboard.isLoading ? (
+        <div className="text-sm text-muted-foreground">Loading cockpit…</div>
+      ) : dashboard.isError ? (
+        <div className="text-sm text-red-600">
+          Failed to load dashboard. Run <code>cairndex doctor</code> to diagnose.
         </div>
-      )}
+      ) : data ? (
+        <>
+          <ProjectStatePanel alias={alias} state={data.projectState} />
+          <AgentContextPanel alias={alias} agentContext={data.agentContext} />
+          <MemoryHealthPanel alias={alias} health={data.memoryHealth} />
+          <InboxPanel alias={alias} />
 
-      <div>
-        <div className="text-xs uppercase text-muted-foreground mb-2">Counts</div>
-        <ul className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
-          {Object.entries(overview.data?.counts ?? {}).map(([type, n]) => (
-            <li key={type} className="bg-muted/30 rounded p-2 text-sm">
-              <div className="text-xs text-muted-foreground">{type}</div>
-              <div className="text-lg font-semibold">{n}</div>
-            </li>
-          ))}
-        </ul>
-      </div>
+          <section className="rounded border bg-card text-card-foreground p-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                Recent Activity
+              </h3>
+              <Link to={`/p/${alias}/timeline`} className="text-xs text-primary hover:underline">
+                Full timeline →
+              </Link>
+            </div>
+            {data.recentActivity.length === 0 ? (
+              <div className="text-sm text-muted-foreground">No activity yet.</div>
+            ) : (
+              <ul className="text-sm divide-y">
+                {data.recentActivity.slice(0, 6).map((e, idx) => (
+                  <li key={`${e.date}-${idx}`} className="py-1.5 flex gap-3">
+                    <span className="font-mono text-xs text-muted-foreground w-24 shrink-0">
+                      {e.date}
+                    </span>
+                    <span className="flex-1">{e.summary}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </>
+      ) : null}
     </div>
   );
 }

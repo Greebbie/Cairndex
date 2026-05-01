@@ -42,6 +42,14 @@ describe("init", () => {
     }
   });
 
+  it("creates the derived indexes/ and Phase-2 inbox/ placeholders", async () => {
+    await runInit({ cwd: tmp, yes: true, claudeMd: true, hooks: true });
+    expect(existsSync(join(tmp, ".cairndex/indexes"))).toBe(true);
+    expect(existsSync(join(tmp, ".cairndex/indexes/context-packs"))).toBe(true);
+    expect(existsSync(join(tmp, ".cairndex/inbox"))).toBe(true);
+    expect(existsSync(join(tmp, ".cairndex/inbox/proposed-memory-updates"))).toBe(true);
+  });
+
   it("writes config.yaml, index.md, baseline, and registers globally", async () => {
     await runInit({ cwd: tmp, yes: true, claudeMd: true, hooks: true, alias: "test-proj" });
     expect(existsSync(join(tmp, ".cairndex/config.yaml"))).toBe(true);
@@ -85,6 +93,12 @@ describe("init", () => {
     expect(Array.isArray(stop[0].hooks)).toBe(true);
     expect(stop[0].hooks[0]).toMatchObject({ type: "command" });
     expect(String(stop[0].hooks[0].command)).toContain("--auto-session");
+    // Phase 9: Stop hook also runs the consolidate+archive sweep.
+    const sweepCmd = (stop[0].hooks as Array<{ command: string }>).find((h) =>
+      String(h.command).includes("cairndex sweep"),
+    );
+    expect(sweepCmd).toBeDefined();
+    expect(String(sweepCmd?.command)).toContain("--silent");
   });
 
   it("preserves existing .claude/settings.json hooks (nested user hook)", async () => {

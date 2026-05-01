@@ -6,7 +6,7 @@ import remarkGfm from "remark-gfm";
 interface MarkdownViewProps {
   content: string;
   /** Alias for resolving [[ID]] wikilinks to /p/<alias>/browse/<type>/<ID>. */
-  alias?: string;
+  alias?: string | undefined;
 }
 
 export function MarkdownView({ content, alias }: MarkdownViewProps) {

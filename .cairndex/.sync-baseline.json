@@ -1,0 +1,15 @@
+{
+  "hashes": {
+    "rules/operating-rules.md": "39142d6be9ff74aef9ca7cfd392e485f5c82385cf06fd200978953611b3fec46",
+    "templates/change.md": "5cd25b4a7ffecc87e6a77c636728bcc2dab7b462c958d517b32fe6ab3718e1db",
+    "templates/decision.md": "7b016c5dd28d0956ea9e86dc706bd2a5db1d2e4a5c3eab997d222c8cf7c49e1a",
+    "templates/goal.md": "5f368d092536c69b5e6009f341282bef3e7b8b815bd1d8793efc3af9ecbe702d",
+    "templates/insight.md": "197242ad392e88e409b4f32ac97d4033323bb70b51e6d926d34933d7c63153f1",
+    "templates/intent.md": "547a8d89900169e3a415ccda2909a67b1d4ff380f816936f1983c35a78e59c8f",
+    "templates/plan.md": "f3a673a8bc4779389c4c84d4d9ebe45228234e022dd3a70476b27c00e8093c51",
+    "templates/question.md": "b4c35de543979721b3953fc267d5582912d45aeabc1349e5d7c46925b226f205",
+    "templates/session.md": "a82a57773c26fec98721f0353084ebfbf4d7d26399a16eb8c683df8f14c345b8",
+    "templates/spec.md": "11a01641c24637d3eed9470874926f94fce34937e7af6d181f85fb4472de3482",
+    "templates/task.md": "8795286b64db4aea221570a3c78d6f4136464b8f82ea82c171925b242a5b7074"
+  }
+}

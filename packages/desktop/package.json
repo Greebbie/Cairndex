@@ -1,0 +1,15 @@
+{
+  "name": "@cairndex/desktop",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Tauri desktop wrapper for Cairndex — vault-centric application like Obsidian/Typora.",
+  "scripts": {
+    "dev": "tauri dev",
+    "build:tauri": "tauri build",
+    "tauri": "tauri",
+    "build": "node -e \"console.log('@cairndex/desktop: skipped during workspace build (needs Rust). Run pnpm --filter @cairndex/desktop build:tauri to bundle.')\""
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.0"
+  }
+}

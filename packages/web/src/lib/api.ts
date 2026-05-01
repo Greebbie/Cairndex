@@ -2,9 +2,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import {
   ChangesSchema,
+  ComposePackResponseSchema,
+  DashboardSchema,
+  InboxListSchema,
   IssueSchema,
   NodeListItemSchema,
   NodeResponseSchema,
+  PackListSchema,
+  PackResponseSchema,
   type Project,
   ProjectSchema,
   VaultOverviewSchema,
@@ -127,6 +132,98 @@ export function useSync() {
       if (!r.ok) throw new Error(`${r.status}`);
       return r.json();
     },
+  });
+}
+
+export function useDashboard(alias: string | undefined) {
+  return useQuery({
+    queryKey: ["dashboard", alias],
+    queryFn: () => jsonFetch(`/api/vault/${alias}/dashboard`, DashboardSchema),
+    enabled: !!alias,
+  });
+}
+
+export function usePack(alias: string | undefined, packId: string | undefined) {
+  return useQuery({
+    queryKey: ["pack", alias, packId],
+    queryFn: () => jsonFetch(`/api/vault/${alias}/pack/${packId}`, PackResponseSchema),
+    enabled: !!alias && !!packId,
+  });
+}
+
+export function usePacks(alias: string | undefined) {
+  return useQuery({
+    queryKey: ["packs", alias],
+    queryFn: () => jsonFetch(`/api/vault/${alias}/packs`, PackListSchema),
+    enabled: !!alias,
+  });
+}
+
+export function useComposePack() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { alias: string; task?: string; budget?: number }) => {
+      const payload: Record<string, unknown> = {};
+      if (input.task !== undefined) payload.task = input.task;
+      if (input.budget !== undefined) payload.budget = input.budget;
+      const r = await fetch(`${API_BASE}/api/vault/${input.alias}/pack`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+      return ComposePackResponseSchema.parse(await r.json());
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["packs", vars.alias] });
+      qc.invalidateQueries({ queryKey: ["dashboard", vars.alias] });
+    },
+  });
+}
+
+export function useInbox(alias: string | undefined) {
+  return useQuery({
+    queryKey: ["inbox", alias],
+    queryFn: () => jsonFetch(`/api/vault/${alias}/inbox`, InboxListSchema),
+    enabled: !!alias,
+  });
+}
+
+export function useAcceptProposal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { alias: string; proposalId: string }) => {
+      const r = await fetch(
+        `${API_BASE}/api/vault/${input.alias}/inbox/${input.proposalId}/accept`,
+        { method: "POST" },
+      );
+      if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+      return r.json();
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["inbox", vars.alias] });
+      qc.invalidateQueries({ queryKey: ["dashboard", vars.alias] });
+      qc.invalidateQueries({ queryKey: ["vault", vars.alias] });
+    },
+  });
+}
+
+export function useRejectProposal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { alias: string; proposalId: string; reason: string }) => {
+      const r = await fetch(
+        `${API_BASE}/api/vault/${input.alias}/inbox/${input.proposalId}/reject`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason: input.reason }),
+        },
+      );
+      if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+      return r.json();
+    },
+    onSuccess: (_, vars) => qc.invalidateQueries({ queryKey: ["inbox", vars.alias] }),
   });
 }
 

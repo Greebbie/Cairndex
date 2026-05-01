@@ -42,6 +42,9 @@ export async function createServer(input: CreateServerInput): Promise<CreateServ
   const { registerSyncRoutes } = await import("./routes/sync.js");
   const { registerInsightRoutes } = await import("./routes/insight.js");
   const { registerEventsRoutes } = await import("./routes/events.js");
+  const { registerDashboardRoutes } = await import("./routes/dashboard.js");
+  const { registerPackRoutes } = await import("./routes/pack.js");
+  const { registerInboxRoutes } = await import("./routes/inbox.js");
 
   await registerProjectsRoutes(app);
   await registerVaultRoutes(app);
@@ -51,6 +54,9 @@ export async function createServer(input: CreateServerInput): Promise<CreateServ
   await registerSyncRoutes(app);
   await registerInsightRoutes(app);
   await registerEventsRoutes(app, hub);
+  await registerDashboardRoutes(app);
+  await registerPackRoutes(app);
+  await registerInboxRoutes(app);
 
   const { registerStatic } = await import("./lib/static.js");
   await registerStatic(app, input.webRoot);

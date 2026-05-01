@@ -1,0 +1,25 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cairndex doctor --silent --fix --scope changed --filter-path .cairndex/ # cairndex-managed"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cairndex doctor --silent --auto-session # cairndex-managed"
+          }
+        ]
+      }
+    ]
+  }
+}

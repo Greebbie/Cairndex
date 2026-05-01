@@ -26,8 +26,9 @@ function resolveType(id: string): string | null {
 function urlForId(id: string, alias: string | undefined): string {
   const type = resolveType(id);
   if (alias && type) return `/p/${alias}/browse/${type}/${id}`;
-  // Fallback: anchor-only link, won't resolve but won't navigate away either.
-  return `#${id}`;
+  // Fallback when alias unknown: a node-shaped anchor that callers can intercept
+  // or that downgrades safely (won't navigate away).
+  return `#/node/${id}`;
 }
 
 export interface RemarkWikilinksOptions {

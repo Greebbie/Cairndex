@@ -42,6 +42,10 @@ const CAIRNDEX_HOOKS: { PostToolUse: HookEntry[]; Stop: HookEntry[] } = {
           type: "command",
           command: `cairndex doctor --silent --auto-session # ${CAIRNDEX_HOOK_TAG}`,
         },
+        {
+          type: "command",
+          command: `cairndex sweep --silent # ${CAIRNDEX_HOOK_TAG}`,
+        },
       ],
     },
   ],

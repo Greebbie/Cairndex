@@ -1,0 +1,19 @@
+{
+  "phase": "discovering",
+  "phaseSince": "2026-05-01",
+  "activeGoal": null,
+  "activeSpec": {
+    "id": "SPEC-001",
+    "title": "Memory Cockpit — Phase 1 core loop",
+    "status": "active"
+  },
+  "activePlan": null,
+  "currentTask": {
+    "id": "TASK-001",
+    "title": "Bump vite to 6.x and verify web build/dev flow",
+    "status": "pending"
+  },
+  "nextAction": "TODO",
+  "warnings": [],
+  "generatedAt": "2026-05-01T17:57:44.613Z"
+}

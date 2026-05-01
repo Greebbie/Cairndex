@@ -30,6 +30,11 @@ const NODE_FOLDERS = [
   "rules",
   "templates",
   "archive",
+  // Phase 1: derived index layer + Phase 2 inbox placeholder.
+  "indexes",
+  "indexes/context-packs",
+  "inbox",
+  "inbox/proposed-memory-updates",
 ];
 
 const INDEX_BODY = `---

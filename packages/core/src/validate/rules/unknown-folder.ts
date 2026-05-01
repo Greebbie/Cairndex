@@ -3,7 +3,15 @@ import { join } from "node:path";
 import { vaultPath } from "../../paths.js";
 import type { ValidationIssue, ValidationRule } from "../types.js";
 
-const ALLOWED_EXTRA = new Set(["archive", "templates", "rules", "context", ".sync-conflicts"]);
+const ALLOWED_EXTRA = new Set([
+  "archive",
+  "templates",
+  "rules",
+  "context",
+  ".sync-conflicts",
+  "indexes", // derived layer: active-context/node-summary/memory-health/backlinks/context-packs
+  "inbox", // Phase 2 placeholder: proposed-memory-updates
+]);
 
 const KNOWN_NODE_FOLDERS = new Set([
   "goals",

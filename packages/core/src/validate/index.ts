@@ -6,10 +6,12 @@ import { confidenceLow } from "./rules/confidence-low.js";
 import { freshness } from "./rules/freshness.js";
 import { idCollision } from "./rules/id-collision.js";
 import { idConsistency } from "./rules/id-consistency.js";
+import { multipleActive } from "./rules/multiple-active.js";
 import { phaseCoherence } from "./rules/phase-coherence.js";
 import { provenancePresent } from "./rules/provenance-present.js";
 import { referenceIntegrity } from "./rules/reference-integrity.js";
 import { schemaRequired } from "./rules/schema-required.js";
+import { supersededActive } from "./rules/superseded-active.js";
 import { tagFormat } from "./rules/tag-format.js";
 import { unknownFolder } from "./rules/unknown-folder.js";
 import { verificationBound } from "./rules/verification-bound.js";
@@ -28,6 +30,8 @@ const RULES: ValidationRule[] = [
   phaseCoherence,
   unknownFolder,
   confidenceLow,
+  multipleActive,
+  supersededActive,
 ];
 
 export interface RunValidationOptions {
