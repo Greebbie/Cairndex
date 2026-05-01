@@ -13,7 +13,14 @@ current_task: TASK-001
 
 ## Must-know now
 - **Never auto-commit / auto-push.** User controls all commit boundaries (`~/.claude/CLAUDE.md` rule).
-- **Inbox is the write gate.** Durable memory (specs, decisions, insights, plan/task state) should propose through `.cairndex/inbox/proposed-memory-updates/` unless explicitly accepted inline.
+- **Central vault is the target architecture.** Cairndex should work like an
+  Obsidian vault: one user-selected vault contains every project under
+  `projects/<project-id>/`; repo-local `.cairndex/` is only legacy
+  implementation and migration source.
+- **Inbox is the write gate.** Durable memory (specs, decisions, insights,
+  plan/task state) should propose through
+  `projects/<project-id>/inbox/proposed-memory-updates/` unless explicitly
+  accepted inline.
 - Latest session note: [[2026-05-02-1900]] — full handoff for next-session resume.
 
 ## Recent changes
@@ -25,6 +32,7 @@ current_task: TASK-001
 <!-- cairndex:recent-changes:end -->
 
 ## Read next
+- `docs/superpowers/specs/2026-05-02-cairndex-central-vault-architecture.md` (accepted central vault direction)
 - `.cairndex/sessions/2026-05-02-1900.md` (latest handoff)
 - `.cairndex/specs/SPEC-001.md` (Phase 1 scope; many items now also true for what we shipped beyond)
 - `.cairndex/rules/operating-rules.md`

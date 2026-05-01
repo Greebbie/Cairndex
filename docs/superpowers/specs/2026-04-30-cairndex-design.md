@@ -1,10 +1,20 @@
 # cairndex — Design Spec
 
 **Date**: 2026-04-30
-**Status**: Approved (brainstorm phase)
+**Status**: Superseded architecture note
 **Owner**: Greebbie (p65420201@gmail.com)
 
 ---
+
+> **Superseded on 2026-05-02:** This document describes the original per-repo
+> `.cairndex/` architecture. The accepted product direction is now a central
+> Obsidian-style vault containing all projects under `projects/<project-id>/`.
+> See `2026-05-02-cairndex-central-vault-architecture.md`.
+>
+> The memory model, node taxonomy, validation rules, and agent-surface ideas in
+> this document still apply. The storage topology does not: repo-local
+> `.cairndex/` is now a migration source / compatibility mode, not the target
+> source of truth.
 
 ## 1. Overview
 
