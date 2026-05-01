@@ -4,3 +4,5 @@ dist/
 *.tsbuildinfo
 coverage/
 .vitest/
+/docs/superpowers
+/.playwright-mcp

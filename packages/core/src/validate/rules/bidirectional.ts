@@ -38,6 +38,7 @@ export const bidirectional: ValidationRule = {
             nodeId: node.id,
             path: node.path,
             fixable: true,
+            meta: { sourceId: node.id, targetId: link.target, reciprocal },
           });
         }
       }

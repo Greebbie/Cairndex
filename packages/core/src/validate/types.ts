@@ -10,6 +10,8 @@ export interface ValidationIssue {
   nodeId?: string;
   path?: string;
   fixable: boolean;
+  /** Structured metadata for auto-fixers; avoids regex-parsing of `message`. */
+  meta?: Record<string, string>;
 }
 
 export interface ValidationContext {

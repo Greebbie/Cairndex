@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { sha256 } from "./hash.js";
+import { assertContained } from "./safePath.js";
 
 export interface SyncResult {
   fastForwarded: string[];
@@ -111,6 +112,12 @@ export async function runSync(input: SyncInput): Promise<SyncResult> {
     if (globalChanged && !projectChanged) {
       // fast-forward
       if (globalContent != null) {
+        try {
+          assertContained(projectPath, projectVault);
+        } catch (err) {
+          console.warn(`sync: skipping path traversal attempt for ${rel}:`, err);
+          continue;
+        }
         await mkdir(dirname(projectPath), { recursive: true });
         await writeFile(projectPath, globalContent, "utf8");
         await updateBaselineEntry(projectDir, rel, globalContent);

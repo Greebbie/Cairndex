@@ -33,11 +33,14 @@ You are interacting with a cairndex Markdown memory vault. Follow these rules.
 
 ## Automatic behaviors (you do not need to do these)
 
-- Reciprocal links (e.g., `superseded_by` when you set `supersedes`) — auto-written by watcher
-- `updated` frontmatter timestamp — auto-refreshed on save
-- Index `Recent changes` section — auto-regenerated
-- Session note at session end — auto-written by Stop hook
-- Validation on every save — auto-run by PostToolUse hook
+- Reciprocal links (e.g., `superseded_by` when you set `supersedes`) — auto-written
+- `updated` frontmatter timestamp — auto-refreshed on save (UTC date)
+- Files with `status: removed`, `archived`, or `abandoned` — moved to `archive/`
+- Index `Recent changes` section (between `<!-- cairndex:recent-changes:start/end -->` markers in `index.md`) — auto-regenerated
+- Session note at session end — auto-written by Claude Code's Stop hook (with tool-call counts when transcript is available)
+- Validation + auto-fix on every save — auto-run by Claude Code's PostToolUse hook
+
+> **When does automation run?** Either (a) `cairndex ui` is running in this repo, or (b) Claude Code's `PostToolUse`/`Stop` hooks are configured (they are, by default, after `cairndex init`). If neither, run `cairndex doctor --fix` manually after a session.
 
 ## Hard rules
 

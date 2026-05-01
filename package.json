@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "lint": "biome check .",
     "format": "biome format --write .",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "package": "pnpm -F @cairndex/core build && pnpm -F @cairndex/server build && pnpm -F @cairndex/web build && pnpm -F cairndex build && pnpm -F cairndex run prepublish"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.0",

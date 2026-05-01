@@ -68,13 +68,29 @@ export async function applyAutoFixes(
   // Handle bidirectional separately: write the reciprocal on the target file.
   for (const i of issues) {
     if (i.rule !== "bidirectional" || !i.fixable) continue;
-    // Parse message: "${node.id}.${link.type} -> ${link.target}, but ${link.target}.${reciprocal} -> ${node.id} is missing"
-    const m = /^(.+?)\.(\w+) -> (.+?), but (.+?)\.(\w+) -> (.+?) is missing$/.exec(i.message);
-    if (!m) {
-      unfixed.push(i);
-      continue;
+
+    let targetId: string | undefined;
+    let reciprocal: string | undefined;
+    let sourceId: string | undefined;
+
+    if (i.meta?.targetId && i.meta?.reciprocal && i.meta?.sourceId) {
+      // Preferred: read from structured metadata.
+      targetId = i.meta.targetId;
+      reciprocal = i.meta.reciprocal;
+      sourceId = i.meta.sourceId;
+    } else {
+      // Fallback: parse human-readable message (backward compat, deprecated).
+      console.warn(
+        "bidirectional fix: falling back to regex parsing — attach meta to ValidationIssue",
+      );
+      const m = /^(.+?)\.(\w+) -> (.+?), but (.+?)\.(\w+) -> (.+?) is missing$/.exec(i.message);
+      if (!m) {
+        unfixed.push(i);
+        continue;
+      }
+      [, , , , targetId, reciprocal, sourceId] = m;
     }
-    const [, , , , targetId, reciprocal, sourceId] = m;
+
     if (!targetId || !reciprocal || !sourceId) {
       unfixed.push(i);
       continue;

@@ -18,3 +18,6 @@ export * from "./sync.js";
 export * from "./autoSession.js";
 export * from "./watcher.js";
 export * from "./validate/fix.js";
+export * from "./safePath.js";
+export * from "./watcherActions.js";
+export * from "./indexUpdate.js";

@@ -30,7 +30,9 @@ describe("backlinks", () => {
         "---\nid: ADR-001\ntitle: A\nstatus: accepted\ncreated: 2026-04-30\nlinks:\n  - { type: implements, target: SPEC-001 }\n---\n",
     });
     const idx = await computeBacklinks(tmp, defaultConfig());
-    expect(idx.get("SPEC-001")).toEqual([{ from: "ADR-001", type: "implements" }]);
+    expect(idx.get("SPEC-001")).toEqual([
+      { from: "ADR-001", fromType: "decision", type: "implements" },
+    ]);
   });
 
   it("collects [[wikilinks]] from body as 'mentions' edges", async () => {
@@ -42,7 +44,7 @@ describe("backlinks", () => {
     });
     const idx = await computeBacklinks(tmp, defaultConfig());
     const refs = idx.get("SPEC-001") ?? [];
-    expect(refs).toContainEqual({ from: "2026-04-30-1530", type: "mentions" });
+    expect(refs).toContainEqual({ from: "2026-04-30-1530", fromType: "session", type: "mentions" });
   });
 
   it("returns empty entry for nodes with no backlinks", async () => {

@@ -63,7 +63,7 @@ export function loadProjectConfig(repoRoot: string): Config {
   const p = configPath(repoRoot);
   if (!existsSync(p)) return defaultConfig();
   const raw = readFileSync(p, "utf8");
-  const data = yaml.load(raw);
+  const data = yaml.load(raw, { schema: yaml.JSON_SCHEMA });
   return ConfigSchema.parse(data);
 }
 

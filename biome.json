@@ -14,5 +14,14 @@
       "style": { "noNonNullAssertion": "off" }
     }
   },
-  "files": { "ignore": ["**/dist", "**/node_modules", "**/*.md", "**/coverage", "**/.vitest"] }
+  "files": {
+    "ignore": [
+      "**/dist",
+      "**/node_modules",
+      "**/*.md",
+      "**/coverage",
+      "**/.vitest",
+      "**/test-results"
+    ]
+  }
 }

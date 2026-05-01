@@ -61,6 +61,7 @@ describe("public api surface", () => {
       "generateAutoSession",
       "createWatcher",
       "applyAutoFixes",
+      "assertContained",
     ];
     for (const name of expected) {
       expect(core, `missing export: ${name}`).toHaveProperty(name);
