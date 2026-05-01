@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { centralSharedPath, centralVaultManifestPath, projectManifestPath } from "../src/paths.js";
 import { loadTemplate, renderTemplate } from "../src/templates.js";
 
 let tmp: string;
@@ -28,6 +29,18 @@ describe("templates", () => {
     mkdirSync(join(tmp, ".cairndex/templates"), { recursive: true });
     const tpl = await loadTemplate(tmp, "spec");
     expect(tpl).toBeNull();
+  });
+
+  it("falls back to shared templates for central project roots", async () => {
+    const vault = join(tmp, "Vault");
+    const projectRoot = join(vault, "projects", "app");
+    mkdirSync(projectRoot, { recursive: true });
+    mkdirSync(join(centralSharedPath(vault), "templates"), { recursive: true });
+    writeFileSync(centralVaultManifestPath(vault), "schemaVersion: 1\n", "utf8");
+    writeFileSync(projectManifestPath(projectRoot), "id: app\n", "utf8");
+    writeFileSync(join(centralSharedPath(vault), "templates", "spec.md"), "shared {{title}}\n");
+
+    expect(await loadTemplate(projectRoot, "spec")).toBe("shared {{title}}\n");
   });
 
   it("renders {{var}} placeholders from a context map", () => {

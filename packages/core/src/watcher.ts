@@ -45,7 +45,7 @@ export function createWatcher(input: WatcherInput): Watcher {
           /(^|[\\/])\.sync-baseline\.json$/,
           // Derived layer is written by the cascade; ignoring here prevents the
           // chokidar→watcherActions→regen loop from firing in the first place.
-          /[\\/]\.cairndex[\\/]indexes(?:[\\/]|$)/,
+          /[\\/](?:\.cairndex[\\/])?indexes(?:[\\/]|$)/,
         ],
         persistent: true,
         ignoreInitial: true,

@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { defaultConfig } from "../src/config.js";
+import { projectManifestPath } from "../src/paths.js";
 import { listNodeFiles, listNodeIds, readNode, vaultExists, writeNode } from "../src/vault.js";
 
 let tmp: string;
@@ -72,6 +73,30 @@ describe("vault", () => {
     });
     const ids = await listNodeIds(tmp, defaultConfig(), "spec");
     expect(ids).toContain("SPEC-001");
+  });
+
+  it("supports central project roots without a nested .cairndex folder", async () => {
+    const projectRoot = join(tmp, "Vault", "projects", "app");
+    mkdirSync(projectRoot, { recursive: true });
+    writeFileSync(projectManifestPath(projectRoot), "id: app\n", "utf8");
+
+    expect(vaultExists(projectRoot)).toBe(true);
+    await writeNode(projectRoot, defaultConfig(), "spec", {
+      frontmatter: {
+        id: "SPEC-001",
+        title: "X",
+        status: "active",
+        created: "2026-05-02",
+        updated: "2026-05-02",
+      },
+      body: "## Body\n",
+      slug: "x",
+    });
+
+    await expect(listNodeIds(projectRoot, defaultConfig(), "spec")).resolves.toEqual(["SPEC-001"]);
+    await expect(readNode(projectRoot, defaultConfig(), "spec", "SPEC-001")).resolves.toMatchObject({
+      id: "SPEC-001",
+    });
   });
 
   it("listNodeFiles returns paths and frontmatter for each", async () => {

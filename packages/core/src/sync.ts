@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { sha256 } from "./hash.js";
+import { vaultPath } from "./paths.js";
 import { assertContained } from "./safePath.js";
 
 export interface SyncResult {
@@ -16,8 +17,8 @@ export interface SyncInput {
 }
 
 const TRACKED_SUBDIRS = ["rules", "templates"] as const;
-const BASELINE_FILE = ".cairndex/.sync-baseline.json";
-const CONFLICTS_DIR = ".cairndex/.sync-conflicts";
+const BASELINE_FILE = ".sync-baseline.json";
+const CONFLICTS_DIR = ".sync-conflicts";
 
 async function listMarkdownRel(dir: string, base: string): Promise<string[]> {
   if (!existsSync(dir)) return [];
@@ -44,7 +45,7 @@ async function readMaybe(path: string): Promise<string | null> {
 }
 
 export async function readSyncBaseline(projectDir: string): Promise<Record<string, string>> {
-  const p = join(projectDir, BASELINE_FILE);
+  const p = join(vaultPath(projectDir), BASELINE_FILE);
   if (!existsSync(p)) return {};
   const raw = await readFile(p, "utf8");
   try {
@@ -61,7 +62,7 @@ export async function writeSyncBaseline(
 ): Promise<void> {
   const hashes: Record<string, string> = {};
   for (const [k, v] of Object.entries(contents)) hashes[k] = sha256(v);
-  const p = join(projectDir, BASELINE_FILE);
+  const p = join(vaultPath(projectDir), BASELINE_FILE);
   await mkdir(dirname(p), { recursive: true });
   await writeFile(p, JSON.stringify({ hashes }, null, 2), "utf8");
 }
@@ -73,14 +74,14 @@ async function updateBaselineEntry(
 ): Promise<void> {
   const baseline = await readSyncBaseline(projectDir);
   baseline[rel] = sha256(content);
-  const p = join(projectDir, BASELINE_FILE);
+  const p = join(vaultPath(projectDir), BASELINE_FILE);
   await mkdir(dirname(p), { recursive: true });
   await writeFile(p, JSON.stringify({ hashes: baseline }, null, 2), "utf8");
 }
 
 export async function runSync(input: SyncInput): Promise<SyncResult> {
   const { globalDir, projectDir } = input;
-  const projectVault = join(projectDir, ".cairndex");
+  const projectVault = vaultPath(projectDir);
 
   // Collect candidate files from both sides under tracked subdirs.
   const candidates = new Set<string>();
@@ -132,7 +133,7 @@ export async function runSync(input: SyncInput): Promise<SyncResult> {
     }
 
     // both changed → conflict
-    const conflictPath = join(projectDir, CONFLICTS_DIR, rel);
+    const conflictPath = join(projectVault, CONFLICTS_DIR, rel);
     await mkdir(dirname(conflictPath), { recursive: true });
     const globalBlock = globalContent ?? "(missing)\n";
     const projectBlock = projectContent ?? "(missing)\n";

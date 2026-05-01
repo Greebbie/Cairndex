@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { applyCairndexBlock } from "./claudeMd.js";
 import { archiveIfNeeded } from "./archive.js";
 import type { Config } from "./config.js";
@@ -42,9 +42,13 @@ function inIndexesLayer(repoRoot: string, changedPath: string): boolean {
   return changedPath.startsWith(indexesRoot);
 }
 
-function isRefreshableNode(changedPath: string): boolean {
-  const norm = changedPath.replace(/\\/g, "/");
-  return REFRESHABLE_DIRS.some((d) => norm.includes(`/.cairndex/${d}`));
+function vaultRelative(repoRoot: string, changedPath: string): string {
+  return relative(vaultPath(repoRoot), changedPath).replace(/\\/g, "/");
+}
+
+function isRefreshableNode(repoRoot: string, changedPath: string): boolean {
+  const rel = vaultRelative(repoRoot, changedPath);
+  return REFRESHABLE_DIRS.some((d) => rel.startsWith(d));
 }
 
 async function refreshUpdatedField(filePath: string): Promise<boolean> {
@@ -92,7 +96,7 @@ export async function handleVaultChange(
 
   // If archived, the source path is gone — skip refresh and per-file validation, but still
   // run cross-file fixes (bidirectional) and try to refresh the index.
-  if (!result.archived && isRefreshableNode(changedPath)) {
+  if (!result.archived && isRefreshableNode(repoRoot, changedPath)) {
     try {
       result.timestampRefreshed = await refreshUpdatedField(changedPath);
     } catch {
@@ -118,12 +122,8 @@ export async function handleVaultChange(
 
   // 3. Refresh index.md "Recent changes" block when changelog/sessions move.
   try {
-    const norm = changedPath.replace(/\\/g, "/");
-    if (
-      norm.includes("/.cairndex/sessions/") ||
-      norm.includes("/.cairndex/changes/") ||
-      result.archived
-    ) {
+    const rel = vaultRelative(repoRoot, changedPath);
+    if (rel.startsWith("sessions/") || rel.startsWith("changes/") || result.archived) {
       const { regenerateRecentChanges } = await import("./indexUpdate.js");
       result.indexUpdated = await regenerateRecentChanges(repoRoot, cfg);
     }

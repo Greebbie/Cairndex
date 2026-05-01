@@ -1,5 +1,4 @@
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
 import {
   acceptProposal,
   type AcceptResult,
@@ -15,14 +14,12 @@ import {
   vaultExists,
   vaultPath,
 } from "@cairndex/core";
+import { resolveMemoryRoot } from "../utils/resolveMemoryRoot.js";
 
 interface BaseOptions {
   cwd: string;
   vaultRoot?: string;
-}
-
-function resolveVaultRoot(opts: BaseOptions): string {
-  return opts.vaultRoot ? resolve(opts.vaultRoot) : resolve(opts.cwd);
+  projectId?: string;
 }
 
 function loadCfg(root: string) {
@@ -51,7 +48,7 @@ export interface InboxProposeResult {
 }
 
 export async function runInboxPropose(opts: InboxProposeOptions): Promise<InboxProposeResult> {
-  const root = resolveVaultRoot(opts);
+  const root = resolveMemoryRoot(opts);
   if (!vaultExists(root)) {
     return {
       exitCode: 1,
@@ -99,7 +96,7 @@ export interface InboxListResult {
 }
 
 export async function runInboxList(opts: BaseOptions): Promise<InboxListResult> {
-  const root = resolveVaultRoot(opts);
+  const root = resolveMemoryRoot(opts);
   if (!vaultExists(root)) {
     return {
       exitCode: 1,
@@ -122,7 +119,7 @@ export interface InboxAcceptResult {
 }
 
 export async function runInboxAccept(opts: InboxAcceptOptions): Promise<InboxAcceptResult> {
-  const root = resolveVaultRoot(opts);
+  const root = resolveMemoryRoot(opts);
   if (!vaultExists(root)) {
     return {
       exitCode: 1,
@@ -149,7 +146,7 @@ export interface InboxRejectOptions extends BaseOptions {
 export async function runInboxReject(
   opts: InboxRejectOptions,
 ): Promise<{ exitCode: 0 | 1; message?: string }> {
-  const root = resolveVaultRoot(opts);
+  const root = resolveMemoryRoot(opts);
   if (!vaultExists(root)) {
     return {
       exitCode: 1,

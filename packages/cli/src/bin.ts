@@ -13,9 +13,15 @@ import {
 import { runInit } from "./commands/init.js";
 import { runMcp } from "./commands/mcp.js";
 import { runInsightPromote, runInsightPull } from "./commands/insight.js";
+import {
+  defaultProjectIdFromRepo,
+  runProjectImportRepoVault,
+  runProjectRegister,
+} from "./commands/project.js";
 import { runSweep } from "./commands/sweep.js";
 import { runSyncCmd } from "./commands/sync.js";
 import { runUi } from "./commands/ui.js";
+import { runVaultInit } from "./commands/vault.js";
 
 const program = new Command();
 
@@ -42,6 +48,67 @@ program
     });
   });
 
+const vault = program.command("vault").description("Manage a central Cairndex vault");
+
+vault
+  .command("init <path>")
+  .description("Create a central Cairndex vault")
+  .option("--title <title>", "Vault title")
+  .action(async (path, opts) => {
+    const r = await runVaultInit({ path, ...(opts.title ? { title: opts.title } : {}) });
+    if (r.message) console.error(r.message);
+    if (r.vaultRoot) console.log(`vault initialized: ${r.vaultRoot}`);
+    process.exit(r.exitCode);
+  });
+
+const project = program.command("project").description("Manage projects inside a central vault");
+
+project
+  .command("register")
+  .description("Register a repo as a project inside a central vault")
+  .requiredOption("--vault <path>", "Central vault root")
+  .option("--project <id>", "Project id inside the vault")
+  .option("--repo <path>", "Code repository path", process.cwd())
+  .option("--title <title>", "Project title")
+  .option("--alias <alias>", "Project alias for the UI")
+  .action(async (opts) => {
+    const repoRoot = opts.repo ? String(opts.repo) : process.cwd();
+    const r = await runProjectRegister({
+      vaultRoot: opts.vault,
+      projectId: opts.project ?? defaultProjectIdFromRepo(repoRoot),
+      repoRoot,
+      ...(opts.title ? { title: opts.title } : {}),
+      ...(opts.alias ? { alias: opts.alias } : {}),
+    });
+    if (r.message) console.error(r.message);
+    if (r.projectRoot) console.log(`project registered: ${r.projectRoot}`);
+    process.exit(r.exitCode);
+  });
+
+project
+  .command("import-repo-vault")
+  .description("Import a legacy repo-local .cairndex/ into a central vault project")
+  .requiredOption("--vault <path>", "Central vault root")
+  .option("--project <id>", "Project id inside the vault")
+  .option("--repo <path>", "Code repository path", process.cwd())
+  .option("--title <title>", "Project title")
+  .option("--alias <alias>", "Project alias for the UI")
+  .option("--overwrite", "Overwrite existing central project files", false)
+  .action(async (opts) => {
+    const repoRoot = opts.repo ? String(opts.repo) : process.cwd();
+    const r = await runProjectImportRepoVault({
+      vaultRoot: opts.vault,
+      projectId: opts.project ?? defaultProjectIdFromRepo(repoRoot),
+      repoRoot,
+      overwrite: opts.overwrite === true,
+      ...(opts.title ? { title: opts.title } : {}),
+      ...(opts.alias ? { alias: opts.alias } : {}),
+    });
+    if (r.message) console.error(r.message);
+    if (r.projectRoot) console.log(`project imported: ${r.projectRoot}`);
+    process.exit(r.exitCode);
+  });
+
 async function readStdinJson(): Promise<Record<string, unknown> | null> {
   // Skip if stdin is a TTY (interactive use, not a hook payload).
   if (process.stdin.isTTY) return null;
@@ -62,6 +129,8 @@ program
   .command("doctor")
   .description("Validate vault, show status, optionally auto-fix")
   .option("--cwd <path>", "Working directory", process.cwd())
+  .option("--vault <path>", "Central vault root")
+  .option("--project <id>", "Project id inside a central vault")
   .option("--fix", "Auto-fix safe issues", false)
   .option("--silent", "No output, exit code only", false)
   .option("--scope <mode>", "Validation scope: changed | all", "all")
@@ -77,6 +146,8 @@ program
     }
     const r = await runDoctor({
       cwd: opts.cwd,
+      ...(opts.vault ? { vaultRoot: opts.vault } : {}),
+      ...(opts.project ? { projectId: opts.project } : {}),
       silent: opts.silent,
       fix: opts.fix,
       scope: opts.scope,
@@ -88,20 +159,32 @@ program
   });
 program
   .command("sync")
-  .description("Sync rules and templates from global ~/.cairndex/shared into project")
+  .description("Sync shared rules and templates into a project")
   .option("--cwd <path>", "Working directory", process.cwd())
+  .option("--vault <path>", "Central vault root")
+  .option("--project <id>", "Project id inside a central vault")
   .option("--silent", "No output, exit code only", false)
   .action(async (opts) => {
-    const r = await runSyncCmd({ cwd: opts.cwd, silent: opts.silent });
+    const r = await runSyncCmd({
+      cwd: opts.cwd,
+      ...(opts.vault ? { vaultRoot: opts.vault } : {}),
+      ...(opts.project ? { projectId: opts.project } : {}),
+      silent: opts.silent,
+    });
     process.exit(r.exitCode);
   });
 program
   .command("ui")
   .description("Launch local web GUI + watcher")
+  .option("--vault <path>", "Central vault root")
   .option("--port <n>", "Port to bind", (v) => Number.parseInt(v, 10), 7777)
   .option("--no-open", "Do not auto-open the browser")
   .action(async (opts) => {
-    await runUi({ port: opts.port, openBrowser: opts.open !== false });
+    await runUi({
+      port: opts.port,
+      openBrowser: opts.open !== false,
+      ...(opts.vault ? { vaultRoot: opts.vault } : {}),
+    });
     // runUi never returns under normal operation (server keeps running)
   });
 
@@ -111,6 +194,7 @@ program
   .argument("[task]", "Task label — used for logging/caching only, does not affect selection")
   .option("--cwd <path>", "Working directory", process.cwd())
   .option("--vault <path>", "Vault root (overrides --cwd for vault discovery)")
+  .option("--project <id>", "Project id inside a central vault")
   .option("--budget <n>", "Token budget cap", (v) => Number.parseInt(v, 10))
   .option("--out <path>", "Override output path (absolute or vault-relative)")
   .option("--no-stdout", "Do not print pack body to stdout (file only)")
@@ -120,6 +204,7 @@ program
       emitStdout: opts.stdout !== false,
     };
     if (opts.vault) callOpts.vaultRoot = opts.vault;
+    if (opts.project) callOpts.projectId = opts.project;
     if (task !== undefined) callOpts.task = task;
     if (typeof opts.budget === "number" && !Number.isNaN(opts.budget)) callOpts.budget = opts.budget;
     if (opts.out) callOpts.out = opts.out;
@@ -135,10 +220,15 @@ emit
   .description("Regenerate the cairndex region inside CLAUDE.md from the current vault state")
   .option("--cwd <path>", "Working directory", process.cwd())
   .option("--vault <path>", "Vault root (overrides --cwd)")
+  .option("--project <id>", "Project id inside a central vault")
+  .option("--project <id>", "Project id inside a central vault")
+  .option("--repo <path>", "Repo path whose CLAUDE.md should be updated")
   .option("--out <path>", "Override CLAUDE.md path (absolute or vault-relative)")
   .action(async (opts) => {
     const callOpts: Parameters<typeof runEmitClaudeMd>[0] = { cwd: opts.cwd };
     if (opts.vault) callOpts.vaultRoot = opts.vault;
+    if (opts.project) callOpts.projectId = opts.project;
+    if (opts.repo) callOpts.repoRoot = opts.repo;
     if (opts.out) callOpts.claudeMdPath = opts.out;
     const r = await runEmitClaudeMd(callOpts);
     if (r.message) console.error(r.message);
@@ -161,6 +251,7 @@ program
   .action(async (opts) => {
     const callOpts: Parameters<typeof runConsolidate>[0] = { cwd: opts.cwd };
     if (opts.vault) callOpts.vaultRoot = opts.vault;
+    if (opts.project) callOpts.projectId = opts.project;
     if (typeof opts.lookback === "number" && !Number.isNaN(opts.lookback)) {
       callOpts.lookbackDays = opts.lookback;
     }
@@ -194,6 +285,7 @@ program
   )
   .option("--cwd <path>", "Working directory", process.cwd())
   .option("--vault <path>", "Vault root (overrides --cwd)")
+  .option("--project <id>", "Project id inside a central vault")
   .option("--age <days>", "Minimum age in days before a node is a candidate (default 180)", (v) =>
     Number.parseInt(v, 10),
   )
@@ -205,6 +297,7 @@ program
   .action(async (opts) => {
     const callOpts: Parameters<typeof runArchive>[0] = { cwd: opts.cwd };
     if (opts.vault) callOpts.vaultRoot = opts.vault;
+    if (opts.project) callOpts.projectId = opts.project;
     if (typeof opts.age === "number" && !Number.isNaN(opts.age)) {
       callOpts.ageDays = opts.age;
     }
@@ -243,6 +336,7 @@ program
   )
   .option("--cwd <path>", "Working directory", process.cwd())
   .option("--vault <path>", "Vault root (overrides --cwd)")
+  .option("--project <id>", "Project id inside a central vault")
   .option("--silent", "Suppress per-candidate output (still prints summary unless 0/0)", false)
   .option("--lookback <days>", "Consolidate lookback window (default 30)", (v) =>
     Number.parseInt(v, 10),
@@ -259,6 +353,7 @@ program
   .action(async (opts) => {
     const callOpts: Parameters<typeof runSweep>[0] = { cwd: opts.cwd };
     if (opts.vault) callOpts.vaultRoot = opts.vault;
+    if (opts.project) callOpts.projectId = opts.project;
     if (typeof opts.lookback === "number" && !Number.isNaN(opts.lookback)) {
       callOpts.lookbackDays = opts.lookback;
     }
@@ -322,9 +417,11 @@ program
   .description("Start an MCP (Model Context Protocol) server over stdio for the current vault")
   .option("--cwd <path>", "Working directory", process.cwd())
   .option("--vault <path>", "Vault root (overrides --cwd)")
+  .option("--project <id>", "Project id inside a central vault")
   .action(async (opts) => {
     const callOpts: Parameters<typeof runMcp>[0] = { cwd: opts.cwd };
     if (opts.vault) callOpts.vaultRoot = opts.vault;
+    if (opts.project) callOpts.projectId = opts.project;
     const r = await runMcp(callOpts);
     if (r.message) console.error(r.message);
     process.exit(r.exitCode);
@@ -339,9 +436,11 @@ inbox
   .description("Show pending and recently accepted/rejected proposals")
   .option("--cwd <path>", "Working directory", process.cwd())
   .option("--vault <path>", "Vault root (overrides --cwd)")
+  .option("--project <id>", "Project id inside a central vault")
   .action(async (opts) => {
     const callOpts: Parameters<typeof runInboxList>[0] = { cwd: opts.cwd };
     if (opts.vault) callOpts.vaultRoot = opts.vault;
+    if (opts.project) callOpts.projectId = opts.project;
     const r = await runInboxList(callOpts);
     if (r.message) console.error(r.message);
     if (r.list) {
@@ -372,9 +471,11 @@ inbox
   .description("Apply a pending proposal to the durable folder")
   .option("--cwd <path>", "Working directory", process.cwd())
   .option("--vault <path>", "Vault root (overrides --cwd)")
+  .option("--project <id>", "Project id inside a central vault")
   .action(async (proposalId, opts) => {
     const callOpts: Parameters<typeof runInboxAccept>[0] = { cwd: opts.cwd, proposalId };
     if (opts.vault) callOpts.vaultRoot = opts.vault;
+    if (opts.project) callOpts.projectId = opts.project;
     const r = await runInboxAccept(callOpts);
     if (r.message) console.error(r.message);
     if (r.applied) {
@@ -390,6 +491,7 @@ inbox
   .description("Reject a pending proposal")
   .option("--cwd <path>", "Working directory", process.cwd())
   .option("--vault <path>", "Vault root (overrides --cwd)")
+  .option("--project <id>", "Project id inside a central vault")
   .option("--reason <text>", "Why this proposal was rejected", "no reason given")
   .action(async (proposalId, opts) => {
     const callOpts: Parameters<typeof runInboxReject>[0] = {
@@ -398,6 +500,7 @@ inbox
       reason: opts.reason,
     };
     if (opts.vault) callOpts.vaultRoot = opts.vault;
+    if (opts.project) callOpts.projectId = opts.project;
     const r = await runInboxReject(callOpts);
     if (r.message) console.error(r.message);
     process.exit(r.exitCode);
@@ -426,6 +529,7 @@ inbox
   .option("--session <id>", "session id provenance", "manual")
   .option("--cwd <path>", "Working directory", process.cwd())
   .option("--vault <path>", "Vault root (overrides --cwd)")
+  .option("--project <id>", "Project id inside a central vault")
   .action(async (opts) => {
     let body: string;
     if (opts.bodyFile) {
@@ -449,6 +553,7 @@ inbox
       session: opts.session,
     };
     if (opts.vault) callOpts.vaultRoot = opts.vault;
+    if (opts.project) callOpts.projectId = opts.project;
     if (opts.target) callOpts.target = opts.target;
     const r = await runInboxPropose(callOpts);
     if (r.message) console.error(r.message);
@@ -465,8 +570,13 @@ insight
   .command("promote <id>")
   .description("Promote a project insight to ~/.cairndex/shared/insights/")
   .option("--cwd <path>", "Working directory", process.cwd())
+  .option("--vault <path>", "Central vault root")
+  .option("--project <id>", "Project id inside a central vault")
   .action(async (id, opts) => {
-    const r = await runInsightPromote({ cwd: opts.cwd, id });
+    const callOpts: Parameters<typeof runInsightPromote>[0] = { cwd: opts.cwd, id };
+    if (opts.vault) callOpts.vaultRoot = opts.vault;
+    if (opts.project) callOpts.projectId = opts.project;
+    const r = await runInsightPromote(callOpts);
     if (r.message) console.error(r.message);
     process.exit(r.exitCode);
   });
@@ -475,8 +585,13 @@ insight
   .command("pull <id>")
   .description("Pull a global insight into the current project")
   .option("--cwd <path>", "Working directory", process.cwd())
+  .option("--vault <path>", "Central vault root")
+  .option("--project <id>", "Project id inside a central vault")
   .action(async (id, opts) => {
-    const r = await runInsightPull({ cwd: opts.cwd, id });
+    const callOpts: Parameters<typeof runInsightPull>[0] = { cwd: opts.cwd, id };
+    if (opts.vault) callOpts.vaultRoot = opts.vault;
+    if (opts.project) callOpts.projectId = opts.project;
+    const r = await runInsightPull(callOpts);
     if (r.message) console.error(r.message);
     process.exit(r.exitCode);
   });

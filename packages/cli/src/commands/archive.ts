@@ -1,5 +1,4 @@
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
 import {
   type ArchiveProposerResult,
   defaultConfig,
@@ -8,10 +7,12 @@ import {
   vaultExists,
   vaultPath,
 } from "@cairndex/core";
+import { resolveMemoryRoot } from "../utils/resolveMemoryRoot.js";
 
 export interface ArchiveCommandOptions {
   cwd: string;
   vaultRoot?: string;
+  projectId?: string;
   ageDays?: number;
   confidenceThreshold?: number;
 }
@@ -22,14 +23,10 @@ export interface ArchiveCommandResult {
   message?: string;
 }
 
-function resolveVaultRoot(opts: ArchiveCommandOptions): string {
-  return opts.vaultRoot ? resolve(opts.vaultRoot) : resolve(opts.cwd);
-}
-
 export async function runArchive(
   opts: ArchiveCommandOptions,
 ): Promise<ArchiveCommandResult> {
-  const root = resolveVaultRoot(opts);
+  const root = resolveMemoryRoot(opts);
   if (!vaultExists(root)) {
     return {
       exitCode: 1,

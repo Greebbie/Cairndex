@@ -15,9 +15,12 @@ import {
 import kleur from "kleur";
 import { logger, silent as makeSilent } from "../utils/logger.js";
 import { readMtimeStore, writeMtimeStore } from "../utils/mtimeStore.js";
+import { resolveMemoryRoot } from "../utils/resolveMemoryRoot.js";
 
 export interface DoctorOptions {
   cwd: string;
+  vaultRoot?: string;
+  projectId?: string;
   silent?: boolean;
   fix?: boolean;
   scope?: "changed" | "all";
@@ -72,7 +75,7 @@ async function collectMtimeTouched(cwd: string): Promise<string[]> {
 
 export async function runDoctor(opts: DoctorOptions): Promise<DoctorResult> {
   if (opts.silent) makeSilent();
-  const cwd = opts.cwd;
+  const cwd = resolveMemoryRoot(opts);
 
   const cfg = existsSync(join(vaultPath(cwd), "config.yaml"))
     ? loadProjectConfig(cwd)

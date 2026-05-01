@@ -4,6 +4,7 @@ export * from "./schema.js";
 export * from "./frontmatter.js";
 export * from "./ids.js";
 export * from "./paths.js";
+export * from "./projectRef.js";
 export * from "./config.js";
 export * from "./vault.js";
 export * from "./templates.js";

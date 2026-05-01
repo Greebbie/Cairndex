@@ -1,5 +1,4 @@
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
 import {
   consolidateRecentSessions,
   type ConsolidateResult,
@@ -8,10 +7,12 @@ import {
   vaultExists,
   vaultPath,
 } from "@cairndex/core";
+import { resolveMemoryRoot } from "../utils/resolveMemoryRoot.js";
 
 export interface ConsolidateOptions {
   cwd: string;
   vaultRoot?: string;
+  projectId?: string;
   lookbackDays?: number;
   minMentions?: number;
 }
@@ -22,14 +23,10 @@ export interface ConsolidateCommandResult {
   message?: string;
 }
 
-function resolveVaultRoot(opts: ConsolidateOptions): string {
-  return opts.vaultRoot ? resolve(opts.vaultRoot) : resolve(opts.cwd);
-}
-
 export async function runConsolidate(
   opts: ConsolidateOptions,
 ): Promise<ConsolidateCommandResult> {
-  const root = resolveVaultRoot(opts);
+  const root = resolveMemoryRoot(opts);
   if (!vaultExists(root)) {
     return {
       exitCode: 1,

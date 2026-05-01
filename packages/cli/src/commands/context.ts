@@ -11,12 +11,15 @@ import {
   vaultExists,
   vaultPath,
 } from "@cairndex/core";
+import { resolveMemoryRoot } from "../utils/resolveMemoryRoot.js";
 
 export interface ContextOptions {
   /** Working directory (used as default vaultRoot). */
   cwd: string;
   /** Explicit vault path; overrides cwd when set. */
   vaultRoot?: string;
+  /** Project id inside a central vault. */
+  projectId?: string;
   /** Task label (pure label — does not affect selection). */
   task?: string;
   /** Token budget override. */
@@ -36,12 +39,8 @@ export interface ContextResult {
   message?: string;
 }
 
-function resolveVaultRoot(opts: ContextOptions): string {
-  return opts.vaultRoot ? resolve(opts.vaultRoot) : resolve(opts.cwd);
-}
-
 export async function runContext(opts: ContextOptions): Promise<ContextResult> {
-  const root = resolveVaultRoot(opts);
+  const root = resolveMemoryRoot(opts);
 
   if (!vaultExists(root)) {
     return {

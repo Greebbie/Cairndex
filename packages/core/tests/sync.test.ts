@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { centralVaultManifestPath, projectManifestPath } from "../src/paths.js";
 import { readSyncBaseline, runSync, writeSyncBaseline } from "../src/sync.js";
 
 let tmp: string;
@@ -89,5 +90,21 @@ describe("sync", () => {
     await writeSyncBaseline(projectDir, {});
     const r = await runSync({ globalDir, projectDir });
     expect(r.fastForwarded.sort()).toEqual(["rules/r.md", "templates/t.md"]);
+  });
+
+  it("syncs shared files into a central project root", async () => {
+    const vault = join(tmp, "Vault");
+    const projectRoot = join(vault, "projects", "app");
+    mkdirSync(projectRoot, { recursive: true });
+    writeFileSync(centralVaultManifestPath(vault), "schemaVersion: 1\n", "utf8");
+    writeFileSync(projectManifestPath(projectRoot), "id: app\n", "utf8");
+    writeFileSync(join(globalDir, "rules/shared.md"), "central\n");
+    await writeSyncBaseline(projectRoot, {});
+
+    const r = await runSync({ globalDir, projectDir: projectRoot });
+
+    expect(r.fastForwarded).toEqual(["rules/shared.md"]);
+    expect(readFileSync(join(projectRoot, "rules/shared.md"), "utf8")).toBe("central\n");
+    expect((await readSyncBaseline(projectRoot))["rules/shared.md"]).toBeTruthy();
   });
 });

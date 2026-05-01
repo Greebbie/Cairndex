@@ -2,16 +2,21 @@ import { existsSync } from "node:fs";
 import { appendFile, copyFile, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import {
+  centralSharedPath,
   defaultConfig,
   parseFrontmatter,
+  resolveProjectRef,
   serializeFrontmatter,
   sharedDir,
   vaultPath,
 } from "@cairndex/core";
+import { resolveMemoryRoot } from "../utils/resolveMemoryRoot.js";
 
 export interface InsightCmdInput {
   cwd: string;
   id: string;
+  vaultRoot?: string;
+  projectId?: string;
 }
 export interface InsightCmdResult {
   exitCode: 0 | 1;
@@ -33,11 +38,16 @@ function todayUtc(): string {
 }
 
 export async function runInsightPromote(input: InsightCmdInput): Promise<InsightCmdResult> {
-  const projectInsightsDir = join(vaultPath(input.cwd), defaultConfig().folders.insights);
+  const root = resolveMemoryRoot(input);
+  const ref = input.vaultRoot && input.projectId
+    ? resolveProjectRef({ cwd: input.cwd, vaultRoot: input.vaultRoot, projectId: input.projectId })
+    : resolveProjectRef({ cwd: input.cwd });
+  const sharedRoot = ref && ref.projectId !== "legacy" ? centralSharedPath(ref.vaultRoot) : sharedDir();
+  const projectInsightsDir = join(vaultPath(root), defaultConfig().folders.insights);
   const src = await findInsightFile(projectInsightsDir, input.id);
   if (!src) return { exitCode: 1, message: `insight ${input.id} not found in project` };
 
-  const globalInsightsDir = join(sharedDir(), "insights");
+  const globalInsightsDir = join(sharedRoot, "insights");
   await mkdir(globalInsightsDir, { recursive: true });
   await copyFile(src, join(globalInsightsDir, basename(src)));
 
@@ -48,8 +58,8 @@ export async function runInsightPromote(input: InsightCmdInput): Promise<Insight
   await writeFile(src, serializeFrontmatter(next, content), "utf8");
 
   // Append change event
-  const changelog = join(vaultPath(input.cwd), "changes/changelog.md");
-  await mkdir(join(vaultPath(input.cwd), "changes"), { recursive: true });
+  const changelog = join(vaultPath(root), "changes/changelog.md");
+  await mkdir(join(vaultPath(root), "changes"), { recursive: true });
   await appendFile(
     changelog,
     `- ${todayUtc()} — Promoted ${input.id} to global insights.\n`,
@@ -60,16 +70,21 @@ export async function runInsightPromote(input: InsightCmdInput): Promise<Insight
 }
 
 export async function runInsightPull(input: InsightCmdInput): Promise<InsightCmdResult> {
-  const globalInsightsDir = join(sharedDir(), "insights");
+  const root = resolveMemoryRoot(input);
+  const ref = input.vaultRoot && input.projectId
+    ? resolveProjectRef({ cwd: input.cwd, vaultRoot: input.vaultRoot, projectId: input.projectId })
+    : resolveProjectRef({ cwd: input.cwd });
+  const sharedRoot = ref && ref.projectId !== "legacy" ? centralSharedPath(ref.vaultRoot) : sharedDir();
+  const globalInsightsDir = join(sharedRoot, "insights");
   const src = await findInsightFile(globalInsightsDir, input.id);
   if (!src) return { exitCode: 1, message: `insight ${input.id} not found in global` };
 
-  const projectInsightsDir = join(vaultPath(input.cwd), defaultConfig().folders.insights);
+  const projectInsightsDir = join(vaultPath(root), defaultConfig().folders.insights);
   await mkdir(projectInsightsDir, { recursive: true });
   await copyFile(src, join(projectInsightsDir, basename(src)));
 
-  const changelog = join(vaultPath(input.cwd), "changes/changelog.md");
-  await mkdir(join(vaultPath(input.cwd), "changes"), { recursive: true });
+  const changelog = join(vaultPath(root), "changes/changelog.md");
+  await mkdir(join(vaultPath(root), "changes"), { recursive: true });
   await appendFile(
     changelog,
     `- ${todayUtc()} — Pulled ${input.id} from global insights.\n`,

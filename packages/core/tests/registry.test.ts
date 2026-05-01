@@ -1,10 +1,14 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { centralProjectsPath } from "../src/paths.js";
 import {
+  centralVaultExists,
   globalDir,
+  listVaultProjects,
   listProjects,
+  resolveVaultProject,
   registerProject,
   touchProject,
   unregisterProject,
@@ -65,5 +69,35 @@ describe("registry", () => {
 
   it("respects CAIRNDEX_HOME env var", () => {
     expect(globalDir()).toBe(home);
+  });
+
+  it("lists projects from a central vault manifest directory", async () => {
+    const vault = join(home, "Vault");
+    const projectRoot = join(centralProjectsPath(vault), "app");
+    mkdirSync(projectRoot, { recursive: true });
+    writeFileSync(join(vault, "vault.yaml"), "schemaVersion: 1\n", "utf8");
+    writeFileSync(
+      join(projectRoot, "project.yaml"),
+      "id: app\ntitle: App\nrepo_paths:\n  - C:/repo/app\naliases:\n  - app-main\nstatus: active\ncreated: 2026-05-02\n",
+      "utf8",
+    );
+
+    expect(centralVaultExists(vault)).toBe(true);
+    expect(await listVaultProjects(vault)).toEqual([
+      {
+        path: projectRoot,
+        alias: "app-main",
+        registered_at: "2026-05-02",
+        vaultRoot: vault,
+        projectId: "app",
+        projectRoot,
+        repoRoot: "C:/repo/app",
+        title: "App",
+        status: "active",
+        aliases: ["app-main"],
+      },
+    ]);
+    expect((await resolveVaultProject(vault, "app"))?.path).toBe(projectRoot);
+    expect((await resolveVaultProject(vault, "app-main"))?.path).toBe(projectRoot);
   });
 });

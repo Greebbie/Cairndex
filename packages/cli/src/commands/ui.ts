@@ -1,7 +1,15 @@
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createWatcher, defaultConfig, handleVaultChange, listProjects } from "@cairndex/core";
+import {
+  createWatcher,
+  defaultConfig,
+  handleVaultChange,
+  listProjects,
+  listVaultProjects,
+  loadProjectConfig,
+  vaultPath,
+} from "@cairndex/core";
 import { createServer } from "@cairndex/server";
 import open from "open";
 import { logger } from "../utils/logger.js";
@@ -9,6 +17,7 @@ import { logger } from "../utils/logger.js";
 export interface UiOptions {
   port?: number;
   openBrowser?: boolean;
+  vaultRoot?: string;
 }
 
 function findWebDist(): string | undefined {
@@ -30,7 +39,7 @@ function findWebDist(): string | undefined {
 
 export async function runUi(opts: UiOptions): Promise<void> {
   const port = opts.port ?? 7777;
-  const projects = await listProjects();
+  const projects = opts.vaultRoot ? await listVaultProjects(opts.vaultRoot) : await listProjects();
 
   const webRoot = findWebDist();
   if (!webRoot) {
@@ -46,7 +55,9 @@ export async function runUi(opts: UiOptions): Promise<void> {
   // Per-project watchers: run vault auto-maintenance, then broadcast SSE.
   const watcherStops: Array<() => Promise<void>> = [];
   for (const p of projects) {
-    const cfg = defaultConfig();
+    const cfg = existsSync(join(vaultPath(p.path), "config.yaml"))
+      ? loadProjectConfig(p.path)
+      : defaultConfig();
     const onSave = async (path: string): Promise<void> => {
       try {
         const r = await handleVaultChange(p.path, cfg, path);

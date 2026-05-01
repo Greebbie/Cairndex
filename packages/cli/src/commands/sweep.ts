@@ -1,5 +1,4 @@
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
 import {
   type ArchiveProposerResult,
   type ConsolidateResult,
@@ -10,10 +9,12 @@ import {
   vaultExists,
   vaultPath,
 } from "@cairndex/core";
+import { resolveMemoryRoot } from "../utils/resolveMemoryRoot.js";
 
 export interface SweepOptions {
   cwd: string;
   vaultRoot?: string;
+  projectId?: string;
   /** Lookback for consolidate (days). */
   lookbackDays?: number;
   /** Min mentions for consolidate. */
@@ -33,12 +34,8 @@ export interface SweepResult {
   archive?: ArchiveProposerResult;
 }
 
-function resolveVaultRoot(opts: SweepOptions): string {
-  return opts.vaultRoot ? resolve(opts.vaultRoot) : resolve(opts.cwd);
-}
-
 export async function runSweep(opts: SweepOptions): Promise<SweepResult> {
-  const root = resolveVaultRoot(opts);
+  const root = resolveMemoryRoot(opts);
   if (!vaultExists(root)) {
     return {
       exitCode: 1,

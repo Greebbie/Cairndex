@@ -1,5 +1,4 @@
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
 import {
   callMcpTool,
   createWatcher,
@@ -19,19 +18,17 @@ import {
   ListToolsRequestSchema,
   ReadResourceRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import { resolveMemoryRoot } from "../utils/resolveMemoryRoot.js";
 
 export interface McpOptions {
   cwd: string;
   vaultRoot?: string;
+  projectId?: string;
 }
 
 export interface McpResult {
   exitCode: 0 | 1;
   message?: string;
-}
-
-function resolveVaultRoot(opts: McpOptions): string {
-  return opts.vaultRoot ? resolve(opts.vaultRoot) : resolve(opts.cwd);
 }
 
 /** Build (but don't connect) the MCP server. Exposed so tests can drive it directly. */
@@ -80,7 +77,7 @@ export function buildMcpServer(repoRoot: string): Server {
 }
 
 export async function runMcp(opts: McpOptions): Promise<McpResult> {
-  const root = resolveVaultRoot(opts);
+  const root = resolveMemoryRoot(opts);
   if (!vaultExists(root)) {
     return {
       exitCode: 1,
