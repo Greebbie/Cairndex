@@ -1,13 +1,14 @@
 import { existsSync } from "node:fs";
-import { mkdir, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { Config } from "../config.js";
-import { serializeFrontmatter } from "../frontmatter.js";
+import { type Config, folderForNodeType } from "../config.js";
+import { parseFrontmatter, serializeFrontmatter } from "../frontmatter.js";
 import { formatSequentialId, parseId } from "../ids.js";
-import { inboxProposalsPath } from "../paths.js";
+import { inboxProposalsPath, nodeFolderPath } from "../paths.js";
+import { applyPatch } from "./applyPatch.js";
 import { computeProposalHash } from "./hash.js";
 import { listProposals } from "./read.js";
-import type { CreateProposalInput, FindDuplicateInput, ProposalFile } from "./types.js";
+import type { CreateProposalInput, FindDuplicateInput, Patch, ProposalFile } from "./types.js";
 
 const PROPOSAL_PREFIX = "PROP";
 
@@ -34,6 +35,15 @@ async function nextProposalId(dir: string): Promise<string> {
   return formatSequentialId(PROPOSAL_PREFIX, max + 1);
 }
 
+async function findTargetFile(folder: string, id: string): Promise<string | null> {
+  if (!existsSync(folder)) return null;
+  const entries = await readdir(folder);
+  const direct = `${id}.md`;
+  if (entries.includes(direct)) return join(folder, direct);
+  const match = entries.find((e) => e.startsWith(`${id}-`) && e.endsWith(".md"));
+  return match ? join(folder, match) : null;
+}
+
 export interface CreateProposalResult {
   proposalId: string;
   path: string;
@@ -42,7 +52,7 @@ export interface CreateProposalResult {
 
 export async function createProposal(
   repoRoot: string,
-  _cfg: Config,
+  cfg: Config,
   input: CreateProposalInput,
 ): Promise<CreateProposalResult> {
   if (input.proposalType === "update" && !input.target) {
@@ -52,6 +62,34 @@ export async function createProposal(
     throw new Error("createProposal: 'create' proposals require newFrontmatter");
   }
 
+  const hasBody = typeof input.newBody === "string";
+  const hasPatch = Array.isArray(input.patch) && input.patch.length > 0;
+  if (!hasBody && !hasPatch) {
+    throw new Error("createProposal: exactly one of newBody or patch must be provided");
+  }
+  if (hasBody && hasPatch) {
+    throw new Error("createProposal: exactly one of newBody or patch must be provided (got both)");
+  }
+  if (hasPatch && input.proposalType !== "update") {
+    throw new Error("createProposal: patch is only valid on update proposals");
+  }
+
+  let resolvedNewBody: string;
+  let patchToPersist: Patch | undefined;
+  if (hasPatch) {
+    const folder = nodeFolderPath(repoRoot, folderForNodeType(cfg, input.targetType));
+    const targetPath = await findTargetFile(folder, input.target as string);
+    if (!targetPath) {
+      throw new Error(`createProposal: target ${input.target} not found in ${folder}`);
+    }
+    const raw = await readFile(targetPath, "utf8");
+    const { content } = parseFrontmatter<Record<string, unknown>>(raw);
+    resolvedNewBody = applyPatch(content, input.patch as Patch);
+    patchToPersist = input.patch as Patch;
+  } else {
+    resolvedNewBody = input.newBody as string;
+  }
+
   const dir = inboxProposalsPath(repoRoot);
   await mkdir(dir, { recursive: true });
 
@@ -59,7 +97,7 @@ export async function createProposal(
   const hashInput: FindDuplicateInput = {
     proposalType: input.proposalType,
     targetType: input.targetType,
-    newBody: input.newBody,
+    newBody: resolvedNewBody,
   };
   if (input.target !== undefined) hashInput.target = input.target;
   const contentHash = computeProposalHash(hashInput);
@@ -84,9 +122,10 @@ export async function createProposal(
   };
   if (input.target !== undefined) fm.target = input.target;
   if (input.newFrontmatter !== undefined) fm.newFrontmatter = input.newFrontmatter;
+  if (patchToPersist !== undefined) fm.patch = patchToPersist;
 
   const filePath = join(dir, `${proposalId}.md`);
-  await writeFile(filePath, serializeFrontmatter(fm, input.newBody), "utf8");
+  await writeFile(filePath, serializeFrontmatter(fm, resolvedNewBody), "utf8");
   return { proposalId, path: filePath, contentHash };
 }
 

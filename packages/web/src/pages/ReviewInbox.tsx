@@ -1,20 +1,39 @@
-import { useAcceptProposal, useInbox, useRejectProposal } from "@/lib/api";
+import { ProposalDiff } from "@/components/inbox/ProposalDiff";
+import { ProposalPatchView } from "@/components/inbox/ProposalPatchView";
+import { useAcceptProposal, useInbox, useNode, useRejectProposal } from "@/lib/api";
+import { nodeLink } from "@/lib/nodeLink";
 import type { Proposal } from "@/lib/types";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
-const TYPE_TO_FOLDER: Record<string, string> = {
-  goal: "goals",
-  intent: "intents",
-  spec: "specs",
-  decision: "decisions",
-  plan: "plans",
-  task: "tasks",
-  session: "sessions",
-  change: "changes",
-  insight: "insights",
-  question: "questions",
-};
+function ProposalBodyView({ alias, p }: { alias: string; p: Proposal }) {
+  // create proposals: no current body to diff against — show the new body raw.
+  if (p.proposalType === "create") {
+    return (
+      <pre className="bg-muted/40 rounded p-2 whitespace-pre-wrap break-words">{p.newBody}</pre>
+    );
+  }
+  // update + structured patch: render each op as a labeled block.
+  if (p.patch && p.patch.length > 0) {
+    return <ProposalPatchView patch={p.patch} />;
+  }
+  // update + legacy newBody: fetch current target and render a line diff.
+  return <UpdateBodyDiff alias={alias} p={p} />;
+}
+
+function UpdateBodyDiff({ alias, p }: { alias: string; p: Proposal }) {
+  const node = useNode(alias, p.targetType, p.target);
+  if (node.isLoading) {
+    return <div className="text-muted-foreground p-2">Loading current body…</div>;
+  }
+  if (node.isError || !node.data) {
+    // Fall back to raw newBody when the target can't be loaded (e.g., target deleted).
+    return (
+      <pre className="bg-muted/40 rounded p-2 whitespace-pre-wrap break-words">{p.newBody}</pre>
+    );
+  }
+  return <ProposalDiff currentBody={node.data.body} newBody={p.newBody} />;
+}
 
 function ProposalCard({
   alias,
@@ -32,14 +51,17 @@ function ProposalCard({
   const [rejectMode, setRejectMode] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
 
-  const folder = TYPE_TO_FOLDER[p.targetType];
-  const targetLink = p.target && folder ? (
-    <Link to={`/p/${alias}/browse/${folder}/${p.target}`} className="font-mono text-primary hover:underline">
-      {p.target}
-    </Link>
-  ) : (
-    <span className="font-mono text-muted-foreground">(new)</span>
-  );
+  const targetLink =
+    p.target && p.targetType ? (
+      <Link
+        to={nodeLink(alias, p.targetType, p.target)}
+        className="font-mono text-primary hover:underline"
+      >
+        {p.target}
+      </Link>
+    ) : (
+      <span className="font-mono text-muted-foreground">(new)</span>
+    );
 
   return (
     <article className="rounded border bg-card text-card-foreground p-4 space-y-2">
@@ -57,8 +79,7 @@ function ProposalCard({
       <div className="text-sm font-medium">{p.summary}</div>
       {p.reason ? <div className="text-xs text-muted-foreground">Reason: {p.reason}</div> : null}
       <div className="text-xs text-muted-foreground">
-        Proposed by{" "}
-        <span className="font-mono">{p.provenance.createdBy}</span> · session{" "}
+        Proposed by <span className="font-mono">{p.provenance.createdBy}</span> · session{" "}
         <span className="font-mono">{p.provenance.session}</span>
       </div>
 
@@ -77,9 +98,9 @@ function ProposalCard({
         ) : null}
       </div>
       {showBody ? (
-        <pre className="text-xs bg-muted/40 rounded p-2 overflow-auto max-h-64 whitespace-pre-wrap">
-          {p.newBody}
-        </pre>
+        <div className="text-xs overflow-auto max-h-64">
+          <ProposalBodyView alias={alias} p={p} />
+        </div>
       ) : null}
 
       {p.status === "pending" ? (
@@ -144,9 +165,7 @@ function ProposalCard({
           </div>
         )
       ) : p.rejectionReason ? (
-        <div className="text-xs text-red-700 dark:text-red-300">
-          Rejected: {p.rejectionReason}
-        </div>
+        <div className="text-xs text-red-700 dark:text-red-300">Rejected: {p.rejectionReason}</div>
       ) : null}
     </article>
   );
@@ -197,7 +216,13 @@ export default function ReviewInbox() {
               <div className="text-sm text-muted-foreground">No pending proposals. 🎉</div>
             ) : (
               inbox.data.pending.map((p) => (
-                <ProposalCard key={p.proposalId} alias={alias} p={p} onAccept={onAccept} onReject={onReject} />
+                <ProposalCard
+                  key={p.proposalId}
+                  alias={alias}
+                  p={p}
+                  onAccept={onAccept}
+                  onReject={onReject}
+                />
               ))
             )}
           </section>
@@ -208,7 +233,13 @@ export default function ReviewInbox() {
                 Recently accepted ({inbox.data.accepted.length})
               </h3>
               {inbox.data.accepted.slice(0, 5).map((p) => (
-                <ProposalCard key={p.proposalId} alias={alias} p={p} onAccept={onAccept} onReject={onReject} />
+                <ProposalCard
+                  key={p.proposalId}
+                  alias={alias}
+                  p={p}
+                  onAccept={onAccept}
+                  onReject={onReject}
+                />
               ))}
             </section>
           ) : null}
@@ -219,7 +250,13 @@ export default function ReviewInbox() {
                 Recently rejected ({inbox.data.rejected.length})
               </h3>
               {inbox.data.rejected.slice(0, 5).map((p) => (
-                <ProposalCard key={p.proposalId} alias={alias} p={p} onAccept={onAccept} onReject={onReject} />
+                <ProposalCard
+                  key={p.proposalId}
+                  alias={alias}
+                  p={p}
+                  onAccept={onAccept}
+                  onReject={onReject}
+                />
               ))}
             </section>
           ) : null}

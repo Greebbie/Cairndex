@@ -1,0 +1,9 @@
+# Per-machine project pointer.
+# Copy this file to `.cairndex-project.yaml` (which is gitignored) and replace
+# the vault path with your local CairndexVault location. The `project` value
+# must match the project alias inside the vault's `projects/<id>/` directory.
+#
+# vault may be absolute (Windows or POSIX) or relative to this repo root.
+
+vault: /absolute/path/to/CairndexVault
+project: cairndex

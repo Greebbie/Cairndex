@@ -125,16 +125,6 @@ export function useFix() {
   });
 }
 
-export function useSync() {
-  return useMutation({
-    mutationFn: async (alias: string) => {
-      const r = await fetch(`${API_BASE}/api/sync/${alias}`, { method: "POST" });
-      if (!r.ok) throw new Error(`${r.status}`);
-      return r.json();
-    },
-  });
-}
-
 export function useDashboard(alias: string | undefined) {
   return useQuery({
     queryKey: ["dashboard", alias],

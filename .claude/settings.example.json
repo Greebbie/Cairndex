@@ -1,0 +1,30 @@
+{
+  "_comment": "Per-machine. Copy to settings.json (gitignored) and replace VAULT_PATH with your CairndexVault root. Or run: cairndex init --no-claude-md (regenerates hooks with central-vault detection).",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node packages/cli/bin/cairndex doctor --silent --fix --scope changed --vault \"VAULT_PATH\" --project cairndex --filter-path projects/cairndex/ # cairndex-managed"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node packages/cli/bin/cairndex doctor --silent --auto-session --vault \"VAULT_PATH\" --project cairndex # cairndex-managed"
+          },
+          {
+            "type": "command",
+            "command": "node packages/cli/bin/cairndex sweep --silent --vault \"VAULT_PATH\" --project cairndex # cairndex-managed"
+          }
+        ]
+      }
+    ]
+  }
+}

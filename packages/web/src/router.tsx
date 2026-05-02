@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes, useParams } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import Browse from "./pages/Browse";
 import Dashboard from "./pages/Dashboard";
 import FileView from "./pages/FileView";
@@ -25,9 +25,4 @@ export function AppRoutes() {
       <Route path="/p/:alias/settings" element={<Settings />} />
     </Routes>
   );
-}
-
-export function useAlias(): string | undefined {
-  const { alias } = useParams<{ alias: string }>();
-  return alias;
 }

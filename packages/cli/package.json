@@ -6,11 +6,17 @@
   "bin": {
     "cairndex": "./bin/cairndex"
   },
-  "files": ["bin", "dist", "templates"],
+  "files": [
+    "bin",
+    "dist",
+    "templates"
+  ],
   "scripts": {
     "build": "tsup",
+    "build:sea-entry": "tsup --config tsup.sea.config.ts",
     "typecheck": "tsc --noEmit",
-    "prepublish": "node scripts/copy-web.mjs"
+    "prepublish": "node scripts/copy-web.mjs",
+    "package:sea": "pnpm run build:sea-entry && node scripts/build-sea.mjs"
   },
   "dependencies": {
     "@cairndex/core": "workspace:*",
@@ -21,13 +27,12 @@
     "kleur": "^4.1.5",
     "open": "^10.1.0",
     "pino": "^9.5.0",
-    "pino-pretty": "^11.3.0",
-    "prompts": "^2.4.2"
+    "pino-pretty": "^11.3.0"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.0.0",
-    "@types/prompts": "^2.4.9"
+    "postject": "1.0.0-alpha.6"
   },
   "engines": {
     "node": ">=20"

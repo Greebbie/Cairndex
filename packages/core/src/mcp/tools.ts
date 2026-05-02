@@ -8,6 +8,7 @@ import type { Config } from "../config.js";
 import { buildContextPack } from "../contextPack/build.js";
 import { renderContextPack } from "../contextPack/render.js";
 import { createProposal, findDuplicate } from "../inbox/create.js";
+import { inferNodeTypeFromId } from "../inbox/idPrefix.js";
 import { listProposals } from "../inbox/read.js";
 import type { NodeType } from "../types.js";
 import type { ListToolsResult, McpToolResult } from "./types.js";
@@ -30,12 +31,40 @@ const ContextPackArgs = z.object({
   budget: z.number().int().positive().optional(),
 });
 
-const ProposeMemoryUpdateArgs = z.object({
-  proposalType: z.enum(["create", "update"]),
-  targetType: z.enum(NODE_TYPE_VALUES),
-  target: z.string().optional(),
-  newFrontmatter: z.record(z.unknown()).optional(),
-  newBody: z.string(),
+const PatchOpSchema = z.object({
+  kind: z.enum(["append-section", "replace-section"]),
+  section: z.string().min(1),
+  content: z.string(),
+});
+
+const ProposeMemoryUpdateArgs = z
+  .object({
+    proposalType: z.enum(["create", "update"]),
+    targetType: z.enum(NODE_TYPE_VALUES),
+    target: z.string().optional(),
+    newFrontmatter: z.record(z.unknown()).optional(),
+    newBody: z.string().optional(),
+    patch: z.array(PatchOpSchema).min(1).optional(),
+    summary: z.string().min(1),
+    reason: z.string().default(""),
+    provenance: z.object({
+      createdBy: z.string(),
+      session: z.string(),
+      confidence: z.number().min(0).max(1).optional(),
+    }),
+  })
+  .refine((d) => (d.newBody !== undefined) !== (d.patch !== undefined), {
+    message: "exactly one of newBody or patch must be provided",
+  })
+  .refine((d) => d.patch === undefined || d.proposalType === "update", {
+    message: "patch is only valid on update proposals",
+  });
+
+const UpdateLivingDocArgs = z.object({
+  targetId: z.string().min(1),
+  section: z.string().min(1),
+  newContent: z.string(),
+  mode: z.enum(["replace", "append"]).default("replace"),
   summary: z.string().min(1),
   reason: z.string().default(""),
   provenance: z.object({
@@ -44,6 +73,13 @@ const ProposeMemoryUpdateArgs = z.object({
     confidence: z.number().min(0).max(1).optional(),
   }),
 });
+
+/** Normalize a section identifier — accept "## History" or "History"; emit "## History". */
+function normalizeSectionHeading(raw: string): string {
+  const trimmed = raw.trim();
+  if (/^#{1,6}\s+\S/.test(trimmed)) return trimmed;
+  return `## ${trimmed}`;
+}
 
 export function listMcpTools(projectId: string = LEGACY_PROJECT_ID): ListToolsResult {
   const inboxHint = inboxProposalsHint(projectId);
@@ -67,11 +103,10 @@ export function listMcpTools(projectId: string = LEGACY_PROJECT_ID): ListToolsRe
       },
       {
         name: "propose_memory_update",
-        description:
-          `Submit a durable-memory change for human review. Use this instead of writing to ${inboxHint.replace(/\/$/, "")}/* siblings (specs, decisions, plans, ...) directly. The user accepts/rejects via the inbox.`,
+        description: `Submit a durable-memory change for human review. Use this instead of writing to ${inboxHint.replace(/\/$/, "")}/* siblings (specs, decisions, plans, ...) directly. The user accepts/rejects via the inbox.`,
         inputSchema: {
           type: "object",
-          required: ["proposalType", "targetType", "newBody", "summary", "provenance"],
+          required: ["proposalType", "targetType", "summary", "provenance"],
           properties: {
             proposalType: { type: "string", enum: ["create", "update"] },
             targetType: { type: "string", enum: [...NODE_TYPE_VALUES] },
@@ -88,10 +123,73 @@ export function listMcpTools(projectId: string = LEGACY_PROJECT_ID): ListToolsRe
             newBody: {
               type: "string",
               description:
-                "Markdown body. Replaces the target's body for update; becomes the new node body for create.",
+                "Markdown body. Replaces the target's body for update; becomes the new node body for create. Mutually exclusive with `patch`.",
+            },
+            patch: {
+              type: "array",
+              description:
+                "Section-level edits to apply to an existing target. Only valid for proposalType=update. Mutually exclusive with `newBody`.",
+              items: {
+                type: "object",
+                required: ["kind", "section", "content"],
+                properties: {
+                  kind: { type: "string", enum: ["append-section", "replace-section"] },
+                  section: {
+                    type: "string",
+                    description:
+                      "Full markdown heading line including hashes, e.g. '## History'. Matched by exact trimmed line.",
+                  },
+                  content: {
+                    type: "string",
+                    description: "Markdown to insert or use as the section's new body.",
+                  },
+                },
+              },
+              minItems: 1,
             },
             summary: { type: "string", description: "One-line description" },
             reason: { type: "string", description: "Why this change is proposed" },
+            provenance: {
+              type: "object",
+              required: ["createdBy", "session"],
+              properties: {
+                createdBy: { type: "string" },
+                session: { type: "string" },
+                confidence: { type: "number", minimum: 0, maximum: 1 },
+              },
+            },
+          },
+        },
+      },
+      {
+        name: "update_living_doc",
+        description: `One-shot helper to propose a section-level edit to an existing living doc. Auto-infers targetType from the id prefix (SPEC-, ADR-, PLAN-, TASK-, INS-, CHG-, GOAL-, INT-, QUESTION-) and submits a patch-mode proposal to ${inboxHint.replace(/\/$/, "")}/. Use this when you want to change a single section without rewriting the whole body. For new nodes or full-body rewrites, use propose_memory_update.`,
+        inputSchema: {
+          type: "object",
+          required: ["targetId", "section", "newContent", "summary", "provenance"],
+          properties: {
+            targetId: {
+              type: "string",
+              description:
+                "The existing node id (e.g. SPEC-001). Type is inferred from the prefix.",
+            },
+            section: {
+              type: "string",
+              description:
+                "Heading of the section to edit. May include or omit leading hashes (`## History` or `History` — both work; missing hashes default to level 2).",
+            },
+            newContent: {
+              type: "string",
+              description:
+                "Markdown content. For mode=replace it becomes the section's new body. For mode=append it is inserted at the end of the section (or as a new section at end of body if missing).",
+            },
+            mode: {
+              type: "string",
+              enum: ["replace", "append"],
+              description: "How to apply newContent. Defaults to 'replace'.",
+            },
+            summary: { type: "string", description: "One-line description for the inbox UI." },
+            reason: { type: "string", description: "Why this change is proposed." },
             provenance: {
               type: "object",
               required: ["createdBy", "session"],
@@ -143,18 +241,21 @@ export async function callMcpTool(
       const parsed = ProposeMemoryUpdateArgs.safeParse(args ?? {});
       if (!parsed.success) return err(`bad args: ${parsed.error.message}`);
       const input = parsed.data;
-      const dupInput: Parameters<typeof findDuplicate>[2] = {
-        proposalType: input.proposalType,
-        targetType: input.targetType as NodeType,
-        newBody: input.newBody,
-      };
-      if (input.target !== undefined) dupInput.target = input.target;
-      const duplicateOf = await findDuplicate(repoRoot, cfg, dupInput);
+
+      let duplicateOf: string | null = null;
+      if (input.newBody !== undefined) {
+        const dupInput: Parameters<typeof findDuplicate>[2] = {
+          proposalType: input.proposalType,
+          targetType: input.targetType as NodeType,
+          newBody: input.newBody,
+        };
+        if (input.target !== undefined) dupInput.target = input.target;
+        duplicateOf = await findDuplicate(repoRoot, cfg, dupInput);
+      }
 
       const createInput: Parameters<typeof createProposal>[2] = {
         proposalType: input.proposalType,
         targetType: input.targetType as NodeType,
-        newBody: input.newBody,
         summary: input.summary,
         reason: input.reason,
         provenance: {
@@ -167,11 +268,57 @@ export async function callMcpTool(
       };
       if (input.target !== undefined) createInput.target = input.target;
       if (input.newFrontmatter !== undefined) createInput.newFrontmatter = input.newFrontmatter;
+      if (input.newBody !== undefined) createInput.newBody = input.newBody;
+      if (input.patch !== undefined) createInput.patch = input.patch;
+
       const created = await createProposal(repoRoot, cfg, createInput);
       const resp = {
         proposalId: created.proposalId,
         path: created.path,
         ...(duplicateOf ? { duplicateOf } : {}),
+      };
+      return ok(JSON.stringify(resp, null, 2));
+    }
+
+    if (name === "update_living_doc") {
+      const parsed = UpdateLivingDocArgs.safeParse(args ?? {});
+      if (!parsed.success) return err(`bad args: ${parsed.error.message}`);
+      const input = parsed.data;
+
+      const targetType = inferNodeTypeFromId(input.targetId);
+      if (!targetType) {
+        return err(
+          `cannot infer node type from id ${JSON.stringify(input.targetId)} — expected a sequential id like SPEC-001 or ADR-042`,
+        );
+      }
+
+      const kind = input.mode === "append" ? "append-section" : "replace-section";
+      const section = normalizeSectionHeading(input.section);
+
+      const createInput: Parameters<typeof createProposal>[2] = {
+        proposalType: "update",
+        targetType,
+        target: input.targetId,
+        patch: [{ kind, section, content: input.newContent }],
+        summary: input.summary,
+        reason: input.reason,
+        provenance: {
+          createdBy: input.provenance.createdBy,
+          session: input.provenance.session,
+          ...(input.provenance.confidence !== undefined
+            ? { confidence: input.provenance.confidence }
+            : {}),
+        },
+      };
+
+      const created = await createProposal(repoRoot, cfg, createInput);
+      const resp = {
+        proposalId: created.proposalId,
+        path: created.path,
+        targetType,
+        targetId: input.targetId,
+        section,
+        mode: input.mode,
       };
       return ok(JSON.stringify(resp, null, 2));
     }

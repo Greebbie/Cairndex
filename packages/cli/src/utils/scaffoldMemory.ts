@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { defaultConfig, writeSyncBaseline } from "@cairndex/core";
 import yaml from "js-yaml";
 
-export const MEMORY_FOLDERS = [
+const MEMORY_FOLDERS = [
   "goals",
   "intents",
   "specs",

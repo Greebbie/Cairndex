@@ -1,15 +1,17 @@
 import { existsSync } from "node:fs";
 import {
-  acceptProposal,
   type AcceptResult,
+  type NodeType,
+  type Patch,
+  type ProposalList,
+  type ProposalType,
+  acceptProposal,
   createProposal,
   defaultConfig,
   findDuplicate,
+  inferNodeTypeFromId,
   listProposals,
   loadProjectConfig,
-  type NodeType,
-  type ProposalList,
-  type ProposalType,
   rejectProposal,
   vaultExists,
   vaultPath,
@@ -38,6 +40,28 @@ export interface InboxProposeOptions extends BaseOptions {
   createdBy: string;
   session: string;
   confidence?: number;
+}
+
+export interface InboxProposeUpdateOptions extends BaseOptions {
+  /** Existing node id, e.g. SPEC-001. targetType is inferred from the prefix. */
+  targetId: string;
+  /** Section heading. Accepts "## History" or "History" (the latter defaults to level 2). */
+  section: string;
+  /** Markdown content for the patch op. */
+  newContent: string;
+  /** "replace" rewrites the section body; "append" inserts at end of section (or at end of body if missing). */
+  mode: "replace" | "append";
+  summary: string;
+  reason: string;
+  createdBy: string;
+  session: string;
+  confidence?: number;
+}
+
+function normalizeSectionHeading(raw: string): string {
+  const trimmed = raw.trim();
+  if (/^#{1,6}\s+\S/.test(trimmed)) return trimmed;
+  return `## ${trimmed}`;
 }
 
 export interface InboxProposeResult {
@@ -88,6 +112,76 @@ export async function runInboxPropose(opts: InboxProposeOptions): Promise<InboxP
   };
   if (duplicateOf) result.duplicateOf = duplicateOf;
   return result;
+}
+
+export interface InboxProposeUpdateResult {
+  exitCode: 0 | 1;
+  proposalId?: string;
+  path?: string;
+  targetType?: NodeType;
+  targetId?: string;
+  section?: string;
+  mode?: "replace" | "append";
+  message?: string;
+}
+
+/**
+ * High-level "patch one section" helper. Auto-infers targetType from the id prefix
+ * and submits a single-op patch proposal. Use runInboxPropose for full-body or
+ * create-mode proposals.
+ */
+export async function runInboxProposeUpdate(
+  opts: InboxProposeUpdateOptions,
+): Promise<InboxProposeUpdateResult> {
+  const root = resolveMemoryRoot(opts);
+  if (!vaultExists(root)) {
+    return { exitCode: 1, message: missingVaultMessage(root) };
+  }
+  const targetType = inferNodeTypeFromId(opts.targetId);
+  if (!targetType) {
+    return {
+      exitCode: 1,
+      message: `cannot infer node type from id "${opts.targetId}" — expected a sequential id like SPEC-001 or ADR-042`,
+    };
+  }
+  const cfg = loadCfg(root);
+  const section = normalizeSectionHeading(opts.section);
+  const patch: Patch = [
+    {
+      kind: opts.mode === "append" ? "append-section" : "replace-section",
+      section,
+      content: opts.newContent,
+    },
+  ];
+
+  const createInput: Parameters<typeof createProposal>[2] = {
+    proposalType: "update",
+    targetType,
+    target: opts.targetId,
+    patch,
+    summary: opts.summary,
+    reason: opts.reason,
+    provenance: {
+      createdBy: opts.createdBy,
+      session: opts.session,
+      ...(opts.confidence !== undefined ? { confidence: opts.confidence } : {}),
+    },
+  };
+
+  try {
+    const created = await createProposal(root, cfg, createInput);
+    return {
+      exitCode: 0,
+      proposalId: created.proposalId,
+      path: created.path,
+      targetType,
+      targetId: opts.targetId,
+      section,
+      mode: opts.mode,
+    };
+  } catch (e) {
+    return { exitCode: 1, message: e instanceof Error ? e.message : String(e) };
+  }
 }
 
 export interface InboxListResult {

@@ -34,59 +34,76 @@ function shellQuote(p: string): string {
   return `"${p.replace(/"/g, '\\"')}"`;
 }
 
-function doctorCommand(layout: HookLayoutMode): string {
+/**
+ * Resolve the binary invocation. When this repo IS the cairndex source repo,
+ * a global `cairndex` may not be on PATH inside Claude Code's hook subshell —
+ * so we fall back to `node packages/cli/bin/cairndex` (resolved relative to
+ * the repo root, which is hooks' cwd). Consumers who installed cairndex
+ * globally use the bare command.
+ */
+function resolveBinCommand(repoRoot: string): string {
+  const localBin = join(repoRoot, "packages", "cli", "bin", "cairndex");
+  if (existsSync(localBin)) return "node packages/cli/bin/cairndex";
+  return "cairndex";
+}
+
+function doctorCommand(layout: HookLayoutMode, bin: string): string {
   if (layout.mode === "central") {
     return (
-      `cairndex doctor --silent --fix --scope changed ` +
+      `${bin} doctor --silent --fix --scope changed ` +
       `--vault ${shellQuote(layout.vaultRoot)} ` +
       `--project ${layout.projectId} ` +
       `--filter-path projects/${layout.projectId}/ ` +
       `# ${CAIRNDEX_HOOK_TAG}`
     );
   }
-  return `cairndex doctor --silent --fix --scope changed --filter-path .cairndex/ # ${CAIRNDEX_HOOK_TAG}`;
+  return `${bin} doctor --silent --fix --scope changed --filter-path .cairndex/ # ${CAIRNDEX_HOOK_TAG}`;
 }
 
-function autoSessionCommand(layout: HookLayoutMode): string {
+function autoSessionCommand(layout: HookLayoutMode, bin: string): string {
   if (layout.mode === "central") {
     return (
-      `cairndex doctor --silent --auto-session ` +
+      `${bin} doctor --silent --auto-session ` +
       `--vault ${shellQuote(layout.vaultRoot)} ` +
       `--project ${layout.projectId} ` +
       `# ${CAIRNDEX_HOOK_TAG}`
     );
   }
-  return `cairndex doctor --silent --auto-session # ${CAIRNDEX_HOOK_TAG}`;
+  return `${bin} doctor --silent --auto-session # ${CAIRNDEX_HOOK_TAG}`;
 }
 
-function sweepCommand(layout: HookLayoutMode): string {
+function sweepCommand(layout: HookLayoutMode, bin: string): string {
   if (layout.mode === "central") {
     return (
-      `cairndex sweep --silent ` +
+      `${bin} sweep --silent ` +
       `--vault ${shellQuote(layout.vaultRoot)} ` +
       `--project ${layout.projectId} ` +
       `# ${CAIRNDEX_HOOK_TAG}`
     );
   }
-  return `cairndex sweep --silent # ${CAIRNDEX_HOOK_TAG}`;
+  return `${bin} sweep --silent # ${CAIRNDEX_HOOK_TAG}`;
 }
 
-export function renderClaudeSettings(layout: HookLayoutMode): {
+export function renderClaudeSettings(
+  layout: HookLayoutMode,
+  repoRoot: string,
+): {
   hooks: { PostToolUse: HookEntry[]; Stop: HookEntry[] };
 } {
+  const bin = resolveBinCommand(repoRoot);
   return {
     hooks: {
       PostToolUse: [
         {
           matcher: "Write|Edit",
-          hooks: [{ type: "command", command: doctorCommand(layout) }],
+          hooks: [{ type: "command", command: doctorCommand(layout, bin) }],
         },
       ],
       Stop: [
         {
           hooks: [
-            { type: "command", command: autoSessionCommand(layout) },
-            { type: "command", command: sweepCommand(layout) },
+            { type: "command", command: autoSessionCommand(layout, bin) },
+            { type: "command", command: sweepCommand(layout, bin) },
           ],
         },
       ],
@@ -135,7 +152,7 @@ export async function applyClaudeHooks(repoRoot: string): Promise<void> {
   }
   existing.hooks = existing.hooks ?? {};
   const layout = detectLayout(repoRoot);
-  const desired = renderClaudeSettings(layout).hooks;
+  const desired = renderClaudeSettings(layout, repoRoot).hooks;
   for (const evt of ["PostToolUse", "Stop"] as const) {
     const list = (existing.hooks[evt] ?? []) as HookEntry[];
     const filtered = list.filter((h) => !entryIsCairndexManaged(h));

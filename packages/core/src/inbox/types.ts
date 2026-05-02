@@ -3,6 +3,16 @@ import type { NodeType } from "../types.js";
 export type ProposalType = "create" | "update";
 export type ProposalStatus = "pending" | "accepted" | "rejected" | "duplicate";
 
+export type PatchOpKind = "append-section" | "replace-section";
+
+export interface PatchOp {
+  kind: PatchOpKind;
+  section: string;
+  content: string;
+}
+
+export type Patch = PatchOp[];
+
 export interface ProposalProvenance {
   createdBy: string;
   session: string;
@@ -16,11 +26,11 @@ export interface CreateProposalInput {
   target?: string;
   /** Required when proposalType === 'create' — must include at least `title` and `status`. */
   newFrontmatter?: Record<string, unknown>;
-  /** Replaces the target node's body (update) or becomes the new node body (create). */
-  newBody: string;
-  /** One-line summary shown in the inbox UI. */
+  /** Exactly one of newBody / patch must be supplied. */
+  newBody?: string;
+  /** Section-level edits. Only valid on update proposals; mutually exclusive with newBody. */
+  patch?: Patch;
   summary: string;
-  /** Why the proposal was made — agent reasoning. */
   reason: string;
   provenance: ProposalProvenance;
 }
@@ -50,6 +60,7 @@ export interface ProposalFile {
   provenance: ProposalProvenance;
   newBody: string;
   newFrontmatter?: Record<string, unknown>;
+  patch?: Patch;
 }
 
 export interface ProposalList {

@@ -6,6 +6,7 @@ import {
   runInboxAccept,
   runInboxList,
   runInboxPropose,
+  runInboxProposeUpdate,
   runInboxReject,
 } from "../src/commands/inbox.js";
 
@@ -124,5 +125,90 @@ describe("runInboxReject", () => {
     const raw = readFileSync(p.path, "utf8");
     expect(raw).toContain("status: rejected");
     expect(raw).toContain("not aligned");
+  });
+});
+
+describe("runInboxProposeUpdate", () => {
+  it("infers targetType from id prefix and writes a single-op patch proposal", async () => {
+    // Seed a target with a ## History section
+    writeFileSync(
+      join(tmp, ".cairndex/specs/SPEC-001.md"),
+      "---\nid: SPEC-001\ntitle: A\nstatus: active\ncreated: 2026-05-01\nupdated: 2026-05-01\n---\n## History\n- a\n",
+      "utf8",
+    );
+    const r = await runInboxProposeUpdate({
+      cwd: tmp,
+      targetId: "SPEC-001",
+      section: "## History",
+      newContent: "- b\n",
+      mode: "append",
+      summary: "log entry",
+      reason: "audit",
+      createdBy: "claude-code",
+      session: "2026-05-02-1500",
+    });
+    expect(r.exitCode).toBe(0);
+    expect(r.targetType).toBe("spec");
+    expect(r.section).toBe("## History");
+    expect(r.proposalId).toMatch(/^PROP-/);
+    if (!r.path) throw new Error("expected path");
+    const raw = readFileSync(r.path, "utf8");
+    expect(raw).toContain("patch:");
+    expect(raw).toContain("append-section");
+    expect(raw).toContain("## History");
+    expect(raw).toContain("- b"); // snapshot newBody contains the patched line
+  });
+
+  it("normalizes a bare section name to a level-2 heading", async () => {
+    writeFileSync(
+      join(tmp, ".cairndex/specs/SPEC-001.md"),
+      "---\nid: SPEC-001\ntitle: A\nstatus: active\ncreated: 2026-05-01\nupdated: 2026-05-01\n---\n## Current Statement\nold\n",
+      "utf8",
+    );
+    const r = await runInboxProposeUpdate({
+      cwd: tmp,
+      targetId: "SPEC-001",
+      section: "Current Statement", // no leading ##
+      newContent: "tightened\n",
+      mode: "replace",
+      summary: "tighten",
+      reason: "clarity",
+      createdBy: "claude-code",
+      session: "s",
+    });
+    expect(r.exitCode).toBe(0);
+    expect(r.section).toBe("## Current Statement");
+  });
+
+  it("returns exitCode=1 with a clear message when the id prefix is unknown", async () => {
+    const r = await runInboxProposeUpdate({
+      cwd: tmp,
+      targetId: "UNKNOWN-001",
+      section: "## H",
+      newContent: "x",
+      mode: "replace",
+      summary: "x",
+      reason: "x",
+      createdBy: "u",
+      session: "s",
+    });
+    expect(r.exitCode).toBe(1);
+    expect(r.message).toMatch(/cannot infer node type/i);
+  });
+
+  it("returns exitCode=1 when the target file doesn't exist", async () => {
+    const r = await runInboxProposeUpdate({
+      cwd: tmp,
+      targetId: "SPEC-999",
+      section: "## H",
+      newContent: "x",
+      mode: "replace",
+      summary: "x",
+      reason: "x",
+      createdBy: "u",
+      session: "s",
+    });
+    expect(r.exitCode).toBe(1);
+    expect(r.message).toMatch(/target SPEC-999 not found/i);
   });
 });

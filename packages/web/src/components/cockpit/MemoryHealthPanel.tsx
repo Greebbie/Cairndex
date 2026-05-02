@@ -1,3 +1,4 @@
+import { nodeLink } from "@/lib/nodeLink";
 import type { MemoryHealth } from "@/lib/types";
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -6,19 +7,6 @@ interface Props {
   alias: string;
   health: MemoryHealth;
 }
-
-const TYPE_TO_FOLDER: Record<string, string> = {
-  goal: "goals",
-  intent: "intents",
-  spec: "specs",
-  decision: "decisions",
-  plan: "plans",
-  task: "tasks",
-  session: "sessions",
-  change: "changes",
-  insight: "insights",
-  question: "questions",
-};
 
 function severityClass(sev: "error" | "warn" | "info"): string {
   if (sev === "error") return "text-red-700 bg-red-50 dark:text-red-300 dark:bg-red-950/40";
@@ -69,18 +57,14 @@ export function MemoryHealthPanel({ alias, health }: Props) {
       {expanded && health.issues.length > 0 ? (
         <ul className="mt-3 space-y-1 text-xs">
           {health.issues.map((i) => {
-            const folder = i.nodeType ? TYPE_TO_FOLDER[i.nodeType] : undefined;
             return (
               <li
                 key={`${i.nodeId}-${i.rule}`}
                 className={`rounded p-2 flex items-start gap-2 ${severityClass(i.severity)}`}
               >
                 <span className="font-mono text-[10px] uppercase">{i.severity}</span>
-                {folder ? (
-                  <Link
-                    to={`/p/${alias}/browse/${folder}/${i.nodeId}`}
-                    className="font-mono hover:underline"
-                  >
+                {i.nodeType ? (
+                  <Link to={nodeLink(alias, i.nodeType, i.nodeId)} className="font-mono hover:underline">
                     {i.nodeId}
                   </Link>
                 ) : (

@@ -6,3 +6,16 @@ coverage/
 .vitest/
 /docs/superpowers
 /.playwright-mcp
+
+# Per-machine — never commit these (paths to local vault, hook bin, etc.)
+.cairndex-project.yaml
+.claude/settings.json
+.claude/settings.local.json
+
+# Playwright test artifacts
+packages/web/test-results/
+packages/web/playwright-report/
+
+# SEA build outputs
+packages/cli/dist-sea/
+packages/cli/dist-sea-entry/

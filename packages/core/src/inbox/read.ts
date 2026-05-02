@@ -4,7 +4,14 @@ import { basename, join } from "node:path";
 import { parseFrontmatter } from "../frontmatter.js";
 import { inboxProposalsPath } from "../paths.js";
 import type { NodeType } from "../types.js";
-import type { ProposalFile, ProposalList, ProposalStatus, ProposalType } from "./types.js";
+import type {
+  Patch,
+  PatchOp,
+  ProposalFile,
+  ProposalList,
+  ProposalStatus,
+  ProposalType,
+} from "./types.js";
 
 interface RawProposalFrontmatter {
   id?: string;
@@ -26,6 +33,7 @@ interface RawProposalFrontmatter {
     confidence?: number;
   };
   newFrontmatter?: Record<string, unknown>;
+  patch?: unknown;
 }
 
 function asProposalType(s: unknown): ProposalType | null {
@@ -50,6 +58,20 @@ function asNodeType(s: unknown): NodeType | null {
     "question",
   ];
   return typeof s === "string" && (known as string[]).includes(s) ? (s as NodeType) : null;
+}
+
+function asPatch(raw: unknown): Patch | null {
+  if (!Array.isArray(raw)) return null;
+  const ops: PatchOp[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") return null;
+    const o = item as Record<string, unknown>;
+    if (o.kind !== "append-section" && o.kind !== "replace-section") return null;
+    if (typeof o.section !== "string") return null;
+    if (typeof o.content !== "string") return null;
+    ops.push({ kind: o.kind, section: o.section, content: o.content });
+  }
+  return ops;
 }
 
 export async function readProposal(path: string): Promise<ProposalFile | null> {
@@ -88,6 +110,10 @@ export async function readProposal(path: string): Promise<ProposalFile | null> {
   if (data.rejectionReason !== undefined) file.rejectionReason = data.rejectionReason;
   if (data.newFrontmatter !== undefined && typeof data.newFrontmatter === "object") {
     file.newFrontmatter = data.newFrontmatter;
+  }
+  if (data.patch !== undefined) {
+    const parsed = asPatch(data.patch);
+    if (parsed && parsed.length > 0) file.patch = parsed;
   }
   return file;
 }

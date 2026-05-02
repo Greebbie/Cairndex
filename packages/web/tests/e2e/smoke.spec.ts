@@ -21,7 +21,7 @@ test.beforeAll(async () => {
   }
   writeFileSync(
     join(v, "index.md"),
-    "---\nphase: implementing\nnext_action: ship it\n---\n# Index\n",
+    "---\nphase: implementing\nnext_action: ship it\nactive_spec: SPEC-001\n---\n# Index\n",
   );
   writeFileSync(
     join(v, "specs/SPEC-001-x.md"),
@@ -102,20 +102,38 @@ test("timeline lists changelog events", async ({ page }) => {
 
 test("dashboard doctor badge shows verification error count", async ({ page }) => {
   await page.goto(`http://localhost:${PORT}/p/e2e`);
-  // The badge renders "1 error" (singular) for one verification-bound issue from ADR-001
-  await expect(page.getByText(/\d+ errors?/)).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByText("1 error")).toBeVisible({ timeout: 10_000 });
+  // The badge renders "1 error" (singular) for one verification-bound issue from ADR-001.
+  // Memory Health panel also says "{red} error" so we use exact-match + first()
+  // to avoid the strict-mode duplicate against e.g. "0 error" on the panel.
+  await expect(page.getByText("1 error", { exact: true }).first()).toBeVisible({
+    timeout: 10_000,
+  });
 });
 
 // ── Test 3: BrowseList ────────────────────────────────────────────────────────
 
 test("browse → spec/ shows the per-type listing", async ({ page }) => {
   await page.goto(`http://localhost:${PORT}/p/e2e/browse`);
-  await page.getByRole("link", { name: "spec/" }).click();
-  await expect(page).toHaveURL(/\/p\/e2e\/browse\/spec$/);
+  // spec/ is now a collapsible button; clicking expands the group inline (no URL change)
+  await page.getByRole("button", { name: /spec\// }).click();
   await expect(page.getByRole("link", { name: /SPEC-001/ })).toBeVisible();
-  // clicking through into the file view still works
+  // clicking the spec id navigates into the file view
   await page.getByRole("link", { name: /SPEC-001/ }).click();
+  await expect(page).toHaveURL(/\/p\/e2e\/browse\/spec\/SPEC-001$/);
+  await expect(page.getByText("body", { exact: true })).toBeVisible({ timeout: 10_000 });
+});
+
+// ── Test 3b: Dashboard active spec link opens the file view ───────────────────
+
+test("dashboard active-spec link opens the file view (no broken plural route)", async ({
+  page,
+}) => {
+  await page.goto(`http://localhost:${PORT}/p/e2e`);
+  await expect(page.getByText("implementing")).toBeVisible({ timeout: 10_000 });
+  // ProjectStatePanel renders SPEC-001 as a Link; clicking it must land on
+  // /browse/spec/SPEC-001 (singular type), not /browse/specs/... which the
+  // server does not accept.
+  await page.getByRole("link", { name: "SPEC-001" }).first().click();
   await expect(page).toHaveURL(/\/p\/e2e\/browse\/spec\/SPEC-001$/);
   await expect(page.getByText("body", { exact: true })).toBeVisible({ timeout: 10_000 });
 });
@@ -124,36 +142,38 @@ test("browse → spec/ shows the per-type listing", async ({ page }) => {
 
 test("settings page saves edited config", async ({ page }) => {
   await page.goto(`http://localhost:${PORT}/p/e2e/settings`);
+  // The raw-JSON textarea now lives inside a collapsed <details> labelled
+  // "Advanced (raw JSON)" — open it before interacting.
+  await page.getByText("Advanced (raw JSON)").click();
   const ta = page.locator("textarea");
   await expect(ta).toBeVisible();
-  // wait for the textarea to be populated by the GET (effect runs after data arrives)
   await expect(ta).toHaveValue(/schemaVersion/, { timeout: 10_000 });
-  // edit: bump a value or add a key
   await ta.fill('{\n  "schemaVersion": 1,\n  "freshness_warn_days": 60\n}');
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Save raw JSON" }).click();
   await expect(page.getByText("Saved")).toBeVisible({ timeout: 10_000 });
 
-  // verify on disk — server writes YAML; check the raw file for the key
   const configOnDisk = readFileSync(join(tmp, ".cairndex/config.yaml"), "utf8");
   expect(configOnDisk).toContain("freshness_warn_days: 60");
 });
 
 // ── Test 5: SSE invalidation ──────────────────────────────────────────────────
 
-test("SSE invalidation updates dashboard counts when a file appears", async ({ page }) => {
-  await page.goto(`http://localhost:${PORT}/p/e2e`);
-  // sanity: spec count is currently 1
-  // The Counts grid renders <li> with "spec" label and the count "1"
-  const specCount = page.locator("li").filter({ hasText: /^spec/ }).getByText(/^\d+$/);
-  await expect(specCount).toHaveText("1", { timeout: 10_000 });
+test("SSE invalidation updates browse counts when a file appears", async ({ page }) => {
+  // The Browse page now owns per-type counts (Dashboard cockpit panels do not).
+  // Each type group is a <button> whose accessible name includes "<type>/" plus
+  // the count digit, e.g. "▸ spec/ 1".
+  await page.goto(`http://localhost:${PORT}/p/e2e/browse`);
+  await expect(page.getByRole("button", { name: /spec\/.*\b1\b/ })).toBeVisible({
+    timeout: 10_000,
+  });
 
-  // write a second SPEC into the vault
   writeFileSync(
     join(tmp, ".cairndex/specs/SPEC-002-y.md"),
     "---\nid: SPEC-002\ntitle: Y\nstatus: active\ncreated: 2026-04-30\nupdated: 2026-04-30\n---\nbody\n",
   );
 
   // watcher debounce is 250ms; SSE hub broadcasts; query invalidates; UI re-fetches.
-  // give it up to 8 seconds (Windows fs event propagation can be slow).
-  await expect(specCount).toHaveText("2", { timeout: 8_000 });
+  await expect(page.getByRole("button", { name: /spec\/.*\b2\b/ })).toBeVisible({
+    timeout: 8_000,
+  });
 });

@@ -198,7 +198,12 @@ describe("acceptProposal — create", () => {
     const proposal = await createProposal(tmp, defaultConfig(), {
       proposalType: "create",
       targetType: "spec",
-      newFrontmatter: { title: "New spec", status: "active", created: "2026-05-02", updated: "2026-05-02" },
+      newFrontmatter: {
+        title: "New spec",
+        status: "active",
+        created: "2026-05-02",
+        updated: "2026-05-02",
+      },
       newBody: "Body of the new spec.\n",
       summary: "create spec",
       reason: "agent proposed a new spec",
@@ -236,5 +241,271 @@ describe("inbox path layout", () => {
     expect(inboxProposalsPath(tmp).replace(/\\/g, "/")).toContain(
       ".cairndex/inbox/proposed-memory-updates",
     );
+  });
+});
+
+describe("createProposal — patch mode", () => {
+  it("resolves a patch against the current target body and snapshots newBody", async () => {
+    writeFileSync(
+      join(tmp, ".cairndex/specs/SPEC-001.md"),
+      [
+        "---",
+        "id: SPEC-001",
+        "title: Title",
+        "status: active",
+        "created: 2026-05-01",
+        "updated: 2026-05-01",
+        "---",
+        "Intro.",
+        "",
+        "## History",
+        "- 2026-05-01: created",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const r = await createProposal(tmp, defaultConfig(), {
+      proposalType: "update",
+      targetType: "spec",
+      target: "SPEC-001",
+      patch: [
+        {
+          kind: "append-section",
+          section: "## History",
+          content: "- 2026-05-02: claude appended\n",
+        },
+      ],
+      summary: "log entry",
+      reason: "audit trail",
+      provenance: { createdBy: "claude", session: "s" },
+    });
+
+    const raw = readFileSync(r.path, "utf8");
+    expect(raw).toContain("patch:");
+    expect(raw).toContain("append-section");
+    expect(raw).toContain("## History");
+    expect(raw).toContain("- 2026-05-01: created");
+    expect(raw).toContain("- 2026-05-02: claude appended");
+  });
+
+  it("rejects when neither newBody nor patch is provided", async () => {
+    await expect(
+      createProposal(tmp, defaultConfig(), {
+        proposalType: "update",
+        targetType: "spec",
+        target: "SPEC-001",
+        summary: "x",
+        reason: "x",
+        provenance: { createdBy: "claude", session: "s" },
+      } as never),
+    ).rejects.toThrow(/newBody.*patch/i);
+  });
+
+  it("rejects when both newBody and patch are provided", async () => {
+    await expect(
+      createProposal(tmp, defaultConfig(), {
+        proposalType: "update",
+        targetType: "spec",
+        target: "SPEC-001",
+        newBody: "x",
+        patch: [{ kind: "append-section", section: "## H", content: "y" }],
+        summary: "x",
+        reason: "x",
+        provenance: { createdBy: "claude", session: "s" },
+      }),
+    ).rejects.toThrow(/exactly one of newBody.*patch/i);
+  });
+
+  it("rejects patch on create proposals", async () => {
+    await expect(
+      createProposal(tmp, defaultConfig(), {
+        proposalType: "create",
+        targetType: "spec",
+        newFrontmatter: { title: "T", status: "draft" },
+        patch: [{ kind: "append-section", section: "## H", content: "y" }],
+        summary: "x",
+        reason: "x",
+        provenance: { createdBy: "claude", session: "s" },
+      }),
+    ).rejects.toThrow(/patch.*only.*update/i);
+  });
+
+  it("rejects patch when target file does not exist", async () => {
+    await expect(
+      createProposal(tmp, defaultConfig(), {
+        proposalType: "update",
+        targetType: "spec",
+        target: "SPEC-MISSING",
+        patch: [{ kind: "append-section", section: "## H", content: "y\n" }],
+        summary: "x",
+        reason: "x",
+        provenance: { createdBy: "claude", session: "s" },
+      }),
+    ).rejects.toThrow(/target.*SPEC-MISSING.*not found/i);
+  });
+
+  it("readProposal round-trips the patch field through frontmatter", async () => {
+    writeFileSync(
+      join(tmp, ".cairndex/specs/SPEC-001.md"),
+      "---\nid: SPEC-001\ntitle: T\nstatus: active\ncreated: 2026-05-01\nupdated: 2026-05-01\n---\nBody.\n\n## History\n- a\n",
+      "utf8",
+    );
+    const created = await createProposal(tmp, defaultConfig(), {
+      proposalType: "update",
+      targetType: "spec",
+      target: "SPEC-001",
+      patch: [{ kind: "append-section", section: "## History", content: "- b\n" }],
+      summary: "s",
+      reason: "r",
+      provenance: { createdBy: "claude", session: "s" },
+    });
+    const list = await listProposals(tmp, defaultConfig());
+    const p = list.pending.find((x) => x.proposalId === created.proposalId);
+    expect(p).toBeDefined();
+    expect(p?.patch).toEqual([{ kind: "append-section", section: "## History", content: "- b\n" }]);
+  });
+
+  it("re-applies patch at accept time against the current target body", async () => {
+    const targetPath = join(tmp, ".cairndex/specs/SPEC-001.md");
+    writeFileSync(
+      targetPath,
+      [
+        "---",
+        "id: SPEC-001",
+        "title: T",
+        "status: active",
+        "created: 2026-05-01",
+        "updated: 2026-05-01",
+        "---",
+        "## History",
+        "- a",
+        "",
+        "## Notes",
+        "n1",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const created = await createProposal(tmp, defaultConfig(), {
+      proposalType: "update",
+      targetType: "spec",
+      target: "SPEC-001",
+      patch: [{ kind: "append-section", section: "## History", content: "- b\n" }],
+      summary: "log",
+      reason: "audit",
+      provenance: { createdBy: "claude", session: "s" },
+    });
+
+    // SIMULATE concurrent edit by user mid-flight
+    writeFileSync(
+      targetPath,
+      [
+        "---",
+        "id: SPEC-001",
+        "title: T",
+        "status: active",
+        "created: 2026-05-01",
+        "updated: 2026-05-01",
+        "---",
+        "## History",
+        "- a",
+        "- a.5 (added by user)",
+        "",
+        "## Notes",
+        "n1",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    await acceptProposal(tmp, defaultConfig(), created.proposalId);
+
+    const final = readFileSync(targetPath, "utf8");
+    expect(final).toContain("- a");
+    expect(final).toContain("- a.5 (added by user)"); // user's edit preserved
+    expect(final).toContain("- b"); // patch re-applied
+    expect(final).toContain("## Notes");
+  });
+
+  it("returns an error when accepting a patch proposal whose target was deleted", async () => {
+    writeFileSync(
+      join(tmp, ".cairndex/specs/SPEC-001.md"),
+      "---\nid: SPEC-001\ntitle: T\nstatus: active\ncreated: 2026-05-01\nupdated: 2026-05-01\n---\n## History\n- a\n",
+      "utf8",
+    );
+    const created = await createProposal(tmp, defaultConfig(), {
+      proposalType: "update",
+      targetType: "spec",
+      target: "SPEC-001",
+      patch: [{ kind: "append-section", section: "## History", content: "- b\n" }],
+      summary: "x",
+      reason: "x",
+      provenance: { createdBy: "claude", session: "s" },
+    });
+    rmSync(join(tmp, ".cairndex/specs/SPEC-001.md"));
+    await expect(acceptProposal(tmp, defaultConfig(), created.proposalId)).rejects.toThrow(
+      /target.*not found/i,
+    );
+  });
+});
+
+describe("patch proposal — full lifecycle", () => {
+  it("create -> list -> accept produces the expected target body and marks proposal accepted", async () => {
+    writeFileSync(
+      join(tmp, ".cairndex/specs/SPEC-007.md"),
+      [
+        "---",
+        "id: SPEC-007",
+        "title: Patch demo",
+        "status: active",
+        "created: 2026-05-01",
+        "updated: 2026-05-01",
+        "---",
+        "## Current Statement",
+        "old wording",
+        "",
+        "## History",
+        "- 2026-05-01: created",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    const created = await createProposal(tmp, defaultConfig(), {
+      proposalType: "update",
+      targetType: "spec",
+      target: "SPEC-007",
+      patch: [
+        {
+          kind: "replace-section",
+          section: "## Current Statement",
+          content: "tightened wording\n",
+        },
+        {
+          kind: "append-section",
+          section: "## History",
+          content: "- 2026-05-02: tightened wording\n",
+        },
+      ],
+      summary: "tighten + log",
+      reason: "user asked",
+      provenance: { createdBy: "claude", session: "s" },
+    });
+
+    const list = await listProposals(tmp, defaultConfig());
+    const p = list.pending.find((x) => x.proposalId === created.proposalId);
+    expect(p?.patch).toHaveLength(2);
+
+    const r = await acceptProposal(tmp, defaultConfig(), created.proposalId);
+    expect(r.action).toBe("updated");
+    const final = readFileSync(r.targetPath, "utf8");
+    expect(final).toContain("tightened wording");
+    expect(final).not.toContain("old wording");
+    expect(final).toContain("- 2026-05-01: created");
+    expect(final).toContain("- 2026-05-02: tightened wording");
+
+    const proposalRaw = readFileSync(created.path, "utf8");
+    expect(proposalRaw).toContain("status: accepted");
   });
 });

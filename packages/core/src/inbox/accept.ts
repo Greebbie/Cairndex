@@ -5,23 +5,10 @@ import { type Config, folderForNodeType } from "../config.js";
 import { parseFrontmatter, serializeFrontmatter } from "../frontmatter.js";
 import { formatSequentialId, parseId } from "../ids.js";
 import { inboxProposalsPath, nodeFolderPath } from "../paths.js";
-import type { NodeType } from "../types.js";
+import { applyPatch } from "./applyPatch.js";
+import { PREFIX_FOR_TYPE } from "./idPrefix.js";
 import { readProposal } from "./read.js";
 import type { AcceptResult } from "./types.js";
-
-const PREFIX_FOR_TYPE: Record<NodeType, string> = {
-  goal: "GOAL",
-  intent: "INT",
-  spec: "SPEC",
-  decision: "ADR",
-  plan: "PLAN",
-  task: "TASK",
-  // Sessions use date-form ids — not auto-allocated by inbox.
-  session: "SESSION",
-  change: "CHG",
-  insight: "INS",
-  question: "QUESTION",
-};
 
 async function findTargetFile(folder: string, id: string): Promise<string | null> {
   if (!existsSync(folder)) return null;
@@ -85,17 +72,17 @@ export async function acceptProposal(
   if (proposal.proposalType === "update") {
     if (!proposal.target) throw new Error(`proposal ${proposalId} has no target`);
     const targetPath = await findTargetFile(folder, proposal.target);
-    if (!targetPath)
-      throw new Error(`target ${proposal.target} not found in ${folder}`);
+    if (!targetPath) throw new Error(`target ${proposal.target} not found in ${folder}`);
     const raw = await readFile(targetPath, "utf8");
-    const { data } = parseFrontmatter<Record<string, unknown>>(raw);
+    const { data, content: currentBody } = parseFrontmatter<Record<string, unknown>>(raw);
     const today = new Date().toISOString().slice(0, 10);
     const nextFm: Record<string, unknown> = {
       ...data,
       ...(proposal.newFrontmatter ?? {}),
       updated: today,
     };
-    await writeFile(targetPath, serializeFrontmatter(nextFm, proposal.newBody), "utf8");
+    const nextBody = proposal.patch ? applyPatch(currentBody, proposal.patch) : proposal.newBody;
+    await writeFile(targetPath, serializeFrontmatter(nextFm, nextBody), "utf8");
     await markAccepted(proposalPath, proposal.target);
     return {
       proposalId,

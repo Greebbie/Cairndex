@@ -13,6 +13,7 @@ import {
 } from "@cairndex/core";
 import { createServer, type CreateServerResult, type OnboardingHooks } from "@cairndex/server";
 import open from "open";
+import { findExeRelative } from "../utils/exePath.js";
 import { logger } from "../utils/logger.js";
 import { defaultProjectIdFromRepo, runProjectRegister } from "./project.js";
 import { runVaultInit } from "./vault.js";
@@ -24,6 +25,9 @@ export interface UiOptions {
 }
 
 function findWebDist(): string | undefined {
+  const sea = findExeRelative("web");
+  if (sea && existsSync(join(sea, "index.html")) && existsSync(join(sea, "assets"))) return sea;
+
   const here =
     typeof __dirname !== "undefined" ? __dirname : dirname(fileURLToPath(import.meta.url));
   const candidates = [

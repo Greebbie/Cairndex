@@ -1,15 +1,19 @@
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { findExeRelative } from "./exePath.js";
 
 // At runtime, this module is at:
 //   <pkg-root>/dist/bin.cjs (after build) or via vitest from src/utils/.
 // We look for `templates/` adjacent to either the package root or two levels up
-// (for monorepo dev where templates/ is at the repo root).
+// (for monorepo dev where templates/ is at the repo root). For SEA distributions,
+// templates/ ships as a sibling of the exe in the portable folder layout.
 export function findBundledTemplatesDir(): string {
+  const sea = findExeRelative("templates");
+  if (sea) return sea;
+
   const here =
     typeof __dirname !== "undefined" ? __dirname : dirname(fileURLToPath(import.meta.url));
-
   const candidates = [
     join(here, "..", "templates"), // packaged: <pkg>/templates next to dist
     join(here, "..", "..", "templates"), // monorepo dev: <repo-root>/templates

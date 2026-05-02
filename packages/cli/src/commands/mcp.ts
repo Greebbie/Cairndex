@@ -32,8 +32,7 @@ export interface McpResult {
   message?: string;
 }
 
-/** Build (but don't connect) the MCP server. Exposed so tests can drive it directly. */
-export function buildMcpServer(repoRoot: string): Server {
+function buildMcpServer(repoRoot: string): Server {
   const cfg = existsSync(`${vaultPath(repoRoot)}/config.yaml`)
     ? loadProjectConfig(repoRoot)
     : defaultConfig();

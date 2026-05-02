@@ -1,9 +1,9 @@
 import {
+  type NodeType,
   acceptProposal,
   createProposal,
   findDuplicate,
   listProposals,
-  type NodeType,
   rejectProposal,
 } from "@cairndex/core";
 import type { FastifyInstance } from "fastify";
@@ -24,20 +24,34 @@ const NODE_TYPE_VALUES = [
   "question",
 ] as const;
 
-const ProposeBody = z.object({
-  proposalType: z.enum(["create", "update"]),
-  targetType: z.enum(NODE_TYPE_VALUES),
-  target: z.string().optional(),
-  newFrontmatter: z.record(z.unknown()).optional(),
-  newBody: z.string(),
-  summary: z.string().min(1),
-  reason: z.string().default(""),
-  provenance: z.object({
-    createdBy: z.string(),
-    session: z.string(),
-    confidence: z.number().min(0).max(1).optional(),
-  }),
+const PatchOpSchema = z.object({
+  kind: z.enum(["append-section", "replace-section"]),
+  section: z.string().min(1),
+  content: z.string(),
 });
+
+const ProposeBody = z
+  .object({
+    proposalType: z.enum(["create", "update"]),
+    targetType: z.enum(NODE_TYPE_VALUES),
+    target: z.string().optional(),
+    newFrontmatter: z.record(z.unknown()).optional(),
+    newBody: z.string().optional(),
+    patch: z.array(PatchOpSchema).min(1).optional(),
+    summary: z.string().min(1),
+    reason: z.string().default(""),
+    provenance: z.object({
+      createdBy: z.string(),
+      session: z.string(),
+      confidence: z.number().min(0).max(1).optional(),
+    }),
+  })
+  .refine((d) => (d.newBody !== undefined) !== (d.patch !== undefined), {
+    message: "exactly one of newBody or patch must be provided",
+  })
+  .refine((d) => d.patch === undefined || d.proposalType === "update", {
+    message: "patch is only valid on update proposals",
+  });
 
 const RejectBody = z.object({
   reason: z.string().min(1),
@@ -65,18 +79,20 @@ export async function registerInboxRoutes(app: FastifyInstance): Promise<void> {
     }
     const cfg = safeLoadConfig(project.path, app.log);
 
-    const dupInput: Parameters<typeof findDuplicate>[2] = {
-      proposalType: parsed.data.proposalType,
-      targetType: parsed.data.targetType as NodeType,
-      newBody: parsed.data.newBody,
-    };
-    if (parsed.data.target !== undefined) dupInput.target = parsed.data.target;
-    const duplicateOf = await findDuplicate(project.path, cfg, dupInput);
+    let duplicateOf: string | null = null;
+    if (parsed.data.newBody !== undefined) {
+      const dupInput: Parameters<typeof findDuplicate>[2] = {
+        proposalType: parsed.data.proposalType,
+        targetType: parsed.data.targetType as NodeType,
+        newBody: parsed.data.newBody,
+      };
+      if (parsed.data.target !== undefined) dupInput.target = parsed.data.target;
+      duplicateOf = await findDuplicate(project.path, cfg, dupInput);
+    }
 
     const createInput: Parameters<typeof createProposal>[2] = {
       proposalType: parsed.data.proposalType,
       targetType: parsed.data.targetType as NodeType,
-      newBody: parsed.data.newBody,
       summary: parsed.data.summary,
       reason: parsed.data.reason,
       provenance: {
@@ -91,6 +107,9 @@ export async function registerInboxRoutes(app: FastifyInstance): Promise<void> {
     if (parsed.data.newFrontmatter !== undefined) {
       createInput.newFrontmatter = parsed.data.newFrontmatter;
     }
+    if (parsed.data.newBody !== undefined) createInput.newBody = parsed.data.newBody;
+    if (parsed.data.patch !== undefined) createInput.patch = parsed.data.patch;
+
     try {
       const created = await createProposal(project.path, cfg, createInput);
       const out: Record<string, unknown> = {

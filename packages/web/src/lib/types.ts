@@ -167,6 +167,12 @@ const ProposalProvenanceSchema = z.object({
   session: z.string(),
   confidence: z.number().optional(),
 });
+export const PatchOpSchema = z.object({
+  kind: z.enum(["append-section", "replace-section"]),
+  section: z.string(),
+  content: z.string(),
+});
+export type PatchOp = z.infer<typeof PatchOpSchema>;
 export const ProposalSchema = z.object({
   proposalId: z.string(),
   path: z.string(),
@@ -185,6 +191,7 @@ export const ProposalSchema = z.object({
   provenance: ProposalProvenanceSchema,
   newBody: z.string(),
   newFrontmatter: z.record(z.unknown()).optional(),
+  patch: z.array(PatchOpSchema).optional(),
 });
 export type Proposal = z.infer<typeof ProposalSchema>;
 

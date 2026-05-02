@@ -8,16 +8,18 @@ import {
   runInboxAccept,
   runInboxList,
   runInboxPropose,
+  runInboxProposeUpdate,
   runInboxReject,
 } from "./commands/inbox.js";
 import { runInit } from "./commands/init.js";
-import { runMcp } from "./commands/mcp.js";
 import { runInsightPromote, runInsightPull } from "./commands/insight.js";
+import { runMcp } from "./commands/mcp.js";
 import {
   defaultProjectIdFromRepo,
   runProjectImportRepoVault,
   runProjectRegister,
 } from "./commands/project.js";
+import { runSessionLog } from "./commands/session.js";
 import { runSweep } from "./commands/sweep.js";
 import { runSyncCmd } from "./commands/sync.js";
 import { runUi } from "./commands/ui.js";
@@ -212,14 +214,17 @@ program
     if (opts.vault) callOpts.vaultRoot = opts.vault;
     if (opts.project) callOpts.projectId = opts.project;
     if (task !== undefined) callOpts.task = task;
-    if (typeof opts.budget === "number" && !Number.isNaN(opts.budget)) callOpts.budget = opts.budget;
+    if (typeof opts.budget === "number" && !Number.isNaN(opts.budget))
+      callOpts.budget = opts.budget;
     if (opts.out) callOpts.out = opts.out;
     const r = await runContext(callOpts);
     if (r.message) console.error(r.message);
     process.exit(r.exitCode);
   });
 
-const emit = program.command("emit").description("Regenerate derived agent surfaces from the vault");
+const emit = program
+  .command("emit")
+  .description("Regenerate derived agent surfaces from the vault");
 
 emit
   .command("claude-md")
@@ -307,10 +312,7 @@ program
     if (typeof opts.age === "number" && !Number.isNaN(opts.age)) {
       callOpts.ageDays = opts.age;
     }
-    if (
-      typeof opts.confidenceThreshold === "number" &&
-      !Number.isNaN(opts.confidenceThreshold)
-    ) {
+    if (typeof opts.confidenceThreshold === "number" && !Number.isNaN(opts.confidenceThreshold)) {
       callOpts.confidenceThreshold = opts.confidenceThreshold;
     }
     const r = await runArchive(callOpts);
@@ -351,10 +353,8 @@ program
     Number.parseInt(v, 10),
   )
   .option("--age <days>", "Archive min age (default 180)", (v) => Number.parseInt(v, 10))
-  .option(
-    "--confidence-threshold <n>",
-    "Archive confidence threshold (default 0.5)",
-    (v) => Number.parseFloat(v),
+  .option("--confidence-threshold <n>", "Archive confidence threshold (default 0.5)", (v) =>
+    Number.parseFloat(v),
   )
   .action(async (opts) => {
     const callOpts: Parameters<typeof runSweep>[0] = { cwd: opts.cwd };
@@ -369,10 +369,7 @@ program
     if (typeof opts.age === "number" && !Number.isNaN(opts.age)) {
       callOpts.ageDays = opts.age;
     }
-    if (
-      typeof opts.confidenceThreshold === "number" &&
-      !Number.isNaN(opts.confidenceThreshold)
-    ) {
+    if (typeof opts.confidenceThreshold === "number" && !Number.isNaN(opts.confidenceThreshold)) {
       callOpts.confidenceThreshold = opts.confidenceThreshold;
     }
     const r = await runSweep(callOpts);
@@ -408,9 +405,7 @@ program
               : c.skipped
                 ? `skipped (${c.skipped})`
                 : "skipped";
-            console.log(
-              `    ${c.nodeType}/${c.nodeId}  age=${Math.round(c.ageDays)}d — ${status}`,
-            );
+            console.log(`    ${c.nodeType}/${c.nodeId}  age=${Math.round(c.ageDays)}d — ${status}`);
           }
         }
       }
@@ -455,9 +450,7 @@ inbox
         console.log(`\n${label} (${items.length}):`);
         for (const p of items) {
           const t = p.target ?? "(new)";
-          console.log(
-            `  ${p.proposalId}  ${p.proposalType}  ${p.targetType}/${t}  — ${p.summary}`,
-          );
+          console.log(`  ${p.proposalId}  ${p.proposalType}  ${p.targetType}/${t}  — ${p.summary}`);
         }
       };
       fmt("PENDING", r.list.pending);
@@ -485,9 +478,7 @@ inbox
     const r = await runInboxAccept(callOpts);
     if (r.message) console.error(r.message);
     if (r.applied) {
-      console.log(
-        `applied ${r.applied.action} -> ${r.applied.targetId} (${r.applied.targetPath})`,
-      );
+      console.log(`applied ${r.applied.action} -> ${r.applied.targetId} (${r.applied.targetPath})`);
     }
     process.exit(r.exitCode);
   });
@@ -523,10 +514,7 @@ inbox
     (v) => v as "update" | "create",
     "update",
   )
-  .requiredOption(
-    "--target-type <nodeType>",
-    "Durable folder: spec/decision/plan/task/...",
-  )
+  .requiredOption("--target-type <nodeType>", "Durable folder: spec/decision/plan/task/...")
   .option("--target <id>", "Existing node id (required for --type update)")
   .requiredOption("--summary <text>", "One-line description shown in inbox")
   .option("--reason <text>", "Why this change is proposed", "(no reason)")
@@ -565,7 +553,66 @@ inbox
     if (r.message) console.error(r.message);
     if (r.proposalId) {
       console.log(`proposed ${r.proposalId} -> ${r.path}`);
-      if (r.duplicateOf) console.log(`note: identical content already proposed as ${r.duplicateOf}`);
+      if (r.duplicateOf)
+        console.log(`note: identical content already proposed as ${r.duplicateOf}`);
+    }
+    process.exit(r.exitCode);
+  });
+
+inbox
+  .command("propose-update <targetId>")
+  .description(
+    "One-shot section-level edit. Auto-infers targetType from the id prefix (e.g. SPEC-001 -> spec).",
+  )
+  .requiredOption(
+    "--section <heading>",
+    "Section heading (e.g. '## History' or 'History' — missing hashes default to level 2)",
+  )
+  .option(
+    "--mode <mode>",
+    "How to apply newContent: replace | append",
+    (v) => v as "replace" | "append",
+    "replace",
+  )
+  .requiredOption("--summary <text>", "One-line description shown in inbox")
+  .option("--reason <text>", "Why this change is proposed", "(no reason)")
+  .option("--content-file <path>", "Read newContent from a file (otherwise reads stdin)")
+  .option("--by <agent>", "createdBy provenance", "user")
+  .option("--session <id>", "session id provenance", "manual")
+  .option("--cwd <path>", "Working directory", process.cwd())
+  .option("--vault <path>", "Vault root (overrides --cwd)")
+  .option("--project <id>", "Project id inside a central vault")
+  .action(async (targetId, opts) => {
+    let content: string;
+    if (opts.contentFile) {
+      const fs = await import("node:fs/promises");
+      content = await fs.readFile(opts.contentFile, "utf8");
+    } else {
+      const chunks: Buffer[] = [];
+      for await (const chunk of process.stdin) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+      content = Buffer.concat(chunks).toString("utf8");
+    }
+    const callOpts: Parameters<typeof runInboxProposeUpdate>[0] = {
+      cwd: opts.cwd,
+      targetId,
+      section: opts.section,
+      newContent: content,
+      mode: opts.mode,
+      summary: opts.summary,
+      reason: opts.reason,
+      createdBy: opts.by,
+      session: opts.session,
+    };
+    if (opts.vault) callOpts.vaultRoot = opts.vault;
+    if (opts.project) callOpts.projectId = opts.project;
+    const r = await runInboxProposeUpdate(callOpts);
+    if (r.message) console.error(r.message);
+    if (r.proposalId) {
+      console.log(
+        `proposed ${r.proposalId} -> ${r.path} (${r.targetType}/${r.targetId} ${r.mode} '${r.section}')`,
+      );
     }
     process.exit(r.exitCode);
   });
@@ -599,6 +646,54 @@ insight
     if (opts.project) callOpts.projectId = opts.project;
     const r = await runInsightPull(callOpts);
     if (r.message) console.error(r.message);
+    process.exit(r.exitCode);
+  });
+
+const session = program
+  .command("session")
+  .description(
+    "Append timestamped progress / verification / decision notes to the active session.",
+  );
+
+session
+  .command("log <kind>")
+  .description(
+    "Append a timestamped bullet to the active session. kind: progress | verify | decision. Reads stdin if --text is omitted.",
+  )
+  .option("--text <text>", "Inline text. If omitted, reads from stdin.")
+  .option("--by <agent>", "agent name (only used when creating a new session file)")
+  .option("--cwd <path>", "Working directory", process.cwd())
+  .option("--vault <path>", "Vault root (overrides --cwd)")
+  .option("--project <id>", "Project id inside a central vault")
+  .action(async (kind, opts) => {
+    if (kind !== "progress" && kind !== "verify" && kind !== "decision") {
+      console.error(`unknown kind: ${kind} (expected: progress | verify | decision)`);
+      process.exit(1);
+    }
+    let text: string;
+    if (opts.text) {
+      text = String(opts.text);
+    } else {
+      const chunks: Buffer[] = [];
+      for await (const chunk of process.stdin) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+      text = Buffer.concat(chunks).toString("utf8");
+    }
+    const callOpts: Parameters<typeof runSessionLog>[0] = {
+      cwd: opts.cwd,
+      kind,
+      text,
+    };
+    if (opts.vault) callOpts.vaultRoot = opts.vault;
+    if (opts.project) callOpts.projectId = opts.project;
+    if (opts.by) callOpts.agentName = opts.by;
+    const r = await runSessionLog(callOpts);
+    if (r.message) console.error(r.message);
+    if (r.sessionId) {
+      const verb = r.created ? "created" : "appended to";
+      console.log(`${verb} ${r.sessionId} (${r.section}) -> ${r.path}`);
+    }
     process.exit(r.exitCode);
   });
 

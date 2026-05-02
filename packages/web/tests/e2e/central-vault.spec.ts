@@ -91,6 +91,7 @@ test("loads dashboard for a central vault project", async ({ page }) => {
 test("browse spec/ lists central project SPEC-001", async ({ page }) => {
   await page.goto(`http://localhost:${PORT}/p/demo/browse`);
   await expect(page.getByRole("heading", { name: "Browse" })).toBeVisible();
-  await page.getByRole("link", { name: "spec/" }).click();
+  // spec/ is a collapsible button now (Browse renders type groups inline)
+  await page.getByRole("button", { name: /spec\// }).click();
   await expect(page.getByRole("link", { name: /SPEC-001/ })).toBeVisible();
 });

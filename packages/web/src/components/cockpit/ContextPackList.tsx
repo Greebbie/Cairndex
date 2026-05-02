@@ -1,3 +1,4 @@
+import { nodeLink } from "@/lib/nodeLink";
 import type { PackResponse } from "@/lib/types";
 import { Link } from "react-router-dom";
 
@@ -6,25 +7,11 @@ interface Props {
   pack: PackResponse;
 }
 
-const TYPE_TO_FOLDER: Record<string, string> = {
-  goal: "goals",
-  intent: "intents",
-  spec: "specs",
-  decision: "decisions",
-  plan: "plans",
-  task: "tasks",
-  session: "sessions",
-  change: "changes",
-  insight: "insights",
-  question: "questions",
-};
-
 export function ContextPackList({ alias, pack }: Props) {
   const items = pack.frontmatter.items ?? [];
   return (
     <ol className="space-y-3">
       {items.map((it, idx) => {
-        const folder = TYPE_TO_FOLDER[it.type];
         return (
           <li
             key={`${idx}-${it.id}`}
@@ -32,11 +19,8 @@ export function ContextPackList({ alias, pack }: Props) {
           >
             <div className="flex items-center gap-3 text-sm">
               <span className="text-muted-foreground font-mono w-6 text-right">{idx + 1}.</span>
-              {folder ? (
-                <Link
-                  to={`/p/${alias}/browse/${folder}/${it.id}`}
-                  className="font-mono text-primary hover:underline"
-                >
+              {it.type ? (
+                <Link to={nodeLink(alias, it.type, it.id)} className="font-mono text-primary hover:underline">
                   {it.id}
                 </Link>
               ) : (

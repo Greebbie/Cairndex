@@ -5,6 +5,7 @@ import {
   buildContextPack,
   contextPacksPath,
   parseFrontmatter,
+  projectIdFromRoot,
   renderContextPack,
 } from "@cairndex/core";
 import type { FastifyInstance } from "fastify";
@@ -40,7 +41,8 @@ export async function registerPackRoutes(app: FastifyInstance): Promise<void> {
     if (parsed.data.task !== undefined) buildInput.task = parsed.data.task;
     if (parsed.data.budget !== undefined) buildInput.tokenBudget = parsed.data.budget;
     const pack = await buildContextPack(project.path, cfg, buildInput);
-    const body = renderContextPack(pack);
+    const projectId = project.projectId ?? projectIdFromRoot(project.path);
+    const body = renderContextPack(pack, projectId);
 
     const dir = contextPacksPath(project.path);
     await mkdir(dir, { recursive: true });

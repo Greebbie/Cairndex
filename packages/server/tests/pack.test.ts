@@ -1,8 +1,10 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { listVaultProjects } from "@cairndex/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createServer } from "../src/index.js";
+import { makeCentralVaultFixture } from "./fixtures/centralVault.js";
 
 let tmp: string;
 beforeEach(() => {
@@ -81,5 +83,41 @@ describe("pack routes", () => {
     const r = await app.inject({ method: "GET", url: "/api/vault/demo/pack/pack-does-not-exist" });
     expect(r.statusCode).toBe(404);
     await app.close();
+  });
+
+  it("legacy project: pack body footer points at .cairndex/inbox/...", async () => {
+    const app = await createServer({
+      projects: [{ path: tmp, alias: "demo", registered_at: "2026-05-02T00:00:00Z" }],
+    });
+    const r = await app.inject({
+      method: "POST",
+      url: "/api/vault/demo/pack",
+      payload: { task: "footer-legacy" },
+    });
+    expect(r.statusCode).toBe(200);
+    const body = (r.json() as { body: string }).body;
+    expect(body).toContain(".cairndex/inbox/proposed-memory-updates/");
+    expect(body).not.toContain("projects/demo/inbox/");
+    await app.close();
+  });
+
+  it("central project: pack body footer points at projects/<id>/inbox/, not .cairndex/", async () => {
+    const fx = makeCentralVaultFixture("demo");
+    try {
+      const projects = await listVaultProjects(fx.vaultRoot);
+      const app = await createServer({ projects, logger: false });
+      const r = await app.inject({
+        method: "POST",
+        url: "/api/vault/demo/pack",
+        payload: { task: "footer-central" },
+      });
+      expect(r.statusCode).toBe(200);
+      const body = (r.json() as { body: string }).body;
+      expect(body).toContain("projects/demo/inbox/proposed-memory-updates/");
+      expect(body).not.toContain(".cairndex/inbox/");
+      await app.close();
+    } finally {
+      fx.cleanup();
+    }
   });
 });

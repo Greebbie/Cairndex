@@ -1,20 +1,10 @@
+import { nodeLink } from "@/lib/nodeLink";
 import type { ProjectState } from "@/lib/types";
 import { Link } from "react-router-dom";
 
 interface Props {
   alias: string;
   state: ProjectState;
-}
-
-const TYPE_TO_FOLDER: Record<string, string> = {
-  goal: "goals",
-  spec: "specs",
-  plan: "plans",
-  task: "tasks",
-};
-
-function nodeLink(alias: string, type: keyof typeof TYPE_TO_FOLDER, id: string): string {
-  return `/p/${alias}/browse/${TYPE_TO_FOLDER[type] ?? type}/${id}`;
 }
 
 export function ProjectStatePanel({ alias, state }: Props) {

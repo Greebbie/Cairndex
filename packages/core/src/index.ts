@@ -18,6 +18,7 @@ export * from "./claudeMd.js";
 export * from "./hash.js";
 export * from "./sync.js";
 export * from "./autoSession.js";
+export * from "./sessionLog.js";
 export * from "./watcher.js";
 export * from "./validate/fix.js";
 export * from "./safePath.js";
