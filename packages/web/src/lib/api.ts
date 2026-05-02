@@ -3,7 +3,10 @@ import { z } from "zod";
 import {
   ChangesSchema,
   ComposePackResponseSchema,
+  ClaudeCodeStatusSchema,
   DashboardSchema,
+  LastTurnSummaryResponseSchema,
+  UserPreferencesSchema,
   InboxListSchema,
   IssueSchema,
   NodeListItemSchema,
@@ -146,6 +149,63 @@ export function useDashboard(alias: string | undefined) {
     queryKey: ["dashboard", alias],
     queryFn: () => jsonFetch(`/api/vault/${alias}/dashboard`, DashboardSchema),
     enabled: !!alias,
+  });
+}
+
+export function useLastTurnSummary(alias: string | undefined) {
+  return useQuery({
+    queryKey: ["last-turn-summary", alias],
+    queryFn: () =>
+      jsonFetch(`/api/vault/${alias}/last-turn-summary`, LastTurnSummaryResponseSchema),
+    enabled: !!alias,
+  });
+}
+
+export function useUserPreferences() {
+  return useQuery({
+    queryKey: ["user-preferences"],
+    queryFn: () => jsonFetch("/api/user/preferences", UserPreferencesSchema),
+  });
+}
+
+export function useUpdateUserPreferences() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: Record<string, unknown>) => {
+      const r = await fetch(`${API_BASE}/api/user/preferences`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!r.ok) throw new Error(`${r.status}`);
+      return r.json();
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["user-preferences"] }),
+  });
+}
+
+export function useClaudeCodeStatus(alias: string | undefined) {
+  return useQuery({
+    queryKey: ["claude-code-status", alias],
+    queryFn: () =>
+      jsonFetch(`/api/projects/${alias}/claude-code-status`, ClaudeCodeStatusSchema),
+    enabled: !!alias,
+  });
+}
+
+export function useWireClaudeCode() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (alias: string) => {
+      const r = await fetch(`${API_BASE}/api/projects/${alias}/claude-code-wire`, {
+        method: "POST",
+      });
+      if (!r.ok) throw new Error(`${r.status}`);
+      return r.json();
+    },
+    onSuccess: (_, alias) => {
+      qc.invalidateQueries({ queryKey: ["claude-code-status", alias] });
+    },
   });
 }
 

@@ -39,3 +39,7 @@ export * from "./inbox/index.js";
 export * from "./mcp/index.js";
 export * from "./consolidate/index.js";
 export * from "./archiveProposer/index.js";
+export * from "./insight/extractFromSession.js";
+export * from "./userPrefs.js";
+export * from "./changelog.js";
+export * from "./claudeCodeHooks.js";

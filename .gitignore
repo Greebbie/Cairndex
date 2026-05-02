@@ -19,3 +19,6 @@ packages/web/playwright-report/
 # SEA build outputs
 packages/cli/dist-sea/
 packages/cli/dist-sea-entry/
+# Root-level copies of the SEA exe (produced by `pnpm -F cairndex package:sea`)
+/Cairndex.exe
+/Cairndex

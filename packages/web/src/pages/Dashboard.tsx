@@ -3,8 +3,11 @@ import { InboxPanel } from "@/components/cockpit/InboxPanel";
 import { MemoryHealthPanel } from "@/components/cockpit/MemoryHealthPanel";
 import { ProjectStatePanel } from "@/components/cockpit/ProjectStatePanel";
 import { DoctorBadge } from "@/components/DoctorBadge";
+import { LastTurnCard } from "@/components/LastTurnCard";
+import { NowBar } from "@/components/NowBar";
 import { useDashboard, useProjects } from "@/lib/api";
 import { useWatcherEvents } from "@/lib/sse";
+import { humanizeDateString } from "@/lib/time";
 import { useEffect } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 
@@ -46,8 +49,29 @@ export default function Dashboard() {
 
   return (
     <div className="p-8 space-y-4 max-w-3xl">
+      {data ? <NowBar alias={alias} state={data.projectState} /> : null}
+      <LastTurnCard alias={alias} />
+
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-semibold">{alias}</h2>
+        <div>
+          <h2 className="text-2xl font-semibold">{alias}</h2>
+          {(() => {
+            const proj = projects.data?.find((p) => p.alias === alias);
+            if (!proj) return null;
+            // Surface where this project's durable memory actually lives. For
+            // central-vault projects the vault path is the answer; for legacy
+            // repo-local layouts it's the repo path itself.
+            const dataPath = proj.projectRoot ?? proj.path;
+            return (
+              <div
+                className="text-xs text-muted-foreground font-mono mt-0.5"
+                title={proj.vaultRoot ? `Vault: ${proj.vaultRoot}` : `Legacy layout — memory in <repo>/${".cairndex"}/`}
+              >
+                {dataPath}
+              </div>
+            );
+          })()}
+        </div>
         <DoctorBadge alias={alias} />
       </div>
 
@@ -79,8 +103,11 @@ export default function Dashboard() {
               <ul className="text-sm divide-y">
                 {data.recentActivity.slice(0, 6).map((e, idx) => (
                   <li key={`${e.date}-${idx}`} className="py-1.5 flex gap-3">
-                    <span className="font-mono text-xs text-muted-foreground w-24 shrink-0">
-                      {e.date}
+                    <span
+                      className="font-mono text-xs text-muted-foreground w-24 shrink-0"
+                      title={e.date}
+                    >
+                      {humanizeDateString(e.date)}
                     </span>
                     <span className="flex-1">{e.summary}</span>
                   </li>

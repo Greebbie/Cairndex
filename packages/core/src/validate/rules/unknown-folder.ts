@@ -15,6 +15,9 @@ const ALLOWED_EXTRA = new Set([
   ".sync-conflicts",
   "indexes",
   "inbox",
+  // Phase D: scratchpad for transient turn-state JSON (last-turn-summary.json,
+  // future ephemeral status files). Not durable memory, intentionally non-node.
+  "state",
 ]);
 
 export const unknownFolder: ValidationRule = {

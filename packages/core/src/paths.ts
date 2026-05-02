@@ -1,5 +1,6 @@
-import { existsSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
+import yaml from "js-yaml";
 
 export const VAULT_DIR = ".cairndex";
 export const REPO_POINTER_FILE = ".cairndex-project.yaml";
@@ -32,8 +33,63 @@ export function centralVaultRootForProject(projectRoot: string): string | null {
   return dirname(dirname(projectRoot));
 }
 
+/**
+ * Read a `.cairndex-project.yaml` pointer file from disk. Inlined here (rather than
+ * imported from `projectRef.ts`) because that module imports from this one — a
+ * circular dependency would result. The format is intentionally tiny so a local
+ * parser is appropriate; full validation lives in `projectRef.ts::ProjectPointerSchema`.
+ */
+function readPointerVaultAndProject(
+  repoRoot: string,
+): { vault: string; project: string } | null {
+  const pointerPath = join(repoRoot, REPO_POINTER_FILE);
+  if (!existsSync(pointerPath)) return null;
+  try {
+    const raw = readFileSync(pointerPath, "utf8");
+    const parsed = yaml.load(raw, { schema: yaml.JSON_SCHEMA }) as
+      | { vault?: unknown; project?: unknown }
+      | null
+      | undefined;
+    if (
+      parsed &&
+      typeof parsed.vault === "string" &&
+      typeof parsed.project === "string" &&
+      parsed.vault.length > 0 &&
+      parsed.project.length > 0
+    ) {
+      return { vault: parsed.vault, project: parsed.project };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolve the directory holding a project's durable memory (specs, decisions, plans,
+ * sessions, inbox/, indexes/, …). Three cases, in priority order:
+ *
+ *   1. The input is already a central project root (has a `project.yaml` or sits inside
+ *      a `<vault>/projects/` parent) → return it as-is.
+ *   2. The input is a repo with a `.cairndex-project.yaml` pointer → follow the pointer
+ *      and return `<vaultRoot>/projects/<projectId>`. This is the case server routes
+ *      relied on accidentally working before the fix; without this branch they read the
+ *      orphan legacy `.cairndex/` instead of the actual central vault.
+ *   3. The input is a legacy repo with no pointer → return `<repoRoot>/.cairndex/`.
+ *
+ * This is the single source of truth for "where does memory live for this thing." All
+ * derived path helpers (`inboxPath`, `configPath`, `nodeFolderPath`, …) build on it,
+ * so consumers that pass a repo root automatically get the right layout.
+ */
 export function vaultPath(repoRoot: string): string {
   if (isCentralProjectRoot(repoRoot)) return repoRoot;
+  const pointer = readPointerVaultAndProject(repoRoot);
+  if (pointer) {
+    const vaultRoot = isAbsolute(pointer.vault)
+      ? resolve(pointer.vault)
+      : resolve(repoRoot, pointer.vault);
+    return centralProjectPath(vaultRoot, pointer.project);
+  }
   return join(repoRoot, VAULT_DIR);
 }
 

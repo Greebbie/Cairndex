@@ -11,11 +11,41 @@ human-readable, and version-controllable.
 
 ## Quickstart
 
-```bash
-# 1. Install
-pnpm add -g @cairndex/cli   # or: npm i -g @cairndex/cli
+**Prereqs:** Node 20+ and pnpm 9+ (only needed to *build* the exe; the resulting
+exe has Node baked in). See [docs/QUICKSTART.md](./docs/QUICKSTART.md) for the
+full 5-minute walkthrough including Claude Code wiring.
 
-# 2. Launch the GUI
+### 1. Build the single .exe and double-click it (recommended)
+
+```bash
+git clone https://github.com/Greebbie/Cairndex.git
+cd Cairndex
+pnpm install
+pnpm -r build
+pnpm -F cairndex package:sea
+```
+
+When the build finishes, **`Cairndex.exe`** sits right at the repo root next to
+this README. Double-click it → server starts on http://localhost:7777 →
+browser opens to the GUI. That's the whole story.
+
+The exe is ~84 MB with Node.js embedded — zero runtime dependencies. It finds
+its web assets in `packages/web/dist/` and its vault templates in `templates/`
+(both already in the repo), so the root copy works as soon as it's built.
+
+For redistribution, the same build also produces `packages/cli/dist-sea/`
+containing a self-contained portable bundle (`Cairndex.exe` + sibling `web/`
+and `templates/` folders). Drop that whole folder onto a USB stick or
+`~/Applications/` — keep the three siblings together — and double-click the
+exe to run.
+
+> Future: pre-built binaries from [Releases](https://github.com/Greebbie/Cairndex/releases)
+> so you can skip the build step entirely.
+
+### 2. Global CLI install (after npm publish; not yet)
+
+```bash
+pnpm add -g @cairndex/cli   # or: npm i -g @cairndex/cli
 cairndex ui
 ```
 
@@ -25,8 +55,8 @@ Your browser opens to a 3-step wizard:
 2. **Register a code repo** as your first project.
 3. **Run doctor** to verify, then land on the project Dashboard.
 
-That's it. No config files, no schemas to learn first. Add more projects from
-the same vault at any time.
+After that, `cairndex init` inside the repo wires Claude Code (hooks +
+MCP server) automatically. No config files, no schemas to learn first.
 
 ## How memory is organized
 

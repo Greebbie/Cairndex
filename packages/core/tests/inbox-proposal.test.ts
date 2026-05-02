@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { defaultConfig } from "../src/config.js";
+import { defaultConfig, mergeConfig } from "../src/config.js";
 import {
   acceptProposal,
   createProposal,
@@ -447,6 +447,120 @@ describe("createProposal — patch mode", () => {
     rmSync(join(tmp, ".cairndex/specs/SPEC-001.md"));
     await expect(acceptProposal(tmp, defaultConfig(), created.proposalId)).rejects.toThrow(
       /target.*not found/i,
+    );
+  });
+});
+
+describe("immutable type enforcement", () => {
+  beforeEach(() => {
+    mkdirSync(join(tmp, ".cairndex/decisions"), { recursive: true });
+    mkdirSync(join(tmp, ".cairndex/sessions"), { recursive: true });
+  });
+
+  it("createProposal rejects update of an immutable type (decision)", async () => {
+    writeFileSync(
+      join(tmp, ".cairndex/decisions/ADR-001.md"),
+      "---\nid: ADR-001\ntitle: T\nstatus: accepted\ncreated: 2026-01-01\n---\nbody\n",
+      "utf8",
+    );
+    await expect(
+      createProposal(tmp, defaultConfig(), {
+        proposalType: "update",
+        targetType: "decision",
+        target: "ADR-001",
+        newBody: "tampered\n",
+        summary: "x",
+        reason: "x",
+        provenance: { createdBy: "claude", session: "s" },
+      }),
+    ).rejects.toThrow(/immutable type 'decision'/);
+  });
+
+  it("createProposal allows create of an immutable type (decision)", async () => {
+    const r = await createProposal(tmp, defaultConfig(), {
+      proposalType: "create",
+      targetType: "decision",
+      newFrontmatter: { title: "New ADR", status: "accepted", created: "2026-05-03" },
+      newBody: "Decision body.\n",
+      summary: "new adr",
+      reason: "new",
+      provenance: { createdBy: "claude", session: "s" },
+    });
+    expect(r.proposalId).toMatch(/^PROP-/);
+  });
+
+  it("createProposal allows update of a mutable type (spec)", async () => {
+    writeFileSync(
+      join(tmp, ".cairndex/specs/SPEC-001.md"),
+      "---\nid: SPEC-001\ntitle: T\nstatus: active\ncreated: 2026-05-01\nupdated: 2026-05-01\n---\nbody\n",
+      "utf8",
+    );
+    const r = await createProposal(tmp, defaultConfig(), {
+      proposalType: "update",
+      targetType: "spec",
+      target: "SPEC-001",
+      newBody: "new body\n",
+      summary: "x",
+      reason: "x",
+      provenance: { createdBy: "claude", session: "s" },
+    });
+    expect(r.proposalId).toMatch(/^PROP-/);
+  });
+
+  it("acceptProposal rejects a legacy update proposal targeting an immutable type", async () => {
+    writeFileSync(
+      join(tmp, ".cairndex/sessions/2026-04-01-1000.md"),
+      "---\nid: 2026-04-01-1000\ndate: 2026-04-01\nsummary: x\n---\noriginal session\n",
+      "utf8",
+    );
+    const proposalPath = join(tmp, ".cairndex/inbox/proposed-memory-updates/PROP-099.md");
+    writeFileSync(
+      proposalPath,
+      [
+        "---",
+        "id: PROP-099",
+        "proposalType: update",
+        "targetType: session",
+        "target: 2026-04-01-1000",
+        "status: pending",
+        "summary: tamper",
+        "reason: tamper",
+        "contentHash: deadbeef",
+        "created: 2026-05-03T00:00:00.000Z",
+        "provenance:",
+        "  created_by: legacy",
+        "  session: legacy",
+        "---",
+        "tampered body",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    await expect(acceptProposal(tmp, defaultConfig(), "PROP-099")).rejects.toThrow(
+      /immutable type 'session'/,
+    );
+  });
+
+  it("acceptProposal honors immutable_types config override (locks down spec)", async () => {
+    writeFileSync(
+      join(tmp, ".cairndex/specs/SPEC-001.md"),
+      "---\nid: SPEC-001\ntitle: T\nstatus: active\ncreated: 2026-05-01\nupdated: 2026-05-01\n---\nbody\n",
+      "utf8",
+    );
+    const created = await createProposal(tmp, defaultConfig(), {
+      proposalType: "update",
+      targetType: "spec",
+      target: "SPEC-001",
+      newBody: "new body\n",
+      summary: "x",
+      reason: "x",
+      provenance: { createdBy: "claude", session: "s" },
+    });
+    const lockedDown = mergeConfig(defaultConfig(), {
+      immutable_types: ["decision", "session", "change", "insight", "spec"],
+    });
+    await expect(acceptProposal(tmp, lockedDown, created.proposalId)).rejects.toThrow(
+      /immutable type 'spec'/,
     );
   });
 });

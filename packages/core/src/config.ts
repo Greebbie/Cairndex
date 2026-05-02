@@ -60,6 +60,9 @@ const CustomTypeDefSchema = z.object({
     .string()
     .min(1)
     .regex(/^[A-Z][A-Z0-9_]*$/, "id_prefix must be UPPER_SNAKE"),
+  // undefined → treated as false by isImmutableType. Optional so existing custom
+  // type defs in user configs don't have to be touched.
+  immutable: z.boolean().optional(),
 });
 
 export type CustomTypeDef = z.infer<typeof CustomTypeDefSchema>;
@@ -72,6 +75,9 @@ export const ConfigSchema = z.object({
   verification_required_for_status: z.array(z.string()).default(["done", "accepted"]),
   freshness_warn_days: z.number().int().min(0).default(30),
   node_types: z.record(z.string(), CustomTypeDefSchema).default({}),
+  immutable_types: z
+    .array(z.string())
+    .default(["decision", "session", "change", "insight"]),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
@@ -96,6 +102,7 @@ export interface ConfigOverride {
   verification_required_for_status?: Config["verification_required_for_status"];
   freshness_warn_days?: Config["freshness_warn_days"];
   node_types?: Config["node_types"];
+  immutable_types?: Config["immutable_types"];
 }
 
 export function mergeConfig(base: Config, override: ConfigOverride): Config {
@@ -111,6 +118,7 @@ export function mergeConfig(base: Config, override: ConfigOverride): Config {
       override.verification_required_for_status ?? base.verification_required_for_status,
     freshness_warn_days: override.freshness_warn_days ?? base.freshness_warn_days,
     node_types: { ...base.node_types, ...(override.node_types ?? {}) },
+    immutable_types: override.immutable_types ?? base.immutable_types,
   });
 }
 
@@ -189,4 +197,24 @@ export function folderForType(cfg: Config, typeName: string): string | null {
 /** True for the 10 built-in types only. */
 export function isBuiltInType(typeName: string): typeName is NodeType {
   return (NODE_TYPES as readonly string[]).includes(typeName);
+}
+
+/**
+ * True when a node type is treated as append-only (proposal `update` is forbidden).
+ * Two opt-in sources are checked: `cfg.immutable_types` (works for any type name,
+ * built-in or custom) and `cfg.node_types[name].immutable === true` (per-type-def
+ * opt-in for custom types). Either source flips it on.
+ *
+ * Note: end-to-end enforcement for *custom* type names is currently bottlenecked
+ * by `asNodeType` in `inbox/read.ts`, which only accepts the 10 built-in
+ * NodeType strings. A hand-authored proposal targeting a custom immutable type
+ * is dropped at parse time with `proposal not found`, so this guard never sees
+ * it. The check below is correct in isolation; the gap is in `read.ts` and
+ * resolves once that whitelist is widened.
+ */
+export function isImmutableType(cfg: Config, typeName: string): boolean {
+  if (cfg.immutable_types.includes(typeName)) return true;
+  const custom = cfg.node_types?.[typeName];
+  if (custom?.immutable === true) return true;
+  return false;
 }

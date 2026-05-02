@@ -1,7 +1,8 @@
 import { existsSync } from "node:fs";
 import { readFile, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { type Config, folderForNodeType } from "../config.js";
+import { appendChangelog } from "../changelog.js";
+import { type Config, folderForNodeType, isImmutableType } from "../config.js";
 import { parseFrontmatter, serializeFrontmatter } from "../frontmatter.js";
 import { formatSequentialId, parseId } from "../ids.js";
 import { inboxProposalsPath, nodeFolderPath } from "../paths.js";
@@ -67,6 +68,15 @@ export async function acceptProposal(
     throw new Error(`proposal ${proposalId} is ${proposal.status}, only pending can be accepted`);
   }
 
+  if (proposal.proposalType === "update" && isImmutableType(cfg, proposal.targetType)) {
+    throw new Error(
+      `acceptProposal: cannot accept update of immutable type '${proposal.targetType}' ` +
+        `(${proposalId}). Immutable types are append-only by convention — ` +
+        `create a new ${proposal.targetType} entry that supersedes the old one instead. ` +
+        `(Configurable via .cairndex/config.yaml → immutable_types.)`,
+    );
+  }
+
   const folder = nodeFolderPath(repoRoot, folderForNodeType(cfg, proposal.targetType));
 
   if (proposal.proposalType === "update") {
@@ -84,6 +94,10 @@ export async function acceptProposal(
     const nextBody = proposal.patch ? applyPatch(currentBody, proposal.patch) : proposal.newBody;
     await writeFile(targetPath, serializeFrontmatter(nextFm, nextBody), "utf8");
     await markAccepted(proposalPath, proposal.target);
+    await appendChangelog(
+      repoRoot,
+      `Accepted ${proposalId} → updated ${proposal.targetType}/${proposal.target}`,
+    );
     return {
       proposalId,
       targetId: proposal.target,
@@ -102,9 +116,27 @@ export async function acceptProposal(
   };
   if (!fm.created) fm.created = new Date().toISOString().slice(0, 10);
   if (!fm.updated) fm.updated = fm.created;
+  // Carry the proposal's provenance forward into the durable node. Without this
+  // the audit trail of "who proposed this" gets lost on accept, and the
+  // provenance-present validator flags the new node as missing required metadata.
+  // Caller-supplied newFrontmatter wins if it explicitly provides provenance.
+  if (!fm.provenance) {
+    const prov: Record<string, unknown> = {
+      created_by: proposal.provenance.createdBy,
+      session: proposal.provenance.session,
+    };
+    if (proposal.provenance.confidence !== undefined) {
+      prov.confidence = proposal.provenance.confidence;
+    }
+    fm.provenance = prov;
+  }
   const slug = slugify(String(fm.title ?? newId));
   const filePath = join(folder, `${newId}-${slug}.md`);
   await writeFile(filePath, serializeFrontmatter(fm, proposal.newBody), "utf8");
   await markAccepted(proposalPath, newId);
+  await appendChangelog(
+    repoRoot,
+    `Accepted ${proposalId} → created ${proposal.targetType}/${newId}`,
+  );
   return { proposalId, targetId: newId, targetPath: filePath, action: "created" };
 }

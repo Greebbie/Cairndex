@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import { runArchive } from "./commands/archive.js";
+import { runBootstrap } from "./commands/bootstrap.js";
 import { runConsolidate } from "./commands/consolidate.js";
 import { runContext } from "./commands/context.js";
 import { runDoctor } from "./commands/doctor.js";
@@ -12,7 +13,8 @@ import {
   runInboxReject,
 } from "./commands/inbox.js";
 import { runInit } from "./commands/init.js";
-import { runInsightPromote, runInsightPull } from "./commands/insight.js";
+import { runInsightPromote, runInsightProposeFromSession, runInsightPull } from "./commands/insight.js";
+import { runLastTurnSummary } from "./commands/lastTurnSummary.js";
 import { runMcp } from "./commands/mcp.js";
 import {
   defaultProjectIdFromRepo,
@@ -20,6 +22,7 @@ import {
   runProjectRegister,
 } from "./commands/project.js";
 import { runSessionLog } from "./commands/session.js";
+import { runStatus } from "./commands/status.js";
 import { runSweep } from "./commands/sweep.js";
 import { runSyncCmd } from "./commands/sync.js";
 import { runUi } from "./commands/ui.js";
@@ -427,6 +430,75 @@ program
   });
 
 program
+  .command("last-turn-summary")
+  .description(
+    "Write <vault>/state/last-turn-summary.json with this turn's tool counts + new proposals. Used by the Stop Claude Code hook.",
+  )
+  .option("--cwd <path>", "Working directory", process.cwd())
+  .option("--vault <path>", "Vault root (overrides --cwd)")
+  .option("--project <id>", "Project id inside a central vault")
+  .action(async (opts) => {
+    const callOpts: Parameters<typeof runLastTurnSummary>[0] = { cwd: opts.cwd };
+    if (opts.vault) callOpts.vaultRoot = opts.vault;
+    if (opts.project) callOpts.projectId = opts.project;
+    // Stop hook payload arrives on stdin as JSON with transcript_path; reuse the same
+    // helper that doctor --auto-session uses so the parsing is identical.
+    const payload = await readStdinJson();
+    if (payload && typeof payload.transcript_path === "string") {
+      callOpts.transcriptPath = payload.transcript_path;
+    }
+    const r = await runLastTurnSummary(callOpts);
+    if (r.message) console.error(r.message);
+    process.exit(r.exitCode);
+  });
+
+program
+  .command("bootstrap")
+  .description(
+    "Emit a session-start context block (phase / active task / pending proposals). Used by the SessionStart Claude Code hook.",
+  )
+  .option("--cwd <path>", "Working directory", process.cwd())
+  .option("--vault <path>", "Vault root (overrides --cwd)")
+  .option("--project <id>", "Project id inside a central vault")
+  .option(
+    "--proposal-limit <n>",
+    "Cap on pending proposals to surface (default 5)",
+    (v) => Number.parseInt(v, 10),
+  )
+  .action(async (opts) => {
+    const callOpts: Parameters<typeof runBootstrap>[0] = { cwd: opts.cwd };
+    if (opts.vault) callOpts.vaultRoot = opts.vault;
+    if (opts.project) callOpts.projectId = opts.project;
+    if (typeof opts.proposalLimit === "number" && !Number.isNaN(opts.proposalLimit)) {
+      callOpts.proposalLimit = opts.proposalLimit;
+    }
+    const r = await runBootstrap(callOpts);
+    if (r.message) console.error(r.message);
+    if (r.body) console.log(r.body);
+    process.exit(r.exitCode);
+  });
+
+program
+  .command("status")
+  .description(
+    "One-screen summary: phase / active task / inbox count / health / last vault change",
+  )
+  .option("--cwd <path>", "Working directory", process.cwd())
+  .option("--vault <path>", "Vault root (overrides --cwd)")
+  .option("--project <id>", "Project id inside a central vault")
+  .option("--json", "Emit machine-readable JSON instead of a human report", false)
+  .action(async (opts) => {
+    const callOpts: Parameters<typeof runStatus>[0] = { cwd: opts.cwd };
+    if (opts.vault) callOpts.vaultRoot = opts.vault;
+    if (opts.project) callOpts.projectId = opts.project;
+    if (opts.json) callOpts.json = true;
+    const r = await runStatus(callOpts);
+    if (r.message) console.error(r.message);
+    if (r.body) console.log(r.body);
+    process.exit(r.exitCode);
+  });
+
+program
   .command("mcp")
   .description("Start an MCP (Model Context Protocol) server over stdio for the current vault")
   .option("--cwd <path>", "Working directory", process.cwd())
@@ -636,6 +708,38 @@ insight
     if (opts.project) callOpts.projectId = opts.project;
     const r = await runInsightPromote(callOpts);
     if (r.message) console.error(r.message);
+    process.exit(r.exitCode);
+  });
+
+insight
+  .command("propose-from-session [sessionId]")
+  .description(
+    "Heuristically distill a draft insight from a session and submit it to the inbox. No LLM call. When sessionId is omitted, the latest session by mtime is used (default for Stop hook chains). Reads stdin for the Claude Code Stop-hook payload `{\"transcript_path\":\"...\"}`; when present, the heuristic also scans assistant-text content from the transcript for decision phrases.",
+  )
+  .option("--cwd <path>", "Working directory", process.cwd())
+  .option("--vault <path>", "Central vault root")
+  .option("--project <id>", "Project id inside a central vault")
+  .option("--by <agent>", "createdBy provenance", "auto-distill")
+  .option("--silent", "Suppress non-error output", false)
+  .action(async (sessionId: string | undefined, opts) => {
+    const callOpts: Parameters<typeof runInsightProposeFromSession>[0] = {
+      cwd: opts.cwd,
+    };
+    if (sessionId) callOpts.sessionId = sessionId;
+    if (opts.vault) callOpts.vaultRoot = opts.vault;
+    if (opts.project) callOpts.projectId = opts.project;
+    if (opts.by) callOpts.createdBy = opts.by;
+    // Read the Stop-hook payload from stdin if available — same envelope shape as
+    // doctor --auto-session and last-turn-summary.
+    const payload = await readStdinJson();
+    if (payload && typeof payload.transcript_path === "string") {
+      callOpts.transcriptPath = payload.transcript_path;
+    }
+    const r = await runInsightProposeFromSession(callOpts);
+    if (r.message && !opts.silent) console.error(r.message);
+    if (r.proposalId && !opts.silent) {
+      console.log(`proposed ${r.proposalId} -> ${r.path}`);
+    }
     process.exit(r.exitCode);
   });
 

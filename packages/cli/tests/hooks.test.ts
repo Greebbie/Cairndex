@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { applyClaudeHooks, renderClaudeSettings } from "../src/utils/hooks.js";
+import { applyClaudeHooks, renderClaudeSettings, renderMcpServerEntry } from "../src/utils/hooks.js";
 
 describe("renderClaudeSettings", () => {
   it("legacy repo emits --filter-path .cairndex/", () => {
@@ -46,6 +46,34 @@ describe("renderClaudeSettings", () => {
       const json = renderClaudeSettings({ mode: "legacy" }, repo);
       const cmd = json.hooks.PostToolUse[0]?.hooks[0]?.command ?? "";
       expect(cmd.startsWith("cairndex ")).toBe(true);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  it("registers a SessionStart hook running cairndex bootstrap", () => {
+    const repo = mkdtempSync(join(tmpdir(), "cairn-render-sessionstart-"));
+    try {
+      const json = renderClaudeSettings({ mode: "legacy" }, repo);
+      expect(json.hooks.SessionStart).toBeDefined();
+      const cmd = json.hooks.SessionStart[0]?.hooks[0]?.command ?? "";
+      expect(cmd).toMatch(/bootstrap/);
+      expect(cmd).toContain("cairndex-managed");
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  it("Stop chain runs auto-session, auto-distill, last-turn-summary, then sweep — in that order", () => {
+    const repo = mkdtempSync(join(tmpdir(), "cairn-render-stop-chain-"));
+    try {
+      const json = renderClaudeSettings({ mode: "legacy" }, repo);
+      const stop = json.hooks.Stop[0]?.hooks ?? [];
+      expect(stop).toHaveLength(4);
+      expect(stop[0]?.command).toMatch(/auto-session/);
+      expect(stop[1]?.command).toMatch(/insight propose-from-session/);
+      expect(stop[2]?.command).toMatch(/last-turn-summary/);
+      expect(stop[3]?.command).toMatch(/sweep/);
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }
@@ -98,5 +126,100 @@ describe("applyClaudeHooks", () => {
     expect(settings).toContain("--project demo");
     expect(settings).toContain("--vault");
     expect(settings).not.toContain("--filter-path .cairndex/");
+  });
+
+  it("registers the cairndex MCP server alongside hooks", async () => {
+    const repo = mkdtempSync(join(tmpdir(), "cairn-hooks-mcp-"));
+    dirs.push(repo);
+    await applyClaudeHooks(repo);
+    const settings = JSON.parse(
+      readFileSync(join(repo, ".claude", "settings.json"), "utf8"),
+    ) as { mcpServers?: Record<string, { command: string; args?: string[] }> };
+    expect(settings.mcpServers).toBeDefined();
+    expect(settings.mcpServers?.cairndex).toBeDefined();
+    expect(settings.mcpServers?.cairndex?.args).toContain("mcp");
+  });
+
+  it("MCP entry passes --vault and --project for central layouts", async () => {
+    const repo = mkdtempSync(join(tmpdir(), "cairn-hooks-mcp-central-"));
+    const vault = mkdtempSync(join(tmpdir(), "cairn-hooks-mcp-vault-"));
+    dirs.push(repo, vault);
+    writeFileSync(
+      join(repo, ".cairndex-project.yaml"),
+      `vault: "${vault.replace(/\\/g, "/")}"\nproject: demo\n`,
+      "utf8",
+    );
+    await applyClaudeHooks(repo);
+    const settings = JSON.parse(
+      readFileSync(join(repo, ".claude", "settings.json"), "utf8"),
+    ) as { mcpServers?: Record<string, { command: string; args?: string[] }> };
+    const args = settings.mcpServers?.cairndex?.args ?? [];
+    expect(args).toContain("--vault");
+    expect(args).toContain("--project");
+    expect(args).toContain("demo");
+  });
+
+  it("preserves user-defined mcpServers entries while overwriting cairndex idempotently", async () => {
+    const repo = mkdtempSync(join(tmpdir(), "cairn-hooks-mcp-preserve-"));
+    dirs.push(repo);
+    mkdirSync(join(repo, ".claude"), { recursive: true });
+    writeFileSync(
+      join(repo, ".claude", "settings.json"),
+      JSON.stringify({
+        mcpServers: {
+          other: { command: "node", args: ["other.js"] },
+          cairndex: { command: "stale", args: ["stale"] },
+        },
+      }),
+      "utf8",
+    );
+    await applyClaudeHooks(repo);
+    const settings = JSON.parse(
+      readFileSync(join(repo, ".claude", "settings.json"), "utf8"),
+    ) as { mcpServers?: Record<string, { command: string; args?: string[] }> };
+    expect(settings.mcpServers?.other?.command).toBe("node");
+    expect(settings.mcpServers?.cairndex?.command).not.toBe("stale");
+    expect(settings.mcpServers?.cairndex?.args).toContain("mcp");
+  });
+});
+
+describe("renderMcpServerEntry", () => {
+  it("legacy layout produces minimal args", () => {
+    const repo = mkdtempSync(join(tmpdir(), "cairn-mcp-legacy-"));
+    try {
+      const entry = renderMcpServerEntry({ mode: "legacy" }, repo);
+      expect(entry.command).toBe("cairndex");
+      expect(entry.args).toEqual(["mcp"]);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  it("central layout includes vault and project arguments", () => {
+    const repo = mkdtempSync(join(tmpdir(), "cairn-mcp-central-"));
+    try {
+      const entry = renderMcpServerEntry(
+        { mode: "central", vaultRoot: "/v", projectId: "p" },
+        repo,
+      );
+      expect(entry.args).toEqual(["mcp", "--vault", "/v", "--project", "p"]);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  it("uses node + repo-relative bin when invoked inside the source repo", () => {
+    const repo = mkdtempSync(join(tmpdir(), "cairn-mcp-dev-"));
+    try {
+      const binDir = join(repo, "packages", "cli", "bin");
+      mkdirSync(binDir, { recursive: true });
+      writeFileSync(join(binDir, "cairndex"), "#!/usr/bin/env node\n", "utf8");
+      const entry = renderMcpServerEntry({ mode: "legacy" }, repo);
+      expect(entry.command).toBe("node");
+      expect(entry.args?.[0]).toBe("packages/cli/bin/cairndex");
+      expect(entry.args).toContain("mcp");
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
   });
 });

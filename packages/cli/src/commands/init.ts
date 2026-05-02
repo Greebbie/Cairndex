@@ -115,51 +115,62 @@ async function copyDirRecursive(src: string, dest: string): Promise<void> {
 
 export async function runInit(opts: InitOptions): Promise<void> {
   const repoRoot = opts.cwd;
+  // When a `.cairndex-project.yaml` pointer exists, this repo is already wired into a
+  // central vault. We must NOT clobber that setup with a fresh legacy `.cairndex/`
+  // skeleton — the user already migrated. In central mode `init` becomes a refresh
+  // operation: re-apply Claude Code hooks + MCP wiring + CLAUDE.md block, nothing else.
+  const pointerPath = join(repoRoot, ".cairndex-project.yaml");
+  const hasCentralPointer = existsSync(pointerPath);
   const vault = vaultPath(repoRoot);
-  logger.info({ repoRoot }, "initializing cairndex");
+  logger.info(
+    { repoRoot, layout: hasCentralPointer ? "central" : "legacy" },
+    "initializing cairndex",
+  );
 
-  // 1. Skeleton
-  await mkdir(vault, { recursive: true });
-  for (const f of NODE_FOLDERS) await mkdir(join(vault, f), { recursive: true });
+  if (!hasCentralPointer) {
+    // 1. Skeleton (legacy repo-local layout only)
+    await mkdir(vault, { recursive: true });
+    for (const f of NODE_FOLDERS) await mkdir(join(vault, f), { recursive: true });
 
-  // 2. Copy rules/templates from global; fall back to bundled defaults.
-  const globalShared = sharedDir();
-  const bundled = findBundledTemplatesDir();
-  const ruleSrc = existsSync(join(globalShared, "rules"))
-    ? join(globalShared, "rules")
-    : join(bundled, "rules");
-  const tplSrc = existsSync(join(globalShared, "templates"))
-    ? join(globalShared, "templates")
-    : join(bundled, "templates");
-  await copyDirRecursive(ruleSrc, join(vault, "rules"));
-  await copyDirRecursive(tplSrc, join(vault, "templates"));
+    // 2. Copy rules/templates from global; fall back to bundled defaults.
+    const globalShared = sharedDir();
+    const bundled = findBundledTemplatesDir();
+    const ruleSrc = existsSync(join(globalShared, "rules"))
+      ? join(globalShared, "rules")
+      : join(bundled, "rules");
+    const tplSrc = existsSync(join(globalShared, "templates"))
+      ? join(globalShared, "templates")
+      : join(bundled, "templates");
+    await copyDirRecursive(ruleSrc, join(vault, "rules"));
+    await copyDirRecursive(tplSrc, join(vault, "templates"));
 
-  // 3. Generate seed files (idempotent: do not overwrite if present).
-  const today = todayUtc();
-  const indexPath = join(vault, "index.md");
-  if (!existsSync(indexPath)) {
-    await writeFile(indexPath, INDEX_BODY.replaceAll("__TODAY__", today), "utf8");
-  }
-  const tasksDir = join(vault, "tasks");
-  if (!existsSync(join(tasksDir, "current.md"))) {
-    await writeFile(join(tasksDir, "current.md"), "# Current Tasks\n\n- (none)\n", "utf8");
-  }
-  if (!existsSync(join(tasksDir, "backlog.md"))) {
-    await writeFile(join(tasksDir, "backlog.md"), "# Backlog\n\n- (none)\n", "utf8");
-  }
-  const changelogPath = join(vault, "changes", "changelog.md");
-  if (!existsSync(changelogPath)) {
-    await writeFile(changelogPath, `# Changelog\n\n- ${today} — cairndex initialized.\n`, "utf8");
+    // 3. Generate seed files (idempotent: do not overwrite if present).
+    const today = todayUtc();
+    const indexPath = join(vault, "index.md");
+    if (!existsSync(indexPath)) {
+      await writeFile(indexPath, INDEX_BODY.replaceAll("__TODAY__", today), "utf8");
+    }
+    const tasksDir = join(vault, "tasks");
+    if (!existsSync(join(tasksDir, "current.md"))) {
+      await writeFile(join(tasksDir, "current.md"), "# Current Tasks\n\n- (none)\n", "utf8");
+    }
+    if (!existsSync(join(tasksDir, "backlog.md"))) {
+      await writeFile(join(tasksDir, "backlog.md"), "# Backlog\n\n- (none)\n", "utf8");
+    }
+    const changelogPath = join(vault, "changes", "changelog.md");
+    if (!existsSync(changelogPath)) {
+      await writeFile(changelogPath, `# Changelog\n\n- ${today} — cairndex initialized.\n`, "utf8");
+    }
+
+    // 4. config.yaml (only write if missing — preserve user overrides)
+    const configPathStr = join(vault, "config.yaml");
+    if (!existsSync(configPathStr)) {
+      const cfg = defaultConfig();
+      await writeFile(configPathStr, yaml.dump({ schemaVersion: cfg.schemaVersion }), "utf8");
+    }
   }
 
-  // 4. config.yaml (only write if missing — preserve user overrides)
-  const configPathStr = join(vault, "config.yaml");
-  if (!existsSync(configPathStr)) {
-    const cfg = defaultConfig();
-    await writeFile(configPathStr, yaml.dump({ schemaVersion: cfg.schemaVersion }), "utf8");
-  }
-
-  // 5. CLAUDE.md
+  // 5. CLAUDE.md (universal — both layouts get the agent-surface block)
   if (opts.claudeMd) {
     const claudePath = join(repoRoot, "CLAUDE.md");
     let existing: string | undefined;
@@ -169,34 +180,40 @@ export async function runInit(opts: InitOptions): Promise<void> {
     logger.info({ action: result.action }, "CLAUDE.md updated");
   }
 
-  // 6. Hooks
+  // 6. Hooks (universal — both layouts get hooks + MCP wiring; applyClaudeHooks
+  //    detects the layout itself and emits central-aware command lines.)
   if (opts.hooks) {
     await applyClaudeHooks(repoRoot);
     logger.info("Claude Code hooks written");
   }
 
-  // 7. Sync baseline (hashes of currently copied rules/templates)
-  const baseline: Record<string, string> = {};
-  for (const sub of ["rules", "templates"]) {
-    const dir = join(vault, sub);
-    if (!existsSync(dir)) continue;
-    const stack = [dir];
-    while (stack.length) {
-      const cur = stack.pop();
-      if (!cur) continue;
-      const entries = await readdir(cur, { withFileTypes: true });
-      for (const e of entries) {
-        const full = join(cur, e.name);
-        if (e.isDirectory()) stack.push(full);
-        else if (e.isFile() && e.name.endsWith(".md")) {
-          baseline[full.slice(vault.length + 1).replace(/\\/g, "/")] = await readFile(full, "utf8");
+  if (!hasCentralPointer) {
+    // 7. Sync baseline (hashes of currently copied rules/templates) — meaningless
+    //    in central mode where the vault lives outside the repo and we did not
+    //    populate the legacy folder.
+    const baseline: Record<string, string> = {};
+    for (const sub of ["rules", "templates"]) {
+      const dir = join(vault, sub);
+      if (!existsSync(dir)) continue;
+      const stack = [dir];
+      while (stack.length) {
+        const cur = stack.pop();
+        if (!cur) continue;
+        const entries = await readdir(cur, { withFileTypes: true });
+        for (const e of entries) {
+          const full = join(cur, e.name);
+          if (e.isDirectory()) stack.push(full);
+          else if (e.isFile() && e.name.endsWith(".md")) {
+            baseline[full.slice(vault.length + 1).replace(/\\/g, "/")] = await readFile(full, "utf8");
+          }
         }
       }
     }
+    await writeSyncBaseline(repoRoot, baseline);
   }
-  await writeSyncBaseline(repoRoot, baseline);
 
-  // 8. Register globally
+  // 8. Register globally (universal — both layouts benefit from the registry entry
+  //    so `cairndex ui` shows this project in the sidebar).
   await mkdir(globalDir(), { recursive: true });
   await registerProject({
     path: repoRoot,
@@ -205,14 +222,20 @@ export async function runInit(opts: InitOptions): Promise<void> {
 
   logger.info("cairndex init complete");
 
-  // 9. Nudge toward the central-vault flow. The legacy repo-local layout keeps working,
-  //    but the canonical target (per ADR-002) is one user-level vault holding every project.
+  // 9. Final tip — accurate per layout.
   console.log("");
-  console.log(
-    "Tip: this created a legacy repo-local vault. The canonical layout is a central vault:",
-  );
-  console.log("  cairndex vault init <path>");
-  console.log(
-    "  cairndex project import-repo-vault --vault <path> --project <id> --repo <repo>",
-  );
+  if (hasCentralPointer) {
+    console.log(
+      `Refreshed Claude Code hooks + MCP wiring against the central vault referenced by ${pointerPath}.`,
+    );
+    console.log("(Legacy `.cairndex/` skeleton skipped — this repo is already on the central layout.)");
+  } else {
+    console.log(
+      "Tip: this created a legacy repo-local vault. The canonical layout is a central vault:",
+    );
+    console.log("  cairndex vault init <path>");
+    console.log(
+      "  cairndex project import-repo-vault --vault <path> --project <id> --repo <repo>",
+    );
+  }
 }

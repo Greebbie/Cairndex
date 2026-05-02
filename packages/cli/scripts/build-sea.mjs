@@ -116,6 +116,15 @@ cpSync(templatesSrc, join(out, "templates"), { recursive: true });
 rmSync(blobPath);
 rmSync(seaConfigPath);
 
-console.log(`[sea] ✓ done. Portable folder: ${out}`);
-console.log(`[sea]   ${exeName} — double-click to launch (server on http://localhost:7777)`);
-console.log(`[sea]   web/ + templates/ are loaded relative to the exe`);
+// 8. Also place a copy of the exe at the repo root so it's visible on clone+build.
+//    The runtime resolves web/ via either <exeDir>/web (portable bundle) or
+//    <exeDir>/packages/web/dist (repo-root case), and templates/ via <exeDir>/templates
+//    (which already exists at the repo root as the source folder). Both paths just work.
+const repoExe = join(repoRoot, exeName);
+copyFileSync(finalExe, repoExe);
+console.log(`[sea] copied to repo root -> ${repoExe}`);
+
+console.log(`[sea] ✓ done.`);
+console.log(`[sea]   Repo root:   ${repoExe}  ← visible after clone, double-click to launch`);
+console.log(`[sea]   Portable:    ${out}/  (move this folder to redistribute)`);
+console.log(`[sea]   Both forms launch the GUI on http://localhost:7777.`);

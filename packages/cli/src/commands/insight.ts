@@ -3,13 +3,20 @@ import { appendFile, copyFile, mkdir, readFile, readdir, writeFile } from "node:
 import { basename, join } from "node:path";
 import {
   centralSharedPath,
+  createProposal,
   defaultConfig,
+  extractInsightFromSessionBody,
+  extractTranscriptText,
+  findDuplicate,
+  loadProjectConfig,
   parseFrontmatter,
   resolveProjectRef,
   serializeFrontmatter,
   sharedDir,
+  vaultExists,
   vaultPath,
 } from "@cairndex/core";
+import { missingVaultMessage } from "../utils/missingVaultMessage.js";
 import { resolveMemoryRoot } from "../utils/resolveMemoryRoot.js";
 
 export interface InsightCmdInput {
@@ -67,6 +74,149 @@ export async function runInsightPromote(input: InsightCmdInput): Promise<Insight
   );
 
   return { exitCode: 0 };
+}
+
+export interface InsightProposeFromSessionInput {
+  cwd: string;
+  /** Session id to distill from. When omitted, the latest session by mtime is used. */
+  sessionId?: string;
+  vaultRoot?: string;
+  projectId?: string;
+  /** Override createdBy in provenance; default "auto-distill". */
+  createdBy?: string;
+  /**
+   * Optional path to the Claude Code transcript JSONL. When provided, the heuristic
+   * also scans the assistant-text content for decision phrases — much richer signal
+   * than the session file body alone, which starts as a TODO placeholder.
+   */
+  transcriptPath?: string;
+}
+
+async function findLatestSessionId(sessionsDir: string): Promise<string | null> {
+  if (!existsSync(sessionsDir)) return null;
+  const entries = await readdir(sessionsDir);
+  let latest: string | null = null;
+  let latestMtime = 0;
+  for (const name of entries) {
+    if (!name.endsWith(".md")) continue;
+    try {
+      const { statSync } = await import("node:fs");
+      const m = statSync(join(sessionsDir, name)).mtimeMs;
+      if (m > latestMtime) {
+        latestMtime = m;
+        latest = name.replace(/\.md$/, "");
+      }
+    } catch {
+      // ignore unreadable
+    }
+  }
+  return latest;
+}
+
+export interface InsightProposeFromSessionResult {
+  exitCode: 0 | 1;
+  message?: string;
+  /** Proposal id, if a draft was produced and proposed. */
+  proposalId?: string;
+  /** Path to the proposal file, if created. */
+  path?: string;
+  /** Set when an existing proposal already covers this content. */
+  duplicateOf?: string;
+  /** Reason the heuristic chose to skip — present when no proposal was created. */
+  skipReason?: "no-signal" | "session-missing" | "duplicate";
+}
+
+/**
+ * Heuristic auto-distillation. Reads the named session file, runs the
+ * extractInsightFromSessionBody pass, and if any signal fires, drafts an *insight*
+ * proposal into the inbox. No LLM call. Designed to be safe to chain off the Stop hook.
+ */
+export async function runInsightProposeFromSession(
+  input: InsightProposeFromSessionInput,
+): Promise<InsightProposeFromSessionResult> {
+  const root = resolveMemoryRoot(input);
+  if (!vaultExists(root)) {
+    return { exitCode: 1, message: missingVaultMessage(root) };
+  }
+  const cfg = existsSync(`${vaultPath(root)}/config.yaml`)
+    ? loadProjectConfig(root)
+    : defaultConfig();
+
+  const sessionsDir = join(vaultPath(root), "sessions");
+  const sessionId = input.sessionId ?? (await findLatestSessionId(sessionsDir));
+  if (!sessionId) {
+    return {
+      exitCode: 0,
+      message: "no sessions found — nothing to distill",
+      skipReason: "session-missing",
+    };
+  }
+  const sessionPath = join(sessionsDir, `${sessionId}.md`);
+  if (!existsSync(sessionPath)) {
+    return {
+      exitCode: 0,
+      message: `session ${sessionId} not found at ${sessionPath} — nothing to distill`,
+      skipReason: "session-missing",
+    };
+  }
+
+  const raw = await readFile(sessionPath, "utf8");
+  const { content } = parseFrontmatter<Record<string, unknown>>(raw);
+  // Concatenate the session body and (when available) the transcript text so the
+  // heuristic sees decision phrases the agent wrote during the turn — not just the
+  // session note's TODO placeholder. Order matters slightly: session body first means
+  // a manually-filled session takes priority over raw transcript noise.
+  const transcriptText = input.transcriptPath
+    ? await extractTranscriptText(input.transcriptPath)
+    : "";
+  const fullText = transcriptText ? `${content}\n\n${transcriptText}` : content;
+  const draft = extractInsightFromSessionBody(fullText, sessionId);
+  if (!draft) {
+    return {
+      exitCode: 0,
+      message: `no insight signal in session ${sessionId}`,
+      skipReason: "no-signal",
+    };
+  }
+
+  // Dedupe against existing proposals via the standard content-hash check. The signal
+  // is intentionally weak (hash of body+target+type) so we mostly use it to avoid
+  // re-proposing the same draft if the Stop hook fires twice.
+  const dup = await findDuplicate(root, cfg, {
+    proposalType: "create",
+    targetType: "insight",
+    newBody: draft.body,
+  });
+  if (dup) {
+    return {
+      exitCode: 0,
+      message: `insight draft already proposed as ${dup}`,
+      duplicateOf: dup,
+      skipReason: "duplicate",
+    };
+  }
+
+  const result = await createProposal(root, cfg, {
+    proposalType: "create",
+    targetType: "insight",
+    newFrontmatter: {
+      title: draft.title,
+      status: "active",
+      created: new Date().toISOString().slice(0, 10),
+      ...(draft.relatedIds.length > 0
+        ? { links: draft.relatedIds.map((id: string) => ({ type: "related", target: id })) }
+        : {}),
+    },
+    newBody: draft.body,
+    summary: `Auto-distilled insight: ${draft.title}`,
+    reason: draft.reason,
+    provenance: {
+      createdBy: input.createdBy ?? "auto-distill",
+      session: sessionId,
+      confidence: 0.4,
+    },
+  });
+  return { exitCode: 0, proposalId: result.proposalId, path: result.path };
 }
 
 export async function runInsightPull(input: InsightCmdInput): Promise<InsightCmdResult> {

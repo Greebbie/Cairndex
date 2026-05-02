@@ -1,6 +1,6 @@
 {
   "hashes": {
-    "rules/operating-rules.md": "39142d6be9ff74aef9ca7cfd392e485f5c82385cf06fd200978953611b3fec46",
+    "rules/operating-rules.md": "2b28ce7da38a5c6ead05612c24d734ab2e845ac55184fe97f20c840eb45a0d6b",
     "templates/change.md": "5cd25b4a7ffecc87e6a77c636728bcc2dab7b462c958d517b32fe6ab3718e1db",
     "templates/decision.md": "7b016c5dd28d0956ea9e86dc706bd2a5db1d2e4a5c3eab997d222c8cf7c49e1a",
     "templates/goal.md": "5f368d092536c69b5e6009f341282bef3e7b8b815bd1d8793efc3af9ecbe702d",

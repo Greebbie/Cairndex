@@ -132,7 +132,23 @@ describe("Dashboard (smoke)", () => {
     expect(await screen.findByText("Recent Activity")).toBeDefined();
     expect(await screen.findByText("Review Inbox")).toBeDefined();
     expect(await screen.findByText("Phase")).toBeDefined();
-    expect(await screen.findByText("implementing")).toBeDefined();
-    expect(await screen.findByText("SPEC-003")).toBeDefined();
+    // Phase + active spec now appear in both the sticky NowBar and the ProjectStatePanel —
+    // either one matching is enough to confirm the data flowed through.
+    expect((await screen.findAllByText("implementing")).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("SPEC-003")).length).toBeGreaterThan(0);
+  });
+
+  it("renders the sticky Now bar with phase + current task + next action", async () => {
+    const Wrapper = withRouting();
+    render(
+      <Wrapper>
+        <Dashboard />
+      </Wrapper>,
+    );
+    const nowBar = await screen.findByTestId("now-bar");
+    expect(nowBar).toBeDefined();
+    expect(nowBar.textContent).toContain("Now");
+    expect(nowBar.textContent).toContain("implementing");
+    expect(nowBar.textContent).toContain("TASK-007");
   });
 });

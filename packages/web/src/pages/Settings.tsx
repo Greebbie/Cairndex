@@ -2,10 +2,12 @@ import { useConfig, useUpdateConfig } from "@/lib/api";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useParams } from "react-router-dom";
+import { ClaudeCodeIntegrationPanel } from "@/components/ClaudeCodeIntegrationPanel";
 import SettingsCustomTypes from "./SettingsCustomTypes";
 import SettingsRules from "./SettingsRules";
+import SettingsUserPreferences from "./SettingsUserPreferences";
 
-type Tab = "config" | "rules";
+type Tab = "config" | "rules" | "user";
 
 interface CommonFields {
   freshness_warn_days: number;
@@ -116,8 +118,15 @@ export default function Settings() {
     <div className="p-8 space-y-6 max-w-3xl">
       <h2 className="text-xl font-semibold">Settings</h2>
 
+      {/* Claude Code wiring is project-scoped and the most common reason a user
+          opens Settings, so surface it above the tabs rather than hiding it inside
+          one. The panel is self-contained — it shows current wiring status and
+          offers a one-click refresh that runs the same applyClaudeHooks logic
+          `cairndex init` does from the terminal. */}
+      {alias && <ClaudeCodeIntegrationPanel alias={alias} />}
+
       <div className="flex gap-2 border-b border-border">
-        {(["config", "rules"] as const).map((t) => (
+        {(["config", "rules", "user"] as const).map((t) => (
           <button
             key={t}
             type="button"
@@ -128,12 +137,13 @@ export default function Settings() {
                 : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
-            {t === "config" ? "Config" : "Rules"}
+            {t === "config" ? "Config" : t === "rules" ? "Rules" : "User Prefs"}
           </button>
         ))}
       </div>
 
       {tab === "rules" && <SettingsRules />}
+      {tab === "user" && <SettingsUserPreferences />}
 
       {tab === "config" && (
       <>

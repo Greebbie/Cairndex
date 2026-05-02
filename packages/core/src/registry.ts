@@ -55,8 +55,45 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+/**
+ * Read projects from the registry, transparently hiding entries whose `path` no
+ * longer exists on disk. This is the user-facing read path — the GUI sidebar and
+ * `cairndex ui` should not surface aliases that point at deleted/moved repos.
+ *
+ * This filter is non-destructive: the registry file itself is unchanged. Use
+ * `pruneDeadProjects()` for persistent cleanup (called once at `cairndex ui`
+ * startup so the file self-heals over time without requiring an explicit
+ * unregister command from the user).
+ */
 export async function listProjects(): Promise<ProjectEntry[]> {
+  const all = await readAll();
+  return all.filter((p) => existsSync(p.path));
+}
+
+/**
+ * The unfiltered read — every entry that's ever been registered, including those
+ * whose `path` no longer exists. Used by `pruneDeadProjects` and any tooling
+ * that needs to inspect the raw state (audit, debugging).
+ */
+export async function listProjectsRaw(): Promise<ProjectEntry[]> {
   return await readAll();
+}
+
+/**
+ * Persistently remove registry entries whose `path` no longer exists. Returns
+ * the list of removed entries so callers can log/report what was pruned. Safe
+ * to call repeatedly — a no-op when the registry is already clean.
+ */
+export async function pruneDeadProjects(): Promise<ProjectEntry[]> {
+  const all = await readAll();
+  const alive: ProjectEntry[] = [];
+  const dead: ProjectEntry[] = [];
+  for (const p of all) {
+    if (existsSync(p.path)) alive.push(p);
+    else dead.push(p);
+  }
+  if (dead.length > 0) await writeAll(alive);
+  return dead;
 }
 
 export async function registerProject(input: {

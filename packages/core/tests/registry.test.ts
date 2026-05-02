@@ -6,10 +6,11 @@ import { centralProjectsPath } from "../src/paths.js";
 import {
   centralVaultExists,
   globalDir,
-  listVaultProjects,
   listProjects,
-  resolveVaultProject,
+  listProjectsRaw,
+  listVaultProjects,
   registerProject,
+  resolveVaultProject,
   touchProject,
   unregisterProject,
 } from "../src/registry.js";
@@ -30,9 +31,13 @@ describe("registry", () => {
     expect(await listProjects()).toEqual([]);
   });
 
+  // These tests use synthetic paths to exercise persistence behavior — they
+  // are NOT about the live-path filtering layer. Switched from `listProjects`
+  // (which now hides dead-path entries) to `listProjectsRaw` so the persistence
+  // contract is checked directly. Live-path filtering is covered in registry-prune.test.ts.
   it("registers a project and persists", async () => {
     await registerProject({ path: "/tmp/repo-a", alias: "a" });
-    const list = await listProjects();
+    const list = await listProjectsRaw();
     expect(list).toHaveLength(1);
     expect(list[0]?.path).toBe("/tmp/repo-a");
     expect(list[0]?.alias).toBe("a");
@@ -44,7 +49,7 @@ describe("registry", () => {
   it("dedupes by path on re-register; preserves alias", async () => {
     await registerProject({ path: "/tmp/repo-a", alias: "a" });
     await registerProject({ path: "/tmp/repo-a", alias: "renamed" });
-    const list = await listProjects();
+    const list = await listProjectsRaw();
     expect(list).toHaveLength(1);
     expect(list[0]?.alias).toBe("renamed");
   });
@@ -53,16 +58,16 @@ describe("registry", () => {
     await registerProject({ path: "/tmp/repo-a", alias: "a" });
     await registerProject({ path: "/tmp/repo-b", alias: "b" });
     await unregisterProject("/tmp/repo-a");
-    const list = await listProjects();
+    const list = await listProjectsRaw();
     expect(list.map((p) => p.alias)).toEqual(["b"]);
   });
 
   it("touchProject updates last_opened", async () => {
     await registerProject({ path: "/tmp/repo-a", alias: "a" });
-    const before = (await listProjects())[0];
+    const before = (await listProjectsRaw())[0];
     await new Promise((r) => setTimeout(r, 5));
     await touchProject("/tmp/repo-a");
-    const after = (await listProjects())[0];
+    const after = (await listProjectsRaw())[0];
     expect(after?.last_opened).toBeTruthy();
     expect(after?.last_opened).not.toBe(before?.last_opened);
   });

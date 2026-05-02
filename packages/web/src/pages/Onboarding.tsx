@@ -111,11 +111,19 @@ function VaultStep({ onDone }: { onDone: (vaultRoot: string) => void }) {
 
   return (
     <form onSubmit={onSubmit} className="space-y-4 rounded border border-border bg-card p-5">
-      <div>
+      <div className="space-y-2">
         <h2 className="text-base font-semibold mb-1">Where should your vault live?</h2>
         <p className="text-sm text-muted-foreground">
           Cairndex will create or open this folder. Every project's memory lives inside it.
         </p>
+        <details className="text-xs text-muted-foreground">
+          <summary className="cursor-pointer hover:text-foreground">What's a vault?</summary>
+          <p className="mt-1 pl-3 border-l-2 border-border">
+            A folder of typed Markdown files (specs, decisions, plans, sessions, insights) shared
+            across all your projects. Versionable, human-readable, and survives your AI agent's
+            chat-window resets. One vault holds many projects.
+          </p>
+        </details>
       </div>
 
       <label className="block">
@@ -194,7 +202,7 @@ function ProjectStep({
 
   return (
     <form onSubmit={onSubmit} className="space-y-4 rounded border border-border bg-card p-5">
-      <div>
+      <div className="space-y-2">
         <h2 className="text-base font-semibold mb-1">Register a project</h2>
         <p className="text-sm text-muted-foreground">
           Point Cairndex at a code repository to track. Memory will be stored under{" "}
@@ -203,6 +211,17 @@ function ProjectStep({
           </code>
           .
         </p>
+        <details className="text-xs text-muted-foreground">
+          <summary className="cursor-pointer hover:text-foreground">
+            What does registering do?
+          </summary>
+          <p className="mt-1 pl-3 border-l-2 border-border">
+            Creates the project folder structure inside the vault (specs/, decisions/, sessions/,
+            inbox/…) and writes a one-line <code>.cairndex-project.yaml</code> pointer file inside
+            your repo so tooling can find the vault. The pointer file is the only thing added to
+            your repo — the vault stays the source of truth.
+          </p>
+        </details>
       </div>
 
       <label className="block">
@@ -271,11 +290,13 @@ function DoctorStep({ registered }: { registered: RegisteredProject }) {
   const navigate = useNavigate();
   const doctor = useDoctor(registered.alias);
   const fix = useFix();
+  const [showAll, setShowAll] = useState(false);
 
   const issues = doctor.data?.issues ?? [];
   const errorCount = issues.filter((i) => i.severity === "error").length;
   const warningCount = issues.filter((i) => i.severity === "warn").length;
   const fixableCount = issues.filter((i) => i.fixable === true).length;
+  const visibleIssues = showAll ? issues : issues.slice(0, 8);
 
   return (
     <div className="space-y-4 rounded border border-border bg-card p-5">
@@ -310,7 +331,7 @@ function DoctorStep({ registered }: { registered: RegisteredProject }) {
 
           {issues.length > 0 && (
             <ul className="text-sm divide-y divide-border border border-border rounded">
-              {issues.slice(0, 8).map((i, idx) => (
+              {visibleIssues.map((i, idx) => (
                 <li key={`${i.rule}-${idx}`} className="px-3 py-2">
                   <span
                     className={
@@ -325,12 +346,35 @@ function DoctorStep({ registered }: { registered: RegisteredProject }) {
                 </li>
               ))}
               {issues.length > 8 && (
-                <li className="px-3 py-2 text-xs text-muted-foreground">
-                  …and {issues.length - 8} more
+                <li className="px-3 py-2 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setShowAll((v) => !v)}
+                    className="text-primary hover:underline"
+                  >
+                    {showAll
+                      ? `Show fewer (collapse to first 8)`
+                      : `Show all ${issues.length} issues`}
+                  </button>
                 </li>
               )}
             </ul>
           )}
+
+          <div className="rounded border border-border bg-muted/40 p-3 text-xs space-y-2">
+            <div className="font-semibold text-foreground">Next: wire Claude Code</div>
+            <p className="text-muted-foreground">
+              Run this once inside your repo to install the Cairndex hooks and MCP server into
+              Claude Code's settings (idempotent — safe to re-run):
+            </p>
+            <pre className="bg-background border border-border rounded p-2 font-mono text-xs overflow-x-auto">
+              <code>cairndex init</code>
+            </pre>
+            <p className="text-muted-foreground">
+              After that, any Claude Code session inside that repo automatically reads/writes
+              this vault. You can skip this for now and do it later — the GUI works either way.
+            </p>
+          </div>
 
           {fixableCount > 0 && (
             <button

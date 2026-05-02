@@ -20,10 +20,41 @@
           },
           {
             "type": "command",
+            "command": "node packages/cli/bin/cairndex insight propose-from-session --silent --vault \"C:\\Users\\lvbab\\Documents\\CairndexVault\" --project cairndex # cairndex-managed"
+          },
+          {
+            "type": "command",
+            "command": "node packages/cli/bin/cairndex last-turn-summary --vault \"C:\\Users\\lvbab\\Documents\\CairndexVault\" --project cairndex # cairndex-managed"
+          },
+          {
+            "type": "command",
             "command": "node packages/cli/bin/cairndex sweep --silent --vault \"C:\\Users\\lvbab\\Documents\\CairndexVault\" --project cairndex # cairndex-managed"
           }
         ]
       }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node packages/cli/bin/cairndex bootstrap --vault \"C:\\Users\\lvbab\\Documents\\CairndexVault\" --project cairndex # cairndex-managed"
+          }
+        ]
+      }
     ]
+  },
+  "mcpServers": {
+    "cairndex": {
+      "command": "node",
+      "args": [
+        "packages/cli/bin/cairndex",
+        "mcp",
+        "--vault",
+        "C:\\Users\\lvbab\\Documents\\CairndexVault",
+        "--project",
+        "cairndex"
+      ]
+    }
   }
 }

@@ -5,6 +5,12 @@ export const ProjectSchema = z.object({
   alias: z.string(),
   registered_at: z.string(),
   last_opened: z.string().optional(),
+  // Populated by the server when the repo has a .cairndex-project.yaml pointer.
+  // Lets the GUI show the user where durable memory actually lives without
+  // making them dig through Settings → Rules.
+  vaultRoot: z.string().optional(),
+  projectId: z.string().optional(),
+  projectRoot: z.string().optional(),
 });
 export type Project = z.infer<typeof ProjectSchema>;
 
@@ -113,6 +119,43 @@ export const DashboardSchema = z.object({
   recentActivity: z.array(RecentActivityEventSchema),
 });
 export type Dashboard = z.infer<typeof DashboardSchema>;
+
+const LastTurnSummarySchema = z.object({
+  ts: z.string(),
+  filesTouched: z.number(),
+  toolCounts: z.object({
+    Edit: z.number(),
+    Write: z.number(),
+    Bash: z.number(),
+    Read: z.number(),
+  }),
+  newProposals: z.array(z.string()),
+  latestSessionId: z.string().nullable(),
+});
+export const LastTurnSummaryResponseSchema = z.object({
+  summary: LastTurnSummarySchema.nullable(),
+});
+export type LastTurnSummary = z.infer<typeof LastTurnSummarySchema>;
+
+export const ClaudeCodeStatusSchema = z.object({
+  wired: z.boolean(),
+  settingsPath: z.string(),
+  settingsExists: z.boolean(),
+  hookEvents: z.array(z.string()),
+  mcpRegistered: z.boolean(),
+});
+export type ClaudeCodeStatus = z.infer<typeof ClaudeCodeStatusSchema>;
+
+export const UserPreferencesSchema = z
+  .object({
+    schemaVersion: z.literal(1).default(1),
+    theme: z.enum(["light", "dark", "system"]).default("system"),
+    defaultFreshnessWarnDays: z.number().int().positive().nullable().default(null),
+    autoAcceptConfidenceThreshold: z.number().min(0).max(1).nullable().default(null),
+    personalRulesPath: z.string().nullable().default(null),
+  })
+  .strict();
+export type UserPreferences = z.infer<typeof UserPreferencesSchema>;
 
 const PackItemSummarySchema = z.object({
   id: z.string(),

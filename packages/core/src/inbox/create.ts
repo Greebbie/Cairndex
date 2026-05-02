@@ -1,7 +1,8 @@
 import { existsSync } from "node:fs";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { type Config, folderForNodeType } from "../config.js";
+import { appendChangelog } from "../changelog.js";
+import { type Config, folderForNodeType, isImmutableType } from "../config.js";
 import { parseFrontmatter, serializeFrontmatter } from "../frontmatter.js";
 import { formatSequentialId, parseId } from "../ids.js";
 import { inboxProposalsPath, nodeFolderPath } from "../paths.js";
@@ -74,6 +75,15 @@ export async function createProposal(
     throw new Error("createProposal: patch is only valid on update proposals");
   }
 
+  if (input.proposalType === "update" && isImmutableType(cfg, input.targetType)) {
+    throw new Error(
+      `createProposal: cannot create update proposal for immutable type '${input.targetType}' ` +
+        `(target ${input.target}). Immutable types are append-only by convention — ` +
+        `create a new ${input.targetType} entry that supersedes the old one instead. ` +
+        `(Configurable via .cairndex/config.yaml → immutable_types.)`,
+    );
+  }
+
   let resolvedNewBody: string;
   let patchToPersist: Patch | undefined;
   if (hasPatch) {
@@ -126,6 +136,12 @@ export async function createProposal(
 
   const filePath = join(dir, `${proposalId}.md`);
   await writeFile(filePath, serializeFrontmatter(fm, resolvedNewBody), "utf8");
+  // Activity-stream entry. Failure here is non-load-bearing (see appendChangelog
+  // jsdoc) — the proposal still landed even if observability logging fails.
+  await appendChangelog(
+    repoRoot,
+    `Proposed ${proposalId} (${input.proposalType} ${input.targetType}${input.target ? `/${input.target}` : ""}): ${input.summary}`,
+  );
   return { proposalId, path: filePath, contentHash };
 }
 
@@ -136,7 +152,12 @@ export async function findDuplicate(
 ): Promise<string | null> {
   const target = computeProposalHash(input);
   const all = await listProposals(repoRoot, _cfg);
-  const candidates: ProposalFile[] = [...all.pending, ...all.accepted];
+  // Include rejected proposals: if the user has already explicitly rejected the
+  // exact same content, don't re-propose it on the next Stop hook tick. Without
+  // this, noisy heuristic auto-distill kept producing the same garbage every
+  // session end. (Pending + accepted dedup was already in place — adding rejected
+  // closes the loop.)
+  const candidates: ProposalFile[] = [...all.pending, ...all.accepted, ...all.rejected];
   for (const p of candidates) {
     if (p.contentHash === target) return p.proposalId;
   }

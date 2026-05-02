@@ -9,6 +9,7 @@ import {
   listVaultProjects,
   loadProjectConfig,
   type ProjectEntry,
+  pruneDeadProjects,
   vaultPath,
 } from "@cairndex/core";
 import { createServer, type CreateServerResult, type OnboardingHooks } from "@cairndex/server";
@@ -25,8 +26,24 @@ export interface UiOptions {
 }
 
 function findWebDist(): string | undefined {
-  const sea = findExeRelative("web");
-  if (sea && existsSync(join(sea, "index.html")) && existsSync(join(sea, "assets"))) return sea;
+  // SEA exe sitting next to its portable bundle (dist-sea/web).
+  const seaBundle = findExeRelative("web");
+  if (
+    seaBundle &&
+    existsSync(join(seaBundle, "index.html")) &&
+    existsSync(join(seaBundle, "assets"))
+  ) {
+    return seaBundle;
+  }
+  // SEA exe placed at the repo root: web assets live under packages/web/dist.
+  const seaRepoRoot = findExeRelative(join("packages", "web", "dist"));
+  if (
+    seaRepoRoot &&
+    existsSync(join(seaRepoRoot, "index.html")) &&
+    existsSync(join(seaRepoRoot, "assets"))
+  ) {
+    return seaRepoRoot;
+  }
 
   const here =
     typeof __dirname !== "undefined" ? __dirname : dirname(fileURLToPath(import.meta.url));
@@ -84,6 +101,24 @@ async function startWatcherForProject(
 
 export async function runUi(opts: UiOptions): Promise<void> {
   const port = opts.port ?? 7777;
+  // Self-heal the global registry on every UI startup. Persistently removes
+  // entries whose `path` no longer exists (test temp dirs, deleted repos, moved
+  // checkouts). This is a write but only when there's something to remove —
+  // a clean registry is a no-op. Logs how many it pruned so users can spot
+  // surprises ("why did 16 projects disappear?").
+  if (!opts.vaultRoot) {
+    try {
+      const pruned = await pruneDeadProjects();
+      if (pruned.length > 0) {
+        logger.info(
+          { count: pruned.length, aliases: pruned.map((p: ProjectEntry) => p.alias) },
+          "pruned dead projects from global registry",
+        );
+      }
+    } catch (err) {
+      logger.warn({ err }, "registry prune failed; continuing");
+    }
+  }
   const projects = opts.vaultRoot ? await listVaultProjects(opts.vaultRoot) : await listProjects();
 
   const webRoot = findWebDist();

@@ -1,5 +1,6 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { appendChangelog } from "../changelog.js";
 import type { Config } from "../config.js";
 import { parseFrontmatter, serializeFrontmatter } from "../frontmatter.js";
 import { inboxProposalsPath } from "../paths.js";
@@ -26,4 +27,5 @@ export async function rejectProposal(
     rejectionReason: reason,
   };
   await writeFile(path, serializeFrontmatter(next, content), "utf8");
+  await appendChangelog(repoRoot, `Rejected ${proposalId}: ${reason}`);
 }

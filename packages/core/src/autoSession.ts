@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
+import { appendChangelog } from "./changelog.js";
 import type { Config } from "./config.js";
 import { folderForNodeType } from "./config.js";
 import { serializeFrontmatter } from "./frontmatter.js";
@@ -49,19 +50,38 @@ function extractIdsFromString(s: string): string[] {
   return out;
 }
 
+/**
+ * PROP-NNN identifies inbox proposals, not durable memory. Sessions referencing them
+ * via `links.touches` produce reference-integrity errors because the validator only
+ * scans durable folders for known IDs (PROPs live in inbox/proposed-memory-updates/).
+ * The proposal itself records its session via `provenance.session`, so the inverse
+ * link is redundant noise. Filter at the auto-session caller boundary, NOT in
+ * extractIdsFromString — parseTranscriptJsonl callers (cairndex status,
+ * last-turn-summary) DO want to count PROP references.
+ */
+const NON_DURABLE_ID_PREFIXES = new Set(["PROP"]);
+
+function isDurableId(id: string): boolean {
+  const prefix = id.split("-")[0];
+  return prefix !== undefined && !NON_DURABLE_ID_PREFIXES.has(prefix);
+}
+
 function emptyToolCounts(): ToolCounts {
   return { Edit: 0, Write: 0, Bash: 0, Read: 0 };
 }
 
-interface ToolUseBlock {
+interface ContentBlock {
   type?: string;
+  // tool_use fields:
   name?: string;
   input?: Record<string, unknown>;
+  // text fields:
+  text?: string;
 }
 
 interface TranscriptEntry {
   type?: string;
-  message?: { content?: ToolUseBlock[] };
+  message?: { content?: ContentBlock[] | string };
 }
 
 export async function parseTranscriptJsonl(transcriptPath: string): Promise<ParsedTranscript> {
@@ -119,6 +139,48 @@ export async function parseTranscriptJsonl(transcriptPath: string): Promise<Pars
   };
 }
 
+/**
+ * Read a Claude Code transcript JSONL and return the concatenated text content from
+ * every text block (both assistant and user messages). Used by auto-distill to feed
+ * decision-phrase heuristics with the actual conversation, not just the boilerplate
+ * session note that starts as a TODO placeholder.
+ *
+ * Returns an empty string when the file is missing or unreadable so callers can
+ * concatenate the result without null checks.
+ */
+export async function extractTranscriptText(transcriptPath: string): Promise<string> {
+  if (!existsSync(transcriptPath)) return "";
+  let raw: string;
+  try {
+    raw = await readFile(transcriptPath, "utf8");
+  } catch {
+    return "";
+  }
+  const out: string[] = [];
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    let entry: TranscriptEntry;
+    try {
+      entry = JSON.parse(trimmed) as TranscriptEntry;
+    } catch {
+      continue;
+    }
+    const content = entry.message?.content;
+    if (typeof content === "string") {
+      // User messages occasionally arrive as a plain string — keep them.
+      out.push(content);
+    } else if (Array.isArray(content)) {
+      for (const b of content) {
+        if (b && b.type === "text" && typeof b.text === "string") {
+          out.push(b.text);
+        }
+      }
+    }
+  }
+  return out.join("\n");
+}
+
 function renderToolCounts(counts: ToolCounts): string {
   return `Edit×${counts.Edit} Write×${counts.Write} Bash×${counts.Bash} Read×${counts.Read}`;
 }
@@ -126,13 +188,31 @@ function renderToolCounts(counts: ToolCounts): string {
 export async function generateAutoSession(
   input: GenerateAutoSessionInput,
 ): Promise<GenerateAutoSessionResult> {
-  const id = formatSessionId(input.now, { utc: true });
-  const date = id.slice(0, 10);
+  const baseId = formatSessionId(input.now, { utc: true });
+  const folder = nodeFolderPath(input.repoRoot, folderForNodeType(input.cfg, "session"));
+  await mkdir(folder, { recursive: true });
+
+  // Compute the final id BEFORE building frontmatter so the filename and the
+  // frontmatter `id` field always agree. Previously the filename got `-1`/`-2`
+  // suffixes on minute-precision collisions but `frontmatter.id` stayed the same,
+  // tripping the id-collision validator.
+  let suffix = 0;
+  let id = baseId;
+  let outputPath = join(folder, `${id}.md`);
+  while (existsSync(outputPath)) {
+    suffix += 1;
+    id = `${baseId}-${suffix}`;
+    outputPath = join(folder, `${id}.md`);
+  }
+
+  const date = baseId.slice(0, 10);
 
   const ids = new Set<string>();
   for (const p of input.touchedPaths) {
     for (const found of extractIdsFromString(p)) {
-      if (parseId(found)) ids.add(found);
+      // Skip PROP-NNN — proposals are inbox-only, not durable; linking them as
+      // `touches` from a session creates bogus reference-integrity errors.
+      if (parseId(found) && isDurableId(found)) ids.add(found);
     }
   }
 
@@ -178,17 +258,12 @@ export async function generateAutoSession(
 
   const body = sections.join("\n");
 
-  const folder = nodeFolderPath(input.repoRoot, folderForNodeType(input.cfg, "session"));
-  await mkdir(folder, { recursive: true });
-
-  let suffix = 0;
-  let outputPath = join(folder, `${id}.md`);
-  while (existsSync(outputPath)) {
-    suffix += 1;
-    outputPath = join(folder, `${id}-${suffix}.md`);
-  }
-
   await writeFile(outputPath, serializeFrontmatter(frontmatter, `\n${body}\n`), "utf8");
+
+  // Activity-stream entry. Tool counts (when available) make the line useful at a
+  // glance from the dashboard's Recent Activity card.
+  const toolSummary = input.toolCounts ? ` (${renderToolCounts(input.toolCounts)})` : "";
+  await appendChangelog(input.repoRoot, `Session ${id} recorded${toolSummary}`);
 
   return { id, path: outputPath };
 }

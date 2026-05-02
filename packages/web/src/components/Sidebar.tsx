@@ -32,20 +32,29 @@ export function Sidebar() {
           Projects
         </div>
         <ul className="space-y-1">
-          {(projects.data ?? []).map((p) => (
-            <li key={p.alias}>
-              <Link
-                to={`/p/${p.alias}`}
-                className={cn(
-                  "block px-2 py-1 rounded text-sm hover:bg-accent",
-                  current === p.alias && "bg-accent font-medium",
-                )}
-                title={p.path}
-              >
-                {p.alias}
-              </Link>
-            </li>
-          ))}
+          {(projects.data ?? []).map((p) => {
+            // Tooltip shows where the project's data lives. For central-vault
+            // projects, the durable memory is in `<vaultRoot>/projects/<id>`,
+            // not in the repo. Show both so the user can reason about file
+            // locations without opening Settings.
+            const tooltip = p.vaultRoot
+              ? `Repo: ${p.path}\nVault: ${p.vaultRoot}\nProject: ${p.projectId ?? p.alias}`
+              : p.path;
+            return (
+              <li key={p.alias}>
+                <Link
+                  to={`/p/${p.alias}`}
+                  className={cn(
+                    "block px-2 py-1 rounded text-sm hover:bg-accent",
+                    current === p.alias && "bg-accent font-medium",
+                  )}
+                  title={tooltip}
+                >
+                  {p.alias}
+                </Link>
+              </li>
+            );
+          })}
           {projects.isLoading && <li className="text-xs text-muted-foreground">Loading...</li>}
           {projects.error && <li className="text-xs text-destructive">Error loading projects</li>}
         </ul>
