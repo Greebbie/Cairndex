@@ -7,6 +7,7 @@ import {
   vaultExists,
   vaultPath,
 } from "@cairndex/core";
+import { missingVaultMessage } from "../utils/missingVaultMessage.js";
 import { resolveMemoryRoot } from "../utils/resolveMemoryRoot.js";
 
 export interface ArchiveCommandOptions {
@@ -30,7 +31,7 @@ export async function runArchive(
   if (!vaultExists(root)) {
     return {
       exitCode: 1,
-      message: `no .cairndex/ vault found at ${vaultPath(root)} (run \`cairndex init\` first)`,
+      message: missingVaultMessage(root),
     };
   }
   const cfg = existsSync(`${vaultPath(root)}/config.yaml`)

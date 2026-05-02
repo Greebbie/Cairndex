@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+import { archiveDestinationHint, projectIdFromRoot } from "../agentSurface/layoutHints.js";
 import type { Config } from "../config.js";
 import { parseFrontmatter } from "../frontmatter.js";
 import { createProposal, findDuplicate } from "../inbox/create.js";
@@ -114,6 +115,7 @@ function buildArchiveBody(
   ageDays: number,
   confidence: number | undefined,
   status: string,
+  projectId: string,
 ): string {
   const lines: string[] = [];
   lines.push(`> Auto-drafted archive proposal for **${target}**.`);
@@ -127,7 +129,7 @@ function buildArchiveBody(
   lines.push("");
   lines.push("## What happens on accept");
   lines.push("- frontmatter `status` flips to `archived`");
-  lines.push("- watcher moves the file under `.cairndex/archive/<type>/`");
+  lines.push(`- watcher moves the file under \`${archiveDestinationHint(projectId)}\``);
   lines.push("");
   lines.push("_Reject if this node is still authoritative — the proposer will not re-suggest the same body._");
   return lines.join("\n");
@@ -142,6 +144,7 @@ export async function proposeStaleNodeArchives(
   const confidenceThreshold = opts.confidenceThreshold ?? DEFAULT_CONFIDENCE_THRESHOLD;
   const now = opts.now ?? new Date();
   const activeSet = await readActiveSet(repoRoot);
+  const projectId = projectIdFromRoot(repoRoot);
 
   const result: ArchiveProposerResult = { proposalsCreated: 0, candidates: [] };
 
@@ -192,7 +195,7 @@ export async function proposeStaleNodeArchives(
         "unverified",
       ];
 
-      const newBody = buildArchiveBody(node.id, age, confidence, status);
+      const newBody = buildArchiveBody(node.id, age, confidence, status, projectId);
       const dup = await findDuplicate(repoRoot, cfg, {
         proposalType: "update",
         targetType: nodeType,

@@ -1,7 +1,11 @@
+import { existsSync } from "node:fs";
+import { readFile, readdir } from "node:fs/promises";
 import { createHash } from "node:crypto";
+import { basename, join } from "node:path";
 import { computeBacklinks } from "../backlinks.js";
 import type { Config } from "../config.js";
 import { buildActiveContext } from "../indexes/activeContext.js";
+import { centralVaultRootForProject, rulesDirForProject } from "../paths.js";
 import type { NodeType } from "../types.js";
 import { listNodeFiles, type NodeFile } from "../vault.js";
 import { estimateTokens, trimToBudget } from "./budget.js";
@@ -9,6 +13,7 @@ import {
   type BuildContextPackInput,
   type ContextPackItem,
   type ContextPackOutput,
+  OPERATING_RULE_BODY_CAP,
   PRIORITY,
 } from "./types.js";
 
@@ -63,6 +68,37 @@ function compareSessionDateDesc(a: NodeFile, b: NodeFile): number {
   return ad < bd ? 1 : -1;
 }
 
+async function collectOperatingRules(
+  repoRoot: string,
+  scope: "vault" | "project",
+): Promise<ContextPackItem[]> {
+  const dir = rulesDirForProject(repoRoot);
+  if (!existsSync(dir)) return [];
+  const entries = await readdir(dir, { withFileTypes: true });
+  const out: ContextPackItem[] = [];
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
+    const path = join(dir, entry.name);
+    const raw = await readFile(path, "utf8");
+    const body =
+      raw.length > OPERATING_RULE_BODY_CAP
+        ? `${raw.slice(0, OPERATING_RULE_BODY_CAP)}\n\n…(truncated; full file at ${entry.name})`
+        : raw;
+    const name = basename(entry.name, ".md");
+    out.push({
+      type: "operating-rule",
+      id: `rule:${name}`,
+      title: name,
+      reason: `operating rule (${scope})`,
+      reasonPriority: PRIORITY.OPERATING_RULE,
+      body,
+    });
+  }
+  // Stable ordering so packs with identical inputs stay byte-identical.
+  out.sort((a, b) => a.id.localeCompare(b.id));
+  return out;
+}
+
 function projectStateBody(
   ctx: Awaited<ReturnType<typeof buildActiveContext>>,
 ): { title: string; body: string } {
@@ -104,6 +140,13 @@ export async function buildContextPack(
     reasonPriority: PRIORITY.PROJECT_STATE,
     body: psHeader.body,
   });
+
+  // 1b. Operating rules — vault-shared markdown the user has authored telling the
+  //     agent how to behave in this project. High priority so a token budget never
+  //     drops them; each body capped to OPERATING_RULE_BODY_CAP chars to keep budget honest.
+  const ruleScope = centralVaultRootForProject(repoRoot) ? "vault" : "project";
+  const rulesItems = await collectOperatingRules(repoRoot, ruleScope);
+  for (const it of rulesItems) items.push(it);
 
   // 2. Active spec, plan, task, goal node bodies (full).
   const specsAll = await listNodeFiles(repoRoot, cfg, "spec");

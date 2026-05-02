@@ -5,9 +5,9 @@ import type { NodeType } from "../types.js";
  * (and the user reading the Pack Preview) can see *why* it was selected.
  */
 export interface ContextPackItem {
-  /** Logical kind. "project-state" is a synthetic header item. */
-  type: NodeType | "project-state";
-  /** Node id, or "PROJECT-STATE" for the synthetic header. */
+  /** Logical kind. "project-state" + "operating-rule" are synthetic header items. */
+  type: NodeType | "project-state" | "operating-rule";
+  /** Node id, or "PROJECT-STATE" / `rule:<name>` for synthetic items. */
   id: string;
   title: string;
   status?: string;
@@ -49,6 +49,7 @@ export interface BuildContextPackInput {
 /** Reason priorities. Lower = more important; never trimmed. */
 export const PRIORITY = {
   PROJECT_STATE: 1,
+  OPERATING_RULE: 1,
   ACTIVE_SPEC: 1,
   ACTIVE_PLAN: 1,
   CURRENT_TASK: 1,
@@ -57,3 +58,6 @@ export const PRIORITY = {
   OPEN_QUESTION: 3,
   RECENT_SESSION: 4,
 } as const;
+
+/** Hard cap on a single operating-rule body to keep the pack budget honest. */
+export const OPERATING_RULE_BODY_CAP = 1500;

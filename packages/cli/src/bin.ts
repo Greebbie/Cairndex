@@ -48,7 +48,11 @@ program
     });
   });
 
-const vault = program.command("vault").description("Manage a central Cairndex vault");
+const vault = program
+  .command("vault")
+  .description(
+    "Manage a central Cairndex vault — one folder containing structured project memory for all your repositories.",
+  );
 
 vault
   .command("init <path>")
@@ -61,7 +65,9 @@ vault
     process.exit(r.exitCode);
   });
 
-const project = program.command("project").description("Manage projects inside a central vault");
+const project = program
+  .command("project")
+  .description("Register or import code repositories as projects inside a central vault.");
 
 project
   .command("register")
@@ -221,7 +227,6 @@ emit
   .option("--cwd <path>", "Working directory", process.cwd())
   .option("--vault <path>", "Vault root (overrides --cwd)")
   .option("--project <id>", "Project id inside a central vault")
-  .option("--project <id>", "Project id inside a central vault")
   .option("--repo <path>", "Repo path whose CLAUDE.md should be updated")
   .option("--out <path>", "Override CLAUDE.md path (absolute or vault-relative)")
   .action(async (opts) => {
@@ -242,6 +247,7 @@ program
   )
   .option("--cwd <path>", "Working directory", process.cwd())
   .option("--vault <path>", "Vault root (overrides --cwd)")
+  .option("--project <id>", "Project id inside a central vault")
   .option("--lookback <days>", "Lookback window in days (default 30)", (v) =>
     Number.parseInt(v, 10),
   )
@@ -568,7 +574,7 @@ const insight = program.command("insight").description("Cross-project insight ma
 
 insight
   .command("promote <id>")
-  .description("Promote a project insight to ~/.cairndex/shared/insights/")
+  .description("Promote a project insight to the vault's shared/insights/ folder")
   .option("--cwd <path>", "Working directory", process.cwd())
   .option("--vault <path>", "Central vault root")
   .option("--project <id>", "Project id inside a central vault")

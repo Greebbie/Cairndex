@@ -208,6 +208,146 @@ export function useAcceptProposal() {
   });
 }
 
+export function useTypes(alias: string | undefined) {
+  return useQuery({
+    queryKey: ["types", alias],
+    queryFn: () =>
+      jsonFetch(
+        `/api/vault/${alias}/types`,
+        z.object({
+          types: z.array(
+            z.object({
+              name: z.string(),
+              folder: z.string(),
+              idPrefix: z.string(),
+              builtIn: z.boolean(),
+            }),
+          ),
+        }),
+      ),
+    enabled: !!alias,
+  });
+}
+
+export function useRules(alias: string | undefined) {
+  return useQuery({
+    queryKey: ["rules", alias],
+    queryFn: () =>
+      jsonFetch(
+        `/api/vault/${alias}/rules`,
+        z.object({
+          rules: z.array(
+            z.object({ name: z.string(), size: z.number(), updated: z.string() }),
+          ),
+          dir: z.string(),
+        }),
+      ),
+    enabled: !!alias,
+  });
+}
+
+export function useRule(alias: string | undefined, name: string | undefined) {
+  return useQuery({
+    queryKey: ["rule", alias, name],
+    queryFn: () =>
+      jsonFetch(
+        `/api/vault/${alias}/rules/${name}`,
+        z.object({ name: z.string(), content: z.string() }),
+      ),
+    enabled: !!alias && !!name,
+  });
+}
+
+export function useSaveRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { alias: string; name: string; content: string }) => {
+      const r = await fetch(`${API_BASE}/api/vault/${input.alias}/rules/${input.name}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: input.content }),
+      });
+      if (!r.ok) {
+        const text = await r.text();
+        throw new Error(text || `${r.status} ${r.statusText}`);
+      }
+      return r.json();
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["rules", vars.alias] });
+      qc.invalidateQueries({ queryKey: ["rule", vars.alias, vars.name] });
+    },
+  });
+}
+
+export function useDeleteRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { alias: string; name: string }) => {
+      const r = await fetch(`${API_BASE}/api/vault/${input.alias}/rules/${input.name}`, {
+        method: "DELETE",
+      });
+      if (!r.ok) {
+        const text = await r.text();
+        throw new Error(text || `${r.status} ${r.statusText}`);
+      }
+      return r.json();
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["rules", vars.alias] });
+    },
+  });
+}
+
+export function useInitVault() {
+  return useMutation({
+    mutationFn: async (input: { path: string; title?: string }) => {
+      const r = await fetch(`${API_BASE}/api/vault/init`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      if (!r.ok) {
+        const text = await r.text();
+        throw new Error(text || `${r.status} ${r.statusText}`);
+      }
+      return (await r.json()) as { vaultRoot: string };
+    },
+  });
+}
+
+export function useRegisterProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      vault: string;
+      project?: string;
+      repo: string;
+      alias?: string;
+      title?: string;
+    }) => {
+      const r = await fetch(`${API_BASE}/api/projects/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      if (!r.ok) {
+        const text = await r.text();
+        throw new Error(text || `${r.status} ${r.statusText}`);
+      }
+      return (await r.json()) as {
+        alias: string;
+        projectId: string | null;
+        projectRoot: string;
+        vaultRoot: string;
+      };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["projects"] });
+    },
+  });
+}
+
 export function useRejectProposal() {
   const qc = useQueryClient();
   return useMutation({

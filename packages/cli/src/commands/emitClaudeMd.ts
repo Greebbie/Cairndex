@@ -7,11 +7,13 @@ import {
   buildMemoryHealth,
   defaultConfig,
   loadProjectConfig,
-  resolveProjectRef,
+  projectIdFromRoot,
   renderAgentSurface,
+  resolveProjectRef,
   vaultExists,
   vaultPath,
 } from "@cairndex/core";
+import { missingVaultMessage } from "../utils/missingVaultMessage.js";
 import { resolveMemoryRoot } from "../utils/resolveMemoryRoot.js";
 
 export interface EmitClaudeMdOptions {
@@ -36,7 +38,7 @@ export async function runEmitClaudeMd(opts: EmitClaudeMdOptions): Promise<EmitCl
   if (!vaultExists(root)) {
     return {
       exitCode: 1,
-      message: `no .cairndex/ vault found at ${vaultPath(root)} (run \`cairndex init\` first)`,
+      message: missingVaultMessage(root),
     };
   }
 
@@ -44,12 +46,17 @@ export async function runEmitClaudeMd(opts: EmitClaudeMdOptions): Promise<EmitCl
 
   const ctx = await buildActiveContext(root, cfg);
   const health = await buildMemoryHealth(root, cfg);
-  const body = renderAgentSurface(ctx, health);
+  const projectId = opts.projectId ?? projectIdFromRoot(root);
+  const body = renderAgentSurface(ctx, health, projectId);
 
-  const ref =
-    opts.vaultRoot && opts.projectId
+  // If the caller passed --vault explicitly, don't fall back to cwd-based pointer
+  // discovery for the target — explicit args always win, otherwise a stray
+  // .cairndex-project.yaml in the cwd silently overrides the user's choice.
+  const ref = opts.vaultRoot
+    ? opts.projectId
       ? resolveProjectRef({ cwd: opts.cwd, vaultRoot: opts.vaultRoot, projectId: opts.projectId })
-      : resolveProjectRef({ cwd: opts.cwd });
+      : null
+    : resolveProjectRef({ cwd: opts.cwd });
   const defaultTargetRoot =
     opts.repoRoot ??
     (ref && ref.projectId !== "legacy" && ref.repoRoot ? ref.repoRoot : root);

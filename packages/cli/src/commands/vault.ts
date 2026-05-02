@@ -1,8 +1,11 @@
 import { existsSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { centralSharedPath, centralVaultManifestPath } from "@cairndex/core";
-import yaml from "js-yaml";
+import {
+  centralSharedPath,
+  centralVaultManifestPath,
+  writeVaultManifest,
+} from "@cairndex/core";
 import { findBundledTemplatesDir } from "../utils/bundledTemplates.js";
 import { copyDirRecursive } from "../utils/scaffoldMemory.js";
 
@@ -36,17 +39,12 @@ export async function runVaultInit(opts: VaultInitOptions): Promise<VaultInitRes
     join(centralSharedPath(vaultRoot), "templates"),
   );
 
-  const manifestPath = centralVaultManifestPath(vaultRoot);
-  if (!existsSync(manifestPath)) {
-    await writeFile(
-      manifestPath,
-      yaml.dump({
-        schemaVersion: 1,
-        title: opts.title ?? "Cairndex Vault",
-        created: todayUtc(),
-      }),
-      "utf8",
-    );
+  if (!existsSync(centralVaultManifestPath(vaultRoot))) {
+    await writeVaultManifest(vaultRoot, {
+      schemaVersion: 1,
+      title: opts.title ?? "Cairndex Vault",
+      created: todayUtc(),
+    });
   }
 
   return { exitCode: 0, vaultRoot };

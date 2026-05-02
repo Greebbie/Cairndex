@@ -51,6 +51,17 @@ describe("validate extra rules", () => {
     expect(issues.filter((i) => i.rule === "unknown-folder")).toEqual([]);
   });
 
+  it("unknown-folder does not warn on a folder declared via config.node_types", async () => {
+    mkdirSync(join(tmp, ".cairndex/experiments"), { recursive: true });
+    writeFileSync(
+      join(tmp, ".cairndex/config.yaml"),
+      "schemaVersion: 1\nnode_types:\n  experiment:\n    folder: experiments\n    id_prefix: EXP\n",
+      "utf8",
+    );
+    const issues = await runValidation(tmp, defaultConfig(), { rules: [unknownFolder] });
+    expect(issues.filter((i) => i.rule === "unknown-folder")).toEqual([]);
+  });
+
   it("confidence-low emits info on low-confidence node referenced by an active spec", async () => {
     mkdirSync(join(tmp, ".cairndex/specs"), { recursive: true });
     mkdirSync(join(tmp, ".cairndex/decisions"), { recursive: true });

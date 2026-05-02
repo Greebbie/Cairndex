@@ -131,7 +131,7 @@ async function copyDirNoConflict(input: {
         source,
         target,
         overwrite: input.overwrite,
-        skipNames: input.skipNames,
+        ...(input.skipNames ? { skipNames: input.skipNames } : {}),
       });
       copied += child.copied;
       skipped += child.skipped;

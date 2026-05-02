@@ -44,6 +44,26 @@ const RequiredFrontmatterSchema = z.object({
   change: z.array(z.string()).default(["id", "date", "type", "target", "summary"]),
 });
 
+/**
+ * User-defined node types. Built-in types (spec, decision, …) get specialised
+ * Dashboard / active-context behaviour; custom types added here become first-class
+ * for Browse, doctor (no "unknown folder" warning), context pack inclusion via
+ * generic helpers, and per-vault rules — but they don't get the active-context
+ * hooks.
+ */
+const CustomTypeDefSchema = z.object({
+  folder: z
+    .string()
+    .min(1)
+    .regex(/^[a-z0-9][a-z0-9-]*$/i, "folder must be a kebab-case directory name"),
+  id_prefix: z
+    .string()
+    .min(1)
+    .regex(/^[A-Z][A-Z0-9_]*$/, "id_prefix must be UPPER_SNAKE"),
+});
+
+export type CustomTypeDef = z.infer<typeof CustomTypeDefSchema>;
+
 export const ConfigSchema = z.object({
   schemaVersion: z.literal(1),
   folders: FoldersSchema.default({} as never),
@@ -51,6 +71,7 @@ export const ConfigSchema = z.object({
   required_frontmatter: RequiredFrontmatterSchema.default({} as never),
   verification_required_for_status: z.array(z.string()).default(["done", "accepted"]),
   freshness_warn_days: z.number().int().min(0).default(30),
+  node_types: z.record(z.string(), CustomTypeDefSchema).default({}),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
@@ -74,6 +95,7 @@ export interface ConfigOverride {
   required_frontmatter?: Partial<Config["required_frontmatter"]>;
   verification_required_for_status?: Config["verification_required_for_status"];
   freshness_warn_days?: Config["freshness_warn_days"];
+  node_types?: Config["node_types"];
 }
 
 export function mergeConfig(base: Config, override: ConfigOverride): Config {
@@ -88,6 +110,7 @@ export function mergeConfig(base: Config, override: ConfigOverride): Config {
     verification_required_for_status:
       override.verification_required_for_status ?? base.verification_required_for_status,
     freshness_warn_days: override.freshness_warn_days ?? base.freshness_warn_days,
+    node_types: { ...base.node_types, ...(override.node_types ?? {}) },
   });
 }
 
@@ -112,4 +135,58 @@ export function nodeTypeForFolder(cfg: Config, folderName: string): NodeType | n
     if (folderForNodeType(cfg, t) === folderName) return t;
   }
   return null;
+}
+
+/**
+ * A type entry as understood by Browse, the Settings UI, and any code that
+ * needs to enumerate every node type the user has configured (built-in + custom).
+ */
+export interface AnyTypeDef {
+  /** Type name — e.g. "spec" or "experiment". */
+  name: string;
+  /** Folder name under the project root where nodes of this type live. */
+  folder: string;
+  /** ID prefix for new nodes. */
+  idPrefix: string;
+  /** True for the 10 baked-in types; false for user-added entries. */
+  builtIn: boolean;
+}
+
+/** All declared node types in stable order: built-ins first, then custom alphabetical. */
+export function listAllTypes(cfg: Config): AnyTypeDef[] {
+  const out: AnyTypeDef[] = [];
+  for (const t of NODE_TYPES) {
+    out.push({
+      name: t,
+      folder: folderForNodeType(cfg, t),
+      idPrefix: cfg.ids[t],
+      builtIn: true,
+    });
+  }
+  const customNames = Object.keys(cfg.node_types ?? {}).sort();
+  for (const name of customNames) {
+    const def = cfg.node_types[name];
+    if (!def) continue;
+    out.push({
+      name,
+      folder: def.folder,
+      idPrefix: def.id_prefix,
+      builtIn: false,
+    });
+  }
+  return out;
+}
+
+/** Folder name for any declared type, or null if the type is unknown. */
+export function folderForType(cfg: Config, typeName: string): string | null {
+  if ((NODE_TYPES as readonly string[]).includes(typeName)) {
+    return folderForNodeType(cfg, typeName as NodeType);
+  }
+  const custom = cfg.node_types?.[typeName];
+  return custom ? custom.folder : null;
+}
+
+/** True for the 10 built-in types only. */
+export function isBuiltInType(typeName: string): typeName is NodeType {
+  return (NODE_TYPES as readonly string[]).includes(typeName);
 }

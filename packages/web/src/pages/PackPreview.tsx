@@ -58,8 +58,8 @@ export default function PackPreview() {
         </form>
         <p className="text-xs text-muted-foreground">
           Task is a <em>label only</em> — selection is rules-based (active spec/plan/task, recent
-          sessions, backlinked decisions, open questions). Agent uses{" "}
-          <code className="font-mono">grep .cairndex/</code> for anything more.
+          sessions, backlinked decisions, open questions). Agent should{" "}
+          <code className="font-mono">grep</code> the project memory directly for anything more.
         </p>
         {compose.isError ? (
           <div className="text-xs text-red-600">

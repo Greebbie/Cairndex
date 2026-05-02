@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import type { Config } from "./config.js";
-import { folderForNodeType } from "./config.js";
+import { folderForNodeType, folderForType } from "./config.js";
 import { parseFrontmatter, serializeFrontmatter } from "./frontmatter.js";
 import { parseId } from "./ids.js";
 import { nodeFolderPath, vaultPath } from "./paths.js";
@@ -110,4 +110,43 @@ export async function writeNode(
 
 export function fileBasename(path: string): string {
   return basename(path);
+}
+
+/**
+ * Generic listing that accepts any type name (built-in or custom). Returns []
+ * when the type is not declared anywhere, so a stale/unknown name in the URL
+ * yields an empty list rather than a crash.
+ */
+export async function listNodeFilesByName(
+  repoRoot: string,
+  cfg: Config,
+  typeName: string,
+): Promise<NodeFile[]> {
+  const folder = folderForType(cfg, typeName);
+  if (!folder) return [];
+  const dir = nodeFolderPath(repoRoot, folder);
+  if (!existsSync(dir)) return [];
+  const entries = await readdir(dir);
+  const out: NodeFile[] = [];
+  for (const e of entries) {
+    if (!isNodeFile(e)) continue;
+    const id = idFromFilename(e);
+    if (!id) continue;
+    const full = join(dir, e);
+    const raw = await readFile(full, "utf8");
+    const { data, content } = parseFrontmatter(raw);
+    // Cast the type label so callers can carry custom names through the same shape.
+    out.push({ type: typeName as NodeType, id, path: full, frontmatter: data, body: content });
+  }
+  return out;
+}
+
+export async function readNodeByName(
+  repoRoot: string,
+  cfg: Config,
+  typeName: string,
+  id: string,
+): Promise<NodeFile | null> {
+  const all = await listNodeFilesByName(repoRoot, cfg, typeName);
+  return all.find((n) => n.id === id) ?? null;
 }

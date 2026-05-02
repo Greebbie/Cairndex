@@ -7,6 +7,7 @@ import type { Config } from "./config.js";
 import { parseFrontmatter, serializeFrontmatter } from "./frontmatter.js";
 import { buildMemoryHealth } from "./indexes/memoryHealth.js";
 import { regenerateAllIndexes } from "./indexes/regenerate.js";
+import { projectIdFromRoot } from "./agentSurface/layoutHints.js";
 import { renderAgentSurface } from "./agentSurface/template.js";
 import { normalizeFrontmatter } from "./normalize.js";
 import { INDEXES_DIR, vaultPath } from "./paths.js";
@@ -18,7 +19,7 @@ export interface HandleVaultChangeResult {
   fixed: number;
   timestampRefreshed: boolean;
   indexUpdated: boolean;
-  /** Whether one or more `.cairndex/indexes/*` files were rewritten. */
+  /** Whether one or more `<projectRoot>/indexes/*` files were rewritten. */
   indexesUpdated: boolean;
   /** Whether the cairndex region of CLAUDE.md was rewritten. */
   claudeMdUpdated: boolean;
@@ -131,7 +132,7 @@ export async function handleVaultChange(
     // indexUpdate may not exist in older builds; treat as best-effort.
   }
 
-  // 4. Regenerate the .cairndex/indexes/ derived layer.
+  // 4. Regenerate the indexes/ derived layer under the project root.
   let activeContextChanged = false;
   let memoryHealthChanged = false;
   try {
@@ -145,8 +146,8 @@ export async function handleVaultChange(
 
   // 5. Regenerate the cairndex region of CLAUDE.md when active-context or memory-health
   //    actually changed. Skipping when nothing changed avoids the chokidar loop on
-  //    untouched runs (CLAUDE.md is at repo root, not under .cairndex/, so a write
-  //    here doesn't itself fire the watcher — but skipping no-op writes keeps mtime stable).
+  //    untouched runs (CLAUDE.md is at repo root, not inside the project memory dir, so a
+  //    write here doesn't itself fire the watcher — but skipping no-op writes keeps mtime stable).
   if (activeContextChanged || memoryHealthChanged) {
     try {
       const ctx = (
@@ -154,7 +155,7 @@ export async function handleVaultChange(
       ).buildActiveContext;
       const ac = await ctx(repoRoot, cfg);
       const health = await buildMemoryHealth(repoRoot, cfg);
-      const body = renderAgentSurface(ac, health);
+      const body = renderAgentSurface(ac, health, projectIdFromRoot(repoRoot));
       const claudeMdPath = join(repoRoot, "CLAUDE.md");
       const existing = existsSync(claudeMdPath)
         ? await readFile(claudeMdPath, "utf8")

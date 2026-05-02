@@ -6,7 +6,7 @@ import { DoctorBadge } from "@/components/DoctorBadge";
 import { useDashboard, useProjects } from "@/lib/api";
 import { useWatcherEvents } from "@/lib/sse";
 import { useEffect } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 
 export default function Dashboard() {
   const { alias } = useParams<{ alias: string }>();
@@ -22,11 +22,21 @@ export default function Dashboard() {
   }, [alias, projects.data, navigate]);
 
   if (!alias) {
+    if (projects.isLoading) {
+      return <div className="p-8 text-sm text-muted-foreground">Loading…</div>;
+    }
+    if (projects.data && projects.data.length === 0) {
+      return <Navigate to="/onboard" replace />;
+    }
     return (
       <div className="p-8">
-        <h2 className="text-xl font-semibold mb-2">No project selected</h2>
-        <p className="text-muted-foreground">
-          Register a project with <code>cairndex init</code>, then it will appear in the sidebar.
+        <h2 className="text-xl font-semibold mb-2">Pick a project</h2>
+        <p className="text-muted-foreground text-sm">
+          Choose a project from the sidebar, or{" "}
+          <Link to="/onboard" className="text-primary hover:underline">
+            register a new one
+          </Link>
+          .
         </p>
       </div>
     );

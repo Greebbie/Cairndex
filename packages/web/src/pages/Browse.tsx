@@ -1,32 +1,19 @@
-import { useNodesByType, useVaultOverview } from "@/lib/api";
+import { useNodesByType, useTypes, useVaultOverview } from "@/lib/api";
 import { useWatcherEvents } from "@/lib/sse";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-
-const TYPES = [
-  "goal",
-  "intent",
-  "spec",
-  "decision",
-  "plan",
-  "task",
-  "session",
-  "change",
-  "insight",
-  "question",
-] as const;
-
-type NodeType = (typeof TYPES)[number];
 
 function TypeGroup({
   alias,
   type,
   count,
+  builtIn,
   initiallyOpen,
 }: {
   alias: string;
-  type: NodeType;
+  type: string;
   count: number;
+  builtIn: boolean;
   initiallyOpen: boolean;
 }) {
   const [open, setOpen] = useState(initiallyOpen);
@@ -44,6 +31,11 @@ function TypeGroup({
         <span className="flex items-center gap-2">
           <span className="inline-block w-3 text-muted-foreground">{open ? "▾" : "▸"}</span>
           <span>{type}/</span>
+          {!builtIn && (
+            <span className="text-[10px] uppercase tracking-wide text-muted-foreground rounded border border-border px-1">
+              custom
+            </span>
+          )}
         </span>
         <span className="text-xs text-muted-foreground">{count}</span>
       </button>
@@ -72,25 +64,32 @@ function TypeGroup({
 export default function Browse() {
   const { alias, type } = useParams<{ alias: string; type?: string }>();
   const overview = useVaultOverview(alias);
+  const types = useTypes(alias);
   useWatcherEvents(alias);
   const counts = overview.data?.counts ?? {};
+  const allTypes = types.data?.types ?? [];
 
   if (!alias) return <div className="p-8 text-muted-foreground">No project selected.</div>;
 
   return (
     <div className="p-8">
       <h2 className="text-xl font-semibold mb-4">Browse</h2>
-      <ul>
-        {TYPES.map((t) => (
-          <TypeGroup
-            key={t}
-            alias={alias}
-            type={t}
-            count={counts[t] ?? 0}
-            initiallyOpen={type === t}
-          />
-        ))}
-      </ul>
+      {types.isLoading ? (
+        <div className="text-sm text-muted-foreground">Loading types…</div>
+      ) : (
+        <ul>
+          {allTypes.map((t) => (
+            <TypeGroup
+              key={t.name}
+              alias={alias}
+              type={t.name}
+              count={counts[t.name] ?? 0}
+              builtIn={t.builtIn}
+              initiallyOpen={type === t.name}
+            />
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

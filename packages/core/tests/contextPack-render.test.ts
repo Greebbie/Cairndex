@@ -64,6 +64,13 @@ describe("renderContextPack", () => {
     expect(out).toMatch(/grep.*\.cairndex/);
   });
 
+  it("uses project-relative grep + inbox hints when given a central project id", () => {
+    const out = renderContextPack(pack(), "demo");
+    expect(out).toContain("grep projects/demo/");
+    expect(out).toContain("projects/demo/inbox/proposed-memory-updates/");
+    expect(out).not.toContain("grep .cairndex/");
+  });
+
   it("notes trimmed items when trimmedItems > 0", () => {
     const out = renderContextPack(pack({ trimmedItems: 3 }));
     expect(out).toMatch(/3\s+item.*trimmed/i);

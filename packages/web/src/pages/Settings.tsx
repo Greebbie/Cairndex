@@ -2,6 +2,10 @@ import { useConfig, useUpdateConfig } from "@/lib/api";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useParams } from "react-router-dom";
+import SettingsCustomTypes from "./SettingsCustomTypes";
+import SettingsRules from "./SettingsRules";
+
+type Tab = "config" | "rules";
 
 interface CommonFields {
   freshness_warn_days: number;
@@ -73,6 +77,7 @@ function mergeFormIntoConfig(cfg: ConfigShape, fields: CommonFields): ConfigShap
 
 export default function Settings() {
   const { alias } = useParams<{ alias: string }>();
+  const [tab, setTab] = useState<Tab>("config");
   const [scope, setScope] = useState<"project" | "global">("project");
   const cfg = useConfig(alias, scope);
   const update = useUpdateConfig();
@@ -111,6 +116,27 @@ export default function Settings() {
     <div className="p-8 space-y-6 max-w-3xl">
       <h2 className="text-xl font-semibold">Settings</h2>
 
+      <div className="flex gap-2 border-b border-border">
+        {(["config", "rules"] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setTab(t)}
+            className={`px-3 py-2 text-sm border-b-2 -mb-px ${
+              tab === t
+                ? "border-primary text-foreground font-medium"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {t === "config" ? "Config" : "Rules"}
+          </button>
+        ))}
+      </div>
+
+      {tab === "rules" && <SettingsRules />}
+
+      {tab === "config" && (
+      <>
       <div className="flex gap-2">
         {(["project", "global"] as const).map((s) => (
           <button
@@ -217,6 +243,8 @@ export default function Settings() {
         </div>
       </form>
 
+      {scope === "project" && <SettingsCustomTypes />}
+
       <details
         className="rounded border border-border bg-muted/10"
         open={advancedOpen}
@@ -241,6 +269,8 @@ export default function Settings() {
           </button>
         </div>
       </details>
+      </>
+      )}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, isAbsolute, resolve } from "node:path";
+import { homedir } from "node:os";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import yaml from "js-yaml";
 import { z } from "zod";
 import {
@@ -10,6 +11,10 @@ import {
   VAULT_DIR,
   vaultPath,
 } from "./paths.js";
+
+function globalRegistryDir(): string {
+  return process.env.CAIRNDEX_HOME ?? join(homedir(), ".cairndex");
+}
 
 export interface ProjectRef {
   vaultRoot: string;
@@ -113,7 +118,18 @@ export function findProjectPointerRoot(startDir: string): string | null {
 }
 
 export function findLegacyVaultRepoRoot(startDir: string): string | null {
-  return findUp(startDir, VAULT_DIR);
+  // The global alias-registry lives at ~/.cairndex/ (or $CAIRNDEX_HOME). It is NOT
+  // a project vault — treating it as one means any cwd outside a real repo would
+  // resolve to the global dir and corrupt downstream operations. Skip it.
+  const globalDir = resolve(globalRegistryDir());
+  let cur = resolve(startDir);
+  while (true) {
+    const candidate = resolve(cur, VAULT_DIR);
+    if (existsSync(candidate) && candidate !== globalDir) return cur;
+    const parent = dirname(cur);
+    if (parent === cur) return null;
+    cur = parent;
+  }
 }
 
 export function resolveProjectRef(input: ResolveProjectRefInput = {}): ProjectRef | null {

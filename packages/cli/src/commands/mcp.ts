@@ -18,6 +18,7 @@ import {
   ListToolsRequestSchema,
   ReadResourceRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import { missingVaultMessage } from "../utils/missingVaultMessage.js";
 import { resolveMemoryRoot } from "../utils/resolveMemoryRoot.js";
 
 export interface McpOptions {
@@ -81,7 +82,7 @@ export async function runMcp(opts: McpOptions): Promise<McpResult> {
   if (!vaultExists(root)) {
     return {
       exitCode: 1,
-      message: `no .cairndex/ vault found at ${vaultPath(root)} (run \`cairndex init\` first)`,
+      message: missingVaultMessage(root),
     };
   }
   const server = buildMcpServer(root);

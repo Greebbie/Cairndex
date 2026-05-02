@@ -147,6 +147,22 @@ describe("init", () => {
     expect(stop).toHaveLength(1);
   });
 
+  it("prints a central-vault migration hint after successful init", async () => {
+    const logs: string[] = [];
+    const origLog = console.log;
+    console.log = (...args: unknown[]) => {
+      logs.push(args.map(String).join(" "));
+    };
+    try {
+      await runInit({ cwd: tmp, yes: true, claudeMd: false, hooks: false });
+    } finally {
+      console.log = origLog;
+    }
+    const all = logs.join("\n");
+    expect(all).toMatch(/cairndex vault init/);
+    expect(all).toMatch(/import-repo-vault/);
+  });
+
   it("idempotent: re-running init does not duplicate or break content", async () => {
     await runInit({ cwd: tmp, yes: true, claudeMd: true, hooks: true });
     const before = readFileSync(join(tmp, "CLAUDE.md"), "utf8");

@@ -1,6 +1,6 @@
 # @cairndex/desktop
 
-Tauri 2 desktop wrapper for Cairndex — the long-form Obsidian/Typora-style application form factor.
+Tauri 2 desktop wrapper for Cairndex — packages the GUI and watcher as a native cross-platform application so users can install and launch Cairndex without touching `npm` or a terminal.
 
 ## v0.1 scope
 
@@ -39,6 +39,6 @@ Produces a platform-native installer (`.dmg` / `.msi` / `.deb` etc.) under `src-
 ## Roadmap (after v0.1)
 
 - Spawn `cairndex ui` (server + watcher) as a Tauri sidecar so the user doesn't run it separately.
-- Vault picker (open/recent/registered) and multi-vault windows — the application form factor that motivated this scaffold.
+- Vault picker (open / recent / registered) and multi-vault windows.
 - Native menu bar with cockpit / pack preview / inbox shortcuts.
 - Auto-update via Tauri's updater plugin.

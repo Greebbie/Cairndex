@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   createWatcher,
@@ -8,11 +8,14 @@ import {
   listProjects,
   listVaultProjects,
   loadProjectConfig,
+  type ProjectEntry,
   vaultPath,
 } from "@cairndex/core";
-import { createServer } from "@cairndex/server";
+import { createServer, type CreateServerResult, type OnboardingHooks } from "@cairndex/server";
 import open from "open";
 import { logger } from "../utils/logger.js";
+import { defaultProjectIdFromRepo, runProjectRegister } from "./project.js";
+import { runVaultInit } from "./vault.js";
 
 export interface UiOptions {
   port?: number;
@@ -37,58 +40,117 @@ function findWebDist(): string | undefined {
   return undefined;
 }
 
+async function startWatcherForProject(
+  project: ProjectEntry,
+  server: CreateServerResult,
+  watcherStops: Array<() => Promise<void>>,
+): Promise<void> {
+  const cfg = existsSync(join(vaultPath(project.path), "config.yaml"))
+    ? loadProjectConfig(project.path)
+    : defaultConfig();
+  const onSave = async (path: string): Promise<void> => {
+    try {
+      const r = await handleVaultChange(project.path, cfg, path);
+      if (r.archived) {
+        server.sseHub.broadcast(project.alias, { type: "archived", path });
+      } else {
+        server.sseHub.broadcast(project.alias, { type: "file-changed", path });
+      }
+      if (r.fixed > 0) {
+        server.sseHub.broadcast(project.alias, { type: "reciprocal-added", path });
+      }
+      if (r.indexUpdated) {
+        server.sseHub.broadcast(project.alias, { type: "file-changed", path: "index.md" });
+      }
+    } catch (err) {
+      logger.error({ err, path, alias: project.alias }, "watcher action failed");
+    }
+  };
+  const w = createWatcher({
+    repoRoot: project.path,
+    cfg,
+    debounceMs: 250,
+    onChange: onSave,
+    onAdd: onSave,
+    onUnlink: (path) => server.sseHub.broadcast(project.alias, { type: "archived", path }),
+  });
+  await w.start();
+  watcherStops.push(() => w.stop());
+}
+
 export async function runUi(opts: UiOptions): Promise<void> {
   const port = opts.port ?? 7777;
   const projects = opts.vaultRoot ? await listVaultProjects(opts.vaultRoot) : await listProjects();
 
   const webRoot = findWebDist();
   if (!webRoot) {
-    logger.warn("web/dist not found; running API-only mode (no GUI). Build packages/web first.");
+    logger.error(
+      "Could not find web UI build output. Run `pnpm -r build` from the repo root and retry.",
+    );
+    process.exit(1);
   }
+
+  const watcherStops: Array<() => Promise<void>> = [];
+  // `serverInstance` is captured by the onboarding callback, which fires
+  // after createServer returns. The closure resolves to the live server then.
+  let serverInstance: CreateServerResult | null = null;
+
+  const onboarding: OnboardingHooks = {
+    async initVault(input) {
+      const r = await runVaultInit(input);
+      if (r.exitCode !== 0 || !r.vaultRoot) {
+        throw new Error(r.message ?? "vault init failed");
+      }
+      return { vaultRoot: r.vaultRoot };
+    },
+    async registerProject(input) {
+      const repoRoot = input.repoRoot;
+      const projectId = input.projectId ?? defaultProjectIdFromRepo(repoRoot);
+      const r = await runProjectRegister({
+        vaultRoot: input.vaultRoot,
+        projectId,
+        repoRoot,
+        ...(input.alias !== undefined ? { alias: input.alias } : {}),
+        ...(input.title !== undefined ? { title: input.title } : {}),
+      });
+      if (r.exitCode !== 0 || !r.projectRoot) {
+        throw new Error(r.message ?? "project register failed");
+      }
+      return { projectRoot: r.projectRoot, vaultRoot: resolve(input.vaultRoot) };
+    },
+    async onProjectRegistered(project) {
+      if (serverInstance) {
+        await startWatcherForProject(project, serverInstance, watcherStops);
+      }
+    },
+  };
 
   const server = await createServer({
     projects,
-    ...(webRoot !== undefined ? { webRoot } : {}),
+    webRoot,
     logger: false,
+    onboarding,
   });
+  serverInstance = server;
 
   // Per-project watchers: run vault auto-maintenance, then broadcast SSE.
-  const watcherStops: Array<() => Promise<void>> = [];
   for (const p of projects) {
-    const cfg = existsSync(join(vaultPath(p.path), "config.yaml"))
-      ? loadProjectConfig(p.path)
-      : defaultConfig();
-    const onSave = async (path: string): Promise<void> => {
-      try {
-        const r = await handleVaultChange(p.path, cfg, path);
-        if (r.archived) {
-          server.sseHub.broadcast(p.alias, { type: "archived", path });
-        } else {
-          server.sseHub.broadcast(p.alias, { type: "file-changed", path });
-        }
-        if (r.fixed > 0) {
-          server.sseHub.broadcast(p.alias, { type: "reciprocal-added", path });
-        }
-        if (r.indexUpdated) {
-          server.sseHub.broadcast(p.alias, { type: "file-changed", path: "index.md" });
-        }
-      } catch (err) {
-        logger.error({ err, path, alias: p.alias }, "watcher action failed");
-      }
-    };
-    const w = createWatcher({
-      repoRoot: p.path,
-      cfg,
-      debounceMs: 250,
-      onChange: onSave,
-      onAdd: onSave,
-      onUnlink: (path) => server.sseHub.broadcast(p.alias, { type: "archived", path }),
-    });
-    await w.start();
-    watcherStops.push(() => w.stop());
+    await startWatcherForProject(p, server, watcherStops);
   }
 
-  await server.listen({ port, host: "127.0.0.1" });
+  try {
+    await server.listen({ port, host: "127.0.0.1" });
+  } catch (err) {
+    const e = err as NodeJS.ErrnoException;
+    if (e.code === "EADDRINUSE") {
+      logger.error(
+        `Port ${port} is already in use. Try \`cairndex ui --port 8080\` or stop the process using ${port}.`,
+      );
+    } else {
+      logger.error({ err }, "failed to start cairndex ui");
+    }
+    process.exit(1);
+  }
   const url = `http://localhost:${port}`;
   logger.info({ url }, "cairndex ui started");
 

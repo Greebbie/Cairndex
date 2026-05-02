@@ -12,8 +12,8 @@ export interface SyncResult {
 }
 
 export interface SyncInput {
-  globalDir: string; // ~/.cairndex/shared
-  projectDir: string; // <repo> (NOT <repo>/.cairndex)
+  globalDir: string; // shared rules/templates source — typically `<vault>/shared/` or the global alias-registry shared folder
+  projectDir: string; // project root inside the central vault, OR repo root for legacy layout
 }
 
 const TRACKED_SUBDIRS = ["rules", "templates"] as const;

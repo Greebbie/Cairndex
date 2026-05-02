@@ -4,7 +4,7 @@ You are interacting with a cairndex Markdown memory vault. Follow these rules.
 
 ## Before any meaningful work
 
-1. Read `.cairndex/index.md` to learn the current phase, active focus, and recent changes.
+1. Read the project's `index.md` to learn the current phase, active focus, and recent changes.
 2. Read this file (`rules/operating-rules.md`) — you are reading it now.
 3. Read the files referenced under "Read next" in `index.md`.
 4. Read any `questions/QUESTION-*` with `status: open` that block your task.
@@ -13,7 +13,7 @@ You are interacting with a cairndex Markdown memory vault. Follow these rules.
 
 ### Writing new entries
 
-- Use templates from `.cairndex/templates/<type>.md` as the starting point.
+- Use templates from `templates/<type>.md` as the starting point.
 - Generate the next ID per the project's `config.yaml.ids` rule for that type:
   - Sequential prefix types (SPEC, ADR, PLAN, TASK, INS, GOAL, INT, QUESTION, CHG): read the highest existing number in the relevant folder and increment.
   - Date-format types (sessions default to `yyyy-MM-dd-HHmm`): use the current local timestamp.
@@ -31,6 +31,10 @@ You are interacting with a cairndex Markdown memory vault. Follow these rules.
 
 - Setting `status: done` (or `status: accepted` for ADRs) requires a `verification` block with at least one of: `test`, `commit`, `run`. Without it, `cairndex doctor` will fail.
 
+### Durable memory writes go through the inbox
+
+- Never overwrite specs, decisions, plans, tasks, or insights directly. Write a proposal under the project's `inbox/proposed-memory-updates/` folder; the user accepts or rejects it from the GUI's Review Inbox or via `cairndex inbox`.
+
 ## Automatic behaviors (you do not need to do these)
 
 - Reciprocal links (e.g., `superseded_by` when you set `supersedes`) — auto-written
@@ -40,11 +44,11 @@ You are interacting with a cairndex Markdown memory vault. Follow these rules.
 - Session note at session end — auto-written by Claude Code's Stop hook (with tool-call counts when transcript is available)
 - Validation + auto-fix on every save — auto-run by Claude Code's PostToolUse hook
 
-> **When does automation run?** Either (a) `cairndex ui` is running in this repo, or (b) Claude Code's `PostToolUse`/`Stop` hooks are configured (they are, by default, after `cairndex init`). If neither, run `cairndex doctor --fix` manually after a session.
+> **When does automation run?** Either (a) `cairndex ui` is running, or (b) Claude Code's `PostToolUse`/`Stop` hooks are configured (they are, by default, after `cairndex init`). If neither, run `cairndex doctor --fix` manually after a session.
 
 ## Hard rules
 
 - Do not silently overwrite the body of an immutable file (decisions, sessions, changes, intents, insights).
 - Do not delete files outside `archive/`. To remove an entry, set its `status: removed` and let the watcher archive it.
 - Do not write IDs that don't match the project's `config.yaml` ID format.
-- Do not write outside `.cairndex/**` to satisfy a cairndex requirement; cairndex changes only its own files.
+- Do not write outside the project's vault folder to satisfy a cairndex requirement; cairndex changes only its own files.

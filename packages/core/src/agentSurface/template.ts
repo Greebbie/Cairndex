@@ -1,5 +1,6 @@
 import type { ActiveContext } from "../indexes/activeContext.js";
 import type { MemoryHealth } from "../indexes/memoryHealth.js";
+import { LEGACY_PROJECT_ID, inboxProposalsHint } from "./layoutHints.js";
 
 /**
  * Render the Recommended-set agent-surface body. This is what goes inside the
@@ -9,7 +10,11 @@ import type { MemoryHealth } from "../indexes/memoryHealth.js";
  * memory-health line + the `cairndex context` command hint + an inbox-proposal note.
  * Open questions and superseded warnings are deferred to v0.2.
  */
-export function renderAgentSurface(ctx: ActiveContext, health: MemoryHealth): string {
+export function renderAgentSurface(
+  ctx: ActiveContext,
+  health: MemoryHealth,
+  projectId: string = LEGACY_PROJECT_ID,
+): string {
   const lines: string[] = [];
   lines.push(`Phase: ${ctx.phase}`);
   if (ctx.activeGoal) lines.push(`Active goal: ${ctx.activeGoal.id} — ${ctx.activeGoal.title}`);
@@ -29,7 +34,7 @@ export function renderAgentSurface(ctx: ActiveContext, health: MemoryHealth): st
   lines.push(`For full task context: \`cairndex context "<task>"\``);
   lines.push("");
   lines.push("Note: durable memory changes (decisions, specs, insights, plan/task state)");
-  lines.push("should propose through `.cairndex/inbox/proposed-memory-updates/`");
+  lines.push(`should propose through \`${inboxProposalsHint(projectId)}\``);
   lines.push("unless the user explicitly accepts inline.");
   return lines.join("\n");
 }

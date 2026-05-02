@@ -2,14 +2,17 @@ import type { ProjectEntry } from "@cairndex/core";
 import cors from "@fastify/cors";
 import Fastify, { type FastifyInstance } from "fastify";
 import { SseHub } from "./lib/sseHub.js";
+import type { OnboardingHooks } from "./routes/onboarding.js";
 
 export { SseHub } from "./lib/sseHub.js";
 export type { SseEvent } from "./lib/sseHub.js";
+export type { OnboardingHooks } from "./routes/onboarding.js";
 
 export interface CreateServerInput {
   projects: readonly ProjectEntry[];
   logger?: boolean;
   webRoot?: string;
+  onboarding?: OnboardingHooks;
 }
 
 export type CreateServerResult = FastifyInstance;
@@ -26,8 +29,15 @@ export async function createServer(input: CreateServerInput): Promise<CreateServ
     credentials: false,
   });
 
-  // Pass projects via decorate so route plugins can access them.
-  app.decorate("projects", input.projects);
+  // Hold projects in a mutable array but expose it as readonly to consumers.
+  // Onboarding routes refresh it in place via `setProjects` after registration.
+  const projectsState: ProjectEntry[] = [...input.projects];
+  const setProjects = (next: readonly ProjectEntry[]): void => {
+    projectsState.length = 0;
+    projectsState.push(...next);
+  };
+  app.decorate("projects", projectsState as readonly ProjectEntry[]);
+  app.decorate("setProjects", setProjects);
 
   const hub = new SseHub();
   app.decorate("sseHub", hub);
@@ -45,6 +55,7 @@ export async function createServer(input: CreateServerInput): Promise<CreateServ
   const { registerDashboardRoutes } = await import("./routes/dashboard.js");
   const { registerPackRoutes } = await import("./routes/pack.js");
   const { registerInboxRoutes } = await import("./routes/inbox.js");
+  const { registerRulesRoutes } = await import("./routes/rules.js");
 
   await registerProjectsRoutes(app);
   await registerVaultRoutes(app);
@@ -57,6 +68,12 @@ export async function createServer(input: CreateServerInput): Promise<CreateServ
   await registerDashboardRoutes(app);
   await registerPackRoutes(app);
   await registerInboxRoutes(app);
+  await registerRulesRoutes(app);
+
+  if (input.onboarding) {
+    const { registerOnboardingRoutes } = await import("./routes/onboarding.js");
+    await registerOnboardingRoutes(app, input.onboarding, setProjects);
+  }
 
   const { registerStatic } = await import("./lib/static.js");
   await registerStatic(app, input.webRoot);
@@ -68,5 +85,6 @@ declare module "fastify" {
   interface FastifyInstance {
     projects: readonly ProjectEntry[];
     sseHub: SseHub;
+    setProjects: (next: readonly ProjectEntry[]) => void;
   }
 }

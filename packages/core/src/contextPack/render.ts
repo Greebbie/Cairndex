@@ -1,14 +1,17 @@
+import { LEGACY_PROJECT_ID, inboxProposalsHint, searchVaultHint } from "../agentSurface/layoutHints.js";
 import { serializeFrontmatter } from "../frontmatter.js";
 import type { ContextPackItem, ContextPackOutput } from "./types.js";
 
-const FOOTER = `---
+function buildFooter(projectId: string): string {
+  return `---
 
-If you need more than what's listed here, \`grep .cairndex/\` directly.
+If you need more than what's listed here, \`${searchVaultHint(projectId)}\` directly.
 
 Durable memory changes (decisions, specs, insights, plan/task state) should
-propose through \`.cairndex/inbox/proposed-memory-updates/\` unless the user
+propose through \`${inboxProposalsHint(projectId)}\` unless the user
 explicitly accepts inline.
 `;
+}
 
 function tokenLine(p: ContextPackOutput): string {
   const pct = Math.min(100, Math.round((p.tokenEstimate / Math.max(1, p.tokenBudget)) * 100));
@@ -48,7 +51,7 @@ function buildFrontmatterData(p: ContextPackOutput) {
   };
 }
 
-function buildBody(pack: ContextPackOutput): string {
+function buildBody(pack: ContextPackOutput, projectId: string): string {
   const sections: string[] = [];
   sections.push(`# Context Pack: ${pack.task}`);
   sections.push("");
@@ -63,10 +66,13 @@ function buildBody(pack: ContextPackOutput): string {
     sections.push(renderItem(it, idx + 1));
     sections.push("");
   });
-  sections.push(FOOTER);
+  sections.push(buildFooter(projectId));
   return sections.join("\n");
 }
 
-export function renderContextPack(pack: ContextPackOutput): string {
-  return serializeFrontmatter(buildFrontmatterData(pack), buildBody(pack));
+export function renderContextPack(
+  pack: ContextPackOutput,
+  projectId: string = LEGACY_PROJECT_ID,
+): string {
+  return serializeFrontmatter(buildFrontmatterData(pack), buildBody(pack, projectId));
 }

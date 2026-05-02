@@ -14,6 +14,7 @@ import {
   vaultExists,
   vaultPath,
 } from "@cairndex/core";
+import { missingVaultMessage } from "../utils/missingVaultMessage.js";
 import { resolveMemoryRoot } from "../utils/resolveMemoryRoot.js";
 
 interface BaseOptions {
@@ -52,7 +53,7 @@ export async function runInboxPropose(opts: InboxProposeOptions): Promise<InboxP
   if (!vaultExists(root)) {
     return {
       exitCode: 1,
-      message: `no .cairndex/ vault found at ${vaultPath(root)} (run \`cairndex init\` first)`,
+      message: missingVaultMessage(root),
     };
   }
   const cfg = loadCfg(root);
@@ -100,7 +101,7 @@ export async function runInboxList(opts: BaseOptions): Promise<InboxListResult> 
   if (!vaultExists(root)) {
     return {
       exitCode: 1,
-      message: `no .cairndex/ vault found at ${vaultPath(root)} (run \`cairndex init\` first)`,
+      message: missingVaultMessage(root),
     };
   }
   const cfg = loadCfg(root);
@@ -123,7 +124,7 @@ export async function runInboxAccept(opts: InboxAcceptOptions): Promise<InboxAcc
   if (!vaultExists(root)) {
     return {
       exitCode: 1,
-      message: `no .cairndex/ vault found at ${vaultPath(root)} (run \`cairndex init\` first)`,
+      message: missingVaultMessage(root),
     };
   }
   const cfg = loadCfg(root);
@@ -150,7 +151,7 @@ export async function runInboxReject(
   if (!vaultExists(root)) {
     return {
       exitCode: 1,
-      message: `no .cairndex/ vault found at ${vaultPath(root)} (run \`cairndex init\` first)`,
+      message: missingVaultMessage(root),
     };
   }
   const cfg = loadCfg(root);

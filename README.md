@@ -1,82 +1,64 @@
 # cairndex
 
-> A Markdown-native central vault for AI-assisted software work.
+> Persistent, reviewable project memory for AI coding agents.
 
-`cairndex` gives Claude Code and other coding agents a persistent, structured,
-human-readable project memory layer. The target product model is **one central
-vault folder that contains every project's memory**, like an Obsidian vault for
-agent work.
+Cairndex is a structured memory layer for AI coding sessions. Your project's
+specs, decisions, plans, sessions, and insights live as typed Markdown in one
+central vault. AI coding agents (Claude Code, Cursor, and others) read this
+memory before they start work and propose updates after — every change goes
+through a review inbox before it lands. Memory survives the chat window, is
+human-readable, and version-controllable.
 
-**Status:** Early development. The current implementation still has legacy
-per-repo `.cairndex/` behavior, but the accepted product direction is the
-central vault model documented in
-[`docs/superpowers/specs/`](./docs/superpowers/specs/).
+## Quickstart
 
-## Why
+```bash
+# 1. Install
+pnpm add -g @cairndex/cli   # or: npm i -g @cairndex/cli
 
-AI coding loses context across sessions. Important information scatters across
-chat history, README files, git commits, ad-hoc notes, issue trackers, and
-unstated assumptions. Agents forget requirements, repeat past mistakes, and
-silently overwrite decisions.
-
-cairndex fixes this with a typed, structured, append-or-evolve memory model
-that agents read before work and update after work. The durable source of truth
-is the vault, not any single code repository.
-
-## Target Storage Model
-
-The user opens or migrates one Cairndex vault:
-
-```txt
-CairndexVault/
-  vault.yaml
-  projects/
-    cairndex/
-      project.yaml
-      index.md
-      goals/
-      intents/
-      specs/
-      decisions/
-      plans/
-      tasks/
-      sessions/
-      changes/
-      insights/
-      questions/
-      indexes/
-      inbox/
-        proposed-memory-updates/
-    another-project/
-      project.yaml
-      ...
-  shared/
-    rules/
-    templates/
-    insights/
-    patterns/
-  indexes/
-    global-project-summary.json
-    cross-project-health.json
-    recent-activity.json
+# 2. Launch the GUI
+cairndex ui
 ```
 
-A code repository may contain a small pointer file:
+Your browser opens to a 3-step wizard:
+
+1. **Choose a vault folder** — created if it doesn't exist (e.g. `~/CairndexVault`).
+2. **Register a code repo** as your first project.
+3. **Run doctor** to verify, then land on the project Dashboard.
+
+That's it. No config files, no schemas to learn first. Add more projects from
+the same vault at any time.
+
+## How memory is organized
+
+A vault holds many projects, each as a tree of typed Markdown:
+
+```
+CairndexVault/
+├── vault.yaml
+├── projects/
+│   └── my-app/
+│       ├── project.yaml
+│       ├── index.md
+│       ├── goals/  intents/  specs/  decisions/  plans/  tasks/
+│       ├── sessions/  changes/  insights/  questions/
+│       ├── indexes/
+│       └── inbox/proposed-memory-updates/
+├── shared/                # cross-project rules, templates, insights
+└── indexes/               # vault-wide rollups
+```
+
+A repo can opt-in via a one-line pointer file:
 
 ```yaml
 # <repo>/.cairndex-project.yaml
-vault: "C:/Users/<user>/Documents/CairndexVault"
-project: "cairndex"
+vault: "C:/Users/<you>/CairndexVault"
+project: "my-app"
 ```
 
-That pointer is not memory. Repo-local `.cairndex/` folders are compatibility
-and migration sources only. Derived agent surfaces such as `CLAUDE.md` can live
-in the repo, but canonical specs, decisions, plans, sessions, indexes, context
-packs, and inbox proposals live under `CairndexVault/projects/<project-id>/`.
+That pointer is not memory — the vault is. Repo-local `.cairndex/` folders
+remain supported for migration but new projects should live in the central vault.
 
-## Memory Model
-
-Each project namespace is a knowledge graph in Markdown. The core folders are:
+### Node types
 
 | Folder | Role | Mutability |
 |---|---|---|
@@ -91,82 +73,80 @@ Each project namespace is a knowledge graph in Markdown. The core folders are:
 | `insights/` | Lessons; promotable to shared memory | append-only |
 | `questions/` | Open uncertainties | living, status-tracked |
 
-Three first-class concepts are stored in frontmatter:
+Three load-bearing properties:
 
-- **Typed edges:** `links: [{ type: supersedes, target: ADR-002 }]`, plus
-  `[[wikilinks]]` in body.
-- **Provenance:** every node records who created it, in which session, and with
-  what confidence.
-- **Verification-bound completion:** claiming `status: done` requires a
+- **Typed edges** in frontmatter (`links: [{type: supersedes, target: ADR-002}]`)
+  plus `[[wikilinks]]` in body.
+- **Provenance**: every node records who created it, in which session, with what
+  confidence.
+- **Verification-bound completion**: marking `status: done` requires a
   `verification` block, enforced by `cairndex doctor`.
 
-The project `index.md` carries the current phase:
-`discovering -> specifying -> planning -> implementing -> reviewing -> shipping`.
+## How agents interact
 
-## Target CLI Shape
-
-```bash
-cairndex vault init <path>
-cairndex vault open <path>
-
-cairndex project register --vault <path> --project <id> --repo <repo-path>
-cairndex project import-repo-vault --vault <path> --project <id> --repo <repo-path>
-
-cairndex context --vault <path> --project <id> "<task>"
-cairndex doctor --vault <path> --project <id>
-cairndex doctor --vault <path> --all
-cairndex emit claude-md --vault <path> --project <id> --repo <repo-path>
-cairndex ui --vault <path>
-```
-
-`cwd` can remain a convenience fallback only when it resolves through
-`.cairndex-project.yaml` or a vault-local project manifest.
-
-## Agent Contract
-
-Agents should:
+The contract is simple and enforceable:
 
 1. Resolve the current repo to `{ vaultRoot, projectId }`.
-2. Read `projects/<project-id>/index.md`, `shared/rules/`, and the generated
-   context pack.
-3. Propose durable memory changes under
-   `projects/<project-id>/inbox/proposed-memory-updates/` unless the user
-   explicitly authorizes direct edits.
-4. Never treat repo-local `.cairndex/` as canonical memory.
+2. Read `projects/<id>/index.md`, `shared/rules/`, and a generated context pack.
+3. Propose durable memory changes by writing to
+   `projects/<id>/inbox/proposed-memory-updates/`. The user accepts or rejects
+   from the GUI's Review Inbox or via `cairndex inbox`.
+4. Never edit canonical memory directly.
 
-## Project Structure
+Agents can read the vault three ways:
 
-```txt
-cairndex/
-  packages/
-    core/      @cairndex/core
-    cli/       @cairndex/cli
-    server/    @cairndex/server
-    web/       @cairndex/web
-  templates/
-  docs/
-    superpowers/
-      specs/
-      plans/
+- **Files**: grep / read the Markdown directly.
+- **CLAUDE.md region**: an auto-generated `<!-- cairndex:start -->` block in
+  your repo's `CLAUDE.md` summarising current phase, active task, and pointers.
+- **MCP**: `cairndex mcp` exposes `context_pack`, `propose_memory_update`,
+  `inbox_list`, and resources over stdio.
+
+## CLI reference
+
+The GUI wizard wraps these — you rarely need to type them, but they're there:
+
+```bash
+cairndex vault init <path>                              # create a central vault
+cairndex project register --vault <path> --project <id> --repo <repo-path>
+cairndex project import-repo-vault ...                  # migrate from legacy .cairndex/
+
+cairndex ui [--vault <path>] [--port 7777]              # launch GUI + watcher
+cairndex context [task] [--vault <path>] [--project <id>]
+cairndex doctor [--vault <path>] [--project <id>] [--fix]
+cairndex emit claude-md ...                             # regenerate CLAUDE.md region
+cairndex inbox list | accept <id> | reject <id> | propose ...
+cairndex sweep                                          # consolidate + archive (idempotent)
+cairndex mcp                                            # MCP server over stdio
 ```
 
-This is a pnpm monorepo. Build with `pnpm build`, test with `pnpm test`.
+## Status
 
-## Roadmap
+**v0.2** — central vault model is GA. The CLI, web GUI, MCP server, watcher,
+review inbox, context packs, and doctor all run against the central layout.
+345+ tests, end-to-end smoke verified via headless browser.
 
-- **v0.1:** central vault primitives, project registration/import, context
-  packs, doctor, GUI, and Claude Code agent surface.
-- **v0.2:** review inbox processing, graph/search views, and stronger memory
-  health.
-- **v0.3:** MCP-facing resources/tools and read-only sharing.
-- **v1.0:** desktop packaging and mature multi-project vault workflows.
+What's next:
+
+- Desktop packaging (Tauri) so users get a double-click install instead of
+  `npm i -g`.
+- Cross-vault search and read-only project sharing.
+- Richer graph views in the GUI.
+
+## Architecture
+
+`cairndex` is a pnpm monorepo:
+
+```
+packages/
+├── core/      @cairndex/core    # vault primitives, validation, MCP, indexes
+├── cli/       @cairndex/cli     # the cairndex command
+├── server/    @cairndex/server  # Fastify API + SSE
+└── web/       @cairndex/web     # React GUI
+```
+
+Build with `pnpm -r build`, test with `pnpm test`. See
+[CONTRIBUTING.md](./CONTRIBUTING.md) for development setup.
 
 ## License
 
 MIT. See [LICENSE](./LICENSE).
-
-## Name
-
-`cairn` is a path marker; `index` is a structured pointer to content.
-`cairndex` is an index of project markers: specs, decisions, sessions, changes,
-plans, insights, and questions.

@@ -2,7 +2,13 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { defaultConfig, loadProjectConfig, mergeConfig } from "../src/config.js";
+import {
+  defaultConfig,
+  folderForType,
+  listAllTypes,
+  loadProjectConfig,
+  mergeConfig,
+} from "../src/config.js";
 
 let tmp: string;
 beforeEach(() => {
@@ -39,6 +45,39 @@ describe("config", () => {
     });
     expect(merged.required_frontmatter.spec).toEqual(["id", "title"]);
     expect(merged.required_frontmatter.decision).toEqual(["id", "title", "status", "created"]);
+  });
+
+  it("listAllTypes returns 10 built-ins for default config, in stable order", () => {
+    const types = listAllTypes(defaultConfig());
+    expect(types).toHaveLength(10);
+    expect(types.every((t) => t.builtIn)).toBe(true);
+    expect(types[0]?.name).toBe("goal");
+    expect(types.find((t) => t.name === "spec")?.folder).toBe("specs");
+    expect(types.find((t) => t.name === "spec")?.idPrefix).toBe("SPEC");
+  });
+
+  it("listAllTypes appends user-defined types after built-ins, alphabetical", () => {
+    const cfg = mergeConfig(defaultConfig(), {
+      node_types: {
+        risk: { folder: "risks", id_prefix: "RISK" },
+        experiment: { folder: "experiments", id_prefix: "EXP" },
+      },
+    });
+    const types = listAllTypes(cfg);
+    expect(types).toHaveLength(12);
+    const customs = types.filter((t) => !t.builtIn);
+    expect(customs.map((t) => t.name)).toEqual(["experiment", "risk"]);
+    expect(customs[0]?.folder).toBe("experiments");
+    expect(customs[0]?.idPrefix).toBe("EXP");
+  });
+
+  it("folderForType resolves built-ins and custom types, returns null for unknown", () => {
+    const cfg = mergeConfig(defaultConfig(), {
+      node_types: { experiment: { folder: "experiments", id_prefix: "EXP" } },
+    });
+    expect(folderForType(cfg, "spec")).toBe("specs");
+    expect(folderForType(cfg, "experiment")).toBe("experiments");
+    expect(folderForType(cfg, "nonexistent-bogus")).toBe(null);
   });
 
   it("rejects config with wrong schemaVersion", () => {

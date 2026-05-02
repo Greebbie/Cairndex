@@ -53,6 +53,17 @@ describe("renderAgentSurface (Recommended template)", () => {
     expect(out).toMatch(/inbox.*proposed-memory-updates/);
   });
 
+  it("uses .cairndex-relative inbox path in legacy mode", () => {
+    const out = renderAgentSurface(baseCtx, baseHealth);
+    expect(out).toContain(".cairndex/inbox/proposed-memory-updates/");
+  });
+
+  it("uses project-relative inbox path when given a central project id", () => {
+    const out = renderAgentSurface(baseCtx, baseHealth, "demo");
+    expect(out).toContain("projects/demo/inbox/proposed-memory-updates/");
+    expect(out).not.toContain(".cairndex/inbox");
+  });
+
   it("omits empty sections gracefully when active info is missing", () => {
     const minimal: ActiveContext = {
       ...baseCtx,

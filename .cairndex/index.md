@@ -1,15 +1,15 @@
 ---
 phase: implementing
 phase_since: 2026-05-02
-next_action: "Awaiting user direction — brainstorm route shipped (Phase 1-9 done sans Tauri compile)"
+next_action: "Awaiting user direction — central-vault migration finished (PLAN-001 phases A-F closed)"
 active_spec: SPEC-001
 current_task: TASK-001
 ---
 
 # Project Index
 
-**Status:** Memory Cockpit shipped — codex's six critique gaps all closed. 58 test files / 298 tests green. Working tree has uncommitted Phase 1-9 work; user controls when to commit.
-**Active focus:** Awaiting user direction. Open candidates: TASK-001 (vite bump), Tauri compile, README rewrite, dogfood screenshot cleanup.
+**Status:** Central-vault migration finished. PLAN-001 closed end-to-end: ProjectRef + vault/project manifests + CLI/server/UI/agent surfaces all routed through `{ vaultRoot, projectId }`, hooks installer is layout-aware, agent text and CLI error messages no longer hardcode `.cairndex/`. Typecheck green across all packages; 67 vitest files / 337 tests + 7 web files / 11 tests all green. Smoke verified: `vault init` → `project register` → `doctor` (exit 0) → `context` (pack written under `projects/<id>/indexes/context-packs/`) → `emit claude-md` (region populated, central inbox hint present). Working tree has uncommitted changes; user controls when to commit.
+**Active focus:** Awaiting user direction. Open candidates: TASK-001 (vite bump), Tauri compile, dogfood the new central layout end-to-end on a second project, run Playwright e2e (added `central-vault.spec.ts` not yet executed locally).
 
 ## Must-know now
 - **Never auto-commit / auto-push.** User controls all commit boundaries (`~/.claude/CLAUDE.md` rule).

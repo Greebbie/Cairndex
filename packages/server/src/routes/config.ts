@@ -2,7 +2,12 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import { ConfigSchema, configPath } from "@cairndex/core";
+import {
+  ConfigSchema,
+  configPath,
+  listAllTypes,
+  vaultPath,
+} from "@cairndex/core";
 import type { FastifyInstance } from "fastify";
 import yaml from "js-yaml";
 import { z } from "zod";
@@ -63,6 +68,30 @@ export async function registerConfigRoutes(app: FastifyInstance): Promise<void> 
     const body = (req.body ?? {}) as Record<string, unknown>;
     await mkdir(dirname(path), { recursive: true });
     await writeFile(path, yaml.dump(body), "utf8");
+
+    // After a project-scope config write, materialise any newly declared folder
+    // (built-in rename or custom type) so Browse shows it and the watcher can
+    // pick up files placed there. Best-effort: failures are logged, not fatal.
+    if (scope.data === "project") {
+      const project = resolveProject(app.projects, params.alias);
+      if (project) {
+        try {
+          const parsed = ConfigSchema.safeParse(body);
+          if (parsed.success) {
+            const root = vaultPath(project.path);
+            for (const t of listAllTypes(parsed.data)) {
+              const dir = join(root, t.folder);
+              if (!existsSync(dir)) {
+                await mkdir(dir, { recursive: true });
+              }
+            }
+          }
+        } catch (err) {
+          app.log.warn({ err, alias: params.alias }, "post-config folder ensure failed");
+        }
+      }
+    }
+
     return { ok: true };
   });
 }

@@ -61,6 +61,19 @@ export function centralSharedPath(vaultRoot: string): string {
   return join(vaultRoot, SHARED_DIR);
 }
 
+/**
+ * Where editable operating-rule markdown lives for the agent surface.
+ * For central projects: vault-shared (`<vaultRoot>/shared/rules/`) — affects every project in the vault.
+ * For legacy repo-local projects: `<repo>/.cairndex/rules/`.
+ */
+export function rulesDirForProject(projectRoot: string): string {
+  const vaultRoot = centralVaultRootForProject(projectRoot);
+  if (vaultRoot) {
+    return join(centralSharedPath(vaultRoot), "rules");
+  }
+  return join(vaultPath(projectRoot), "rules");
+}
+
 export function configPath(repoRoot: string): string {
   return join(vaultPath(repoRoot), CONFIG_FILE);
 }

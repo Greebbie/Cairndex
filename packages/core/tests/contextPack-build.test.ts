@@ -91,6 +91,37 @@ describe("buildContextPack", () => {
     expect(pack.items.some((i) => i.id === "ADR-006")).toBe(false);
   });
 
+  it("auto-includes operating-rule items from rules/ in the pack with high priority", async () => {
+    setup({
+      "index.md": baseIndex,
+      "rules/operating-rules.md": "# Operating rules\n\nDo X. Do Y.\n",
+      "rules/team-conventions.md": "# Team conventions\n\nLink spec → goal.\n",
+    });
+    const pack = await buildContextPack(tmp, defaultConfig(), { task: "x" });
+    const ruleItems = pack.items.filter((i) => i.type === "operating-rule");
+    expect(ruleItems).toHaveLength(2);
+    // Sorted alphabetically by id, so operating-rules comes before team-conventions
+    expect(ruleItems[0]?.id).toBe("rule:operating-rules");
+    expect(ruleItems[1]?.id).toBe("rule:team-conventions");
+    expect(ruleItems[0]?.body).toContain("Do X");
+    // Priority 1 means never trimmed
+    for (const r of ruleItems) expect(r.reasonPriority).toBe(1);
+  });
+
+  it("caps each operating-rule body so an oversize rule doesn't blow the budget", async () => {
+    const huge = `# Big rule\n\n${"x".repeat(5000)}`;
+    setup({
+      "index.md": baseIndex,
+      "rules/big.md": huge,
+    });
+    const pack = await buildContextPack(tmp, defaultConfig(), { task: "x" });
+    const ruleItem = pack.items.find((i) => i.id === "rule:big");
+    expect(ruleItem).toBeDefined();
+    // body got truncated below the original length
+    expect(ruleItem!.body.length).toBeLessThan(huge.length);
+    expect(ruleItem!.body).toContain("(truncated");
+  });
+
   it("uses task as a label only — selection is identical regardless of task string", async () => {
     setup({
       "index.md": baseIndex,

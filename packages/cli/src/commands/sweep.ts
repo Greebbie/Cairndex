@@ -9,6 +9,7 @@ import {
   vaultExists,
   vaultPath,
 } from "@cairndex/core";
+import { missingVaultMessage } from "../utils/missingVaultMessage.js";
 import { resolveMemoryRoot } from "../utils/resolveMemoryRoot.js";
 
 export interface SweepOptions {
@@ -39,7 +40,7 @@ export async function runSweep(opts: SweepOptions): Promise<SweepResult> {
   if (!vaultExists(root)) {
     return {
       exitCode: 1,
-      message: `no .cairndex/ vault found at ${vaultPath(root)} (run \`cairndex init\` first)`,
+      message: missingVaultMessage(root),
     };
   }
   const cfg = existsSync(`${vaultPath(root)}/config.yaml`)

@@ -1,4 +1,9 @@
 import { z } from "zod";
+import {
+  LEGACY_PROJECT_ID,
+  inboxProposalsHint,
+  projectIdFromRoot,
+} from "../agentSurface/layoutHints.js";
 import type { Config } from "../config.js";
 import { buildContextPack } from "../contextPack/build.js";
 import { renderContextPack } from "../contextPack/render.js";
@@ -40,7 +45,8 @@ const ProposeMemoryUpdateArgs = z.object({
   }),
 });
 
-export function listMcpTools(): ListToolsResult {
+export function listMcpTools(projectId: string = LEGACY_PROJECT_ID): ListToolsResult {
+  const inboxHint = inboxProposalsHint(projectId);
   return {
     tools: [
       {
@@ -62,7 +68,7 @@ export function listMcpTools(): ListToolsResult {
       {
         name: "propose_memory_update",
         description:
-          "Submit a durable-memory change for human review. Use this instead of writing to .cairndex/specs/* etc. directly. The user accepts/rejects via the inbox.",
+          `Submit a durable-memory change for human review. Use this instead of writing to ${inboxHint.replace(/\/$/, "")}/* siblings (specs, decisions, plans, ...) directly. The user accepts/rejects via the inbox.`,
         inputSchema: {
           type: "object",
           required: ["proposalType", "targetType", "newBody", "summary", "provenance"],
@@ -122,6 +128,7 @@ export async function callMcpTool(
   args: unknown,
 ): Promise<McpToolResult> {
   try {
+    const projectId = projectIdFromRoot(repoRoot);
     if (name === "context_pack") {
       const parsed = ContextPackArgs.safeParse(args ?? {});
       if (!parsed.success) return err(`bad args: ${parsed.error.message}`);
@@ -129,7 +136,7 @@ export async function callMcpTool(
       if (parsed.data.task !== undefined) buildInput.task = parsed.data.task;
       if (parsed.data.budget !== undefined) buildInput.tokenBudget = parsed.data.budget;
       const pack = await buildContextPack(repoRoot, cfg, buildInput);
-      return ok(renderContextPack(pack));
+      return ok(renderContextPack(pack, projectId));
     }
 
     if (name === "propose_memory_update") {

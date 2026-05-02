@@ -20,7 +20,7 @@ export interface RegenerateAllResult {
   anyChanged: boolean;
 }
 
-/** Single entry point for refreshing every derived file under .cairndex/indexes/.
+/** Single entry point for refreshing every derived file under <projectRoot>/indexes/.
  *  Watcher and CLI commands both call this. Each sub-regenerator is idempotent — only writes
  *  when the (non-`generatedAt`) content actually changed. */
 export async function regenerateAllIndexes(

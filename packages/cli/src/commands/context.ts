@@ -6,11 +6,13 @@ import {
   contextPacksPath,
   defaultConfig,
   loadProjectConfig,
+  projectIdFromRoot,
   regenerateAllIndexes,
   renderContextPack,
   vaultExists,
   vaultPath,
 } from "@cairndex/core";
+import { missingVaultMessage } from "../utils/missingVaultMessage.js";
 import { resolveMemoryRoot } from "../utils/resolveMemoryRoot.js";
 
 export interface ContextOptions {
@@ -45,7 +47,7 @@ export async function runContext(opts: ContextOptions): Promise<ContextResult> {
   if (!vaultExists(root)) {
     return {
       exitCode: 1,
-      message: `no .cairndex/ vault found at ${vaultPath(root)} (run \`cairndex init\` first)`,
+      message: missingVaultMessage(root),
     };
   }
 
@@ -59,7 +61,8 @@ export async function runContext(opts: ContextOptions): Promise<ContextResult> {
   if (opts.task !== undefined) buildInput.task = opts.task;
   if (opts.budget !== undefined) buildInput.tokenBudget = opts.budget;
   const pack = await buildContextPack(root, cfg, buildInput);
-  const body = renderContextPack(pack);
+  const projectId = opts.projectId ?? projectIdFromRoot(root);
+  const body = renderContextPack(pack, projectId);
 
   const targetDir = contextPacksPath(root);
   const targetPath = opts.out

@@ -204,4 +204,15 @@ export async function runInit(opts: InitOptions): Promise<void> {
   });
 
   logger.info("cairndex init complete");
+
+  // 9. Nudge toward the central-vault flow. The legacy repo-local layout keeps working,
+  //    but the canonical target (per ADR-002) is one user-level vault holding every project.
+  console.log("");
+  console.log(
+    "Tip: this created a legacy repo-local vault. The canonical layout is a central vault:",
+  );
+  console.log("  cairndex vault init <path>");
+  console.log(
+    "  cairndex project import-repo-vault --vault <path> --project <id> --repo <repo>",
+  );
 }
