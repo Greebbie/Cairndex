@@ -5,7 +5,18 @@ interface Props {
   newBody: string;
 }
 
+const MAX_DIFF_BYTES = 100_000;
+
 export function ProposalDiff({ currentBody, newBody }: Props) {
+  const totalBytes = currentBody.length + newBody.length;
+  if (totalBytes > MAX_DIFF_BYTES) {
+    return (
+      <div className="text-xs rounded border bg-muted/40 p-2 text-muted-foreground">
+        Diff is too large to render inline ({Math.round(totalBytes / 1024)} KB). Open the target
+        file directly to compare, or reject this proposal and review the diff externally.
+      </div>
+    );
+  }
   const changes = diffLines(currentBody, newBody);
   return (
     <pre className="text-xs whitespace-pre-wrap break-words rounded border bg-muted/40 p-2 font-mono">

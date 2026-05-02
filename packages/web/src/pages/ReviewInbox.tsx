@@ -50,6 +50,7 @@ function ProposalCard({
   const [showBody, setShowBody] = useState(false);
   const [rejectMode, setRejectMode] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const targetLink =
     p.target && p.targetType ? (
@@ -105,63 +106,89 @@ function ProposalCard({
 
       {p.status === "pending" ? (
         rejectMode ? (
-          <div className="flex gap-2 pt-2">
-            <input
-              type="text"
-              placeholder="Reason for rejection"
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              className="flex-1 rounded border bg-background px-2 py-1 text-xs"
-            />
-            <button
-              type="button"
-              disabled={busy || !rejectReason.trim()}
-              onClick={async () => {
-                setBusy(true);
-                try {
-                  await onReject(p.proposalId, rejectReason.trim());
+          <div className="space-y-2 pt-2">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Reason for rejection"
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                className="flex-1 rounded border bg-background px-2 py-1 text-xs"
+              />
+              <button
+                type="button"
+                disabled={busy || !rejectReason.trim()}
+                onClick={async () => {
+                  setBusy(true);
+                  setActionError(null);
+                  try {
+                    await onReject(p.proposalId, rejectReason.trim());
+                    setRejectMode(false);
+                    setRejectReason("");
+                  } catch (err) {
+                    setActionError(err instanceof Error ? err.message : String(err));
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+                className="rounded bg-red-600 text-white px-2 py-1 text-xs disabled:opacity-50"
+              >
+                Confirm reject
+              </button>
+              <button
+                type="button"
+                onClick={() => {
                   setRejectMode(false);
-                  setRejectReason("");
-                } finally {
-                  setBusy(false);
-                }
-              }}
-              className="rounded bg-red-600 text-white px-2 py-1 text-xs disabled:opacity-50"
-            >
-              Confirm reject
-            </button>
-            <button
-              type="button"
-              onClick={() => setRejectMode(false)}
-              className="rounded border px-2 py-1 text-xs"
-            >
-              Cancel
-            </button>
+                  setActionError(null);
+                }}
+                className="rounded border px-2 py-1 text-xs"
+              >
+                Cancel
+              </button>
+            </div>
+            {actionError ? (
+              <div className="text-xs text-red-700 dark:text-red-300">
+                Failed to reject: {actionError}
+              </div>
+            ) : null}
           </div>
         ) : (
-          <div className="flex gap-2 pt-2">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={async () => {
-                setBusy(true);
-                try {
-                  await onAccept(p.proposalId);
-                } finally {
-                  setBusy(false);
-                }
-              }}
-              className="rounded bg-emerald-600 text-white px-3 py-1 text-xs disabled:opacity-50"
-            >
-              Accept
-            </button>
-            <button
-              type="button"
-              onClick={() => setRejectMode(true)}
-              className="rounded border px-3 py-1 text-xs"
-            >
-              Reject
-            </button>
+          <div className="space-y-2 pt-2">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true);
+                  setActionError(null);
+                  try {
+                    await onAccept(p.proposalId);
+                  } catch (err) {
+                    setActionError(err instanceof Error ? err.message : String(err));
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+                className="rounded bg-emerald-600 text-white px-3 py-1 text-xs disabled:opacity-50"
+              >
+                Accept
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setRejectMode(true);
+                  setActionError(null);
+                }}
+                className="rounded border px-3 py-1 text-xs"
+              >
+                Reject
+              </button>
+            </div>
+            {actionError ? (
+              <div className="text-xs text-red-700 dark:text-red-300">
+                Failed to apply: {actionError}
+              </div>
+            ) : null}
           </div>
         )
       ) : p.rejectionReason ? (

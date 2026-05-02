@@ -8,7 +8,7 @@ function isSeaRuntime(): boolean {
   // so use eval to defer resolution to the actual Node runtime where the
   // bundle executes. Falls back to false (regular CJS bundle).
   try {
-    const dynamicRequire = eval("require") as NodeRequire;
+    const dynamicRequire = eval("require") as typeof require;
     const sea = dynamicRequire("node:sea") as { isSea?: () => boolean };
     return sea.isSea?.() ?? false;
   } catch {

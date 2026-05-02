@@ -31,6 +31,22 @@ async function jsonFetch<T>(path: string, schema: z.ZodSchema<T>, init?: Request
   return schema.parse(data);
 }
 
+async function readErrorMessage(r: Response): Promise<string> {
+  // Server returns `{ error: "..." }` for known-cause failures (see server inbox routes).
+  // Fall back to raw body, then to status line.
+  const text = await r.text().catch(() => "");
+  if (text) {
+    try {
+      const parsed = JSON.parse(text) as { error?: unknown };
+      if (typeof parsed.error === "string") return parsed.error;
+    } catch {
+      // Body wasn't JSON — surface the raw text.
+    }
+    return text;
+  }
+  return `${r.status} ${r.statusText}`;
+}
+
 export function useProjects() {
   return useQuery({
     queryKey: ["projects"],
@@ -187,7 +203,7 @@ export function useAcceptProposal() {
         `${API_BASE}/api/vault/${input.alias}/inbox/${input.proposalId}/accept`,
         { method: "POST" },
       );
-      if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+      if (!r.ok) throw new Error(await readErrorMessage(r));
       return r.json();
     },
     onSuccess: (_, vars) => {
@@ -350,7 +366,7 @@ export function useRejectProposal() {
           body: JSON.stringify({ reason: input.reason }),
         },
       );
-      if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+      if (!r.ok) throw new Error(await readErrorMessage(r));
       return r.json();
     },
     onSuccess: (_, vars) => qc.invalidateQueries({ queryKey: ["inbox", vars.alias] }),

@@ -74,6 +74,37 @@ describe("ReviewInbox (smoke)", () => {
     expect(await screen.findByText("Reject")).toBeDefined();
   });
 
+  it("surfaces the server error message when accept fails", async () => {
+    // Override fetch to route by URL+method: inbox list returns the default payload,
+    // accept POST returns a 400 with an actionable error body.
+    globalThis.fetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      const method = (init?.method ?? "GET").toUpperCase();
+      if (method === "POST" && url.includes("/accept")) {
+        return new Response(
+          JSON.stringify({ error: "replace-section: section '## Log' not found in body" }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return new Response(JSON.stringify(currentInboxPayload), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as unknown as typeof fetch;
+
+    const Wrapper = wrap();
+    render(
+      <Wrapper>
+        <ReviewInbox />
+      </Wrapper>,
+    );
+
+    const acceptBtn = await screen.findByText("Accept");
+    fireEvent.click(acceptBtn);
+
+    expect(await screen.findByText(/section '## Log' not found in body/)).toBeDefined();
+  });
+
   it("renders patch-mode proposals as labeled section ops, not a single body blob", async () => {
     currentInboxPayload = {
       pending: [

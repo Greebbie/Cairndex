@@ -40,7 +40,8 @@ describe("runInboxPropose", () => {
     });
     expect(r.exitCode).toBe(0);
     expect(r.proposalId).toMatch(/^PROP-/);
-    expect(existsSync(r.path)).toBe(true);
+    expect(r.path).toBeDefined();
+    expect(existsSync(r.path!)).toBe(true);
   });
 
   it("flags duplicate proposals without writing a new file when the same body is proposed twice", async () => {

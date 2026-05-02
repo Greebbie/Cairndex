@@ -133,6 +133,19 @@ async function readStdinJson(): Promise<Record<string, unknown> | null> {
   }
 }
 
+async function readStdinTextOrFail(missingFlag: string): Promise<string> {
+  // Refuse to hang on a TTY waiting for input the user didn't intend to provide.
+  if (process.stdin.isTTY) {
+    console.error(`error: no input on stdin. Either pipe content or pass ${missingFlag}.`);
+    process.exit(1);
+  }
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
 program
   .command("doctor")
   .description("Validate vault, show status, optionally auto-fix")
@@ -530,11 +543,7 @@ inbox
       const fs = await import("node:fs/promises");
       body = await fs.readFile(opts.bodyFile, "utf8");
     } else {
-      const chunks: Buffer[] = [];
-      for await (const chunk of process.stdin) {
-        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-      }
-      body = Buffer.concat(chunks).toString("utf8");
+      body = await readStdinTextOrFail("--body-file");
     }
     const callOpts: Parameters<typeof runInboxPropose>[0] = {
       cwd: opts.cwd,
@@ -588,11 +597,7 @@ inbox
       const fs = await import("node:fs/promises");
       content = await fs.readFile(opts.contentFile, "utf8");
     } else {
-      const chunks: Buffer[] = [];
-      for await (const chunk of process.stdin) {
-        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-      }
-      content = Buffer.concat(chunks).toString("utf8");
+      content = await readStdinTextOrFail("--content-file");
     }
     const callOpts: Parameters<typeof runInboxProposeUpdate>[0] = {
       cwd: opts.cwd,
@@ -674,11 +679,7 @@ session
     if (opts.text) {
       text = String(opts.text);
     } else {
-      const chunks: Buffer[] = [];
-      for await (const chunk of process.stdin) {
-        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-      }
-      text = Buffer.concat(chunks).toString("utf8");
+      text = await readStdinTextOrFail("--text");
     }
     const callOpts: Parameters<typeof runSessionLog>[0] = {
       cwd: opts.cwd,
