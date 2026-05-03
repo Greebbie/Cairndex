@@ -72,6 +72,73 @@ describe("runContext", () => {
     }
   });
 
+  it("--if-stale skips rebuild when an existing pack is fresh (returns skippedFresh)", async () => {
+    setup({
+      "index.md": baseIndex,
+      "specs/SPEC-001.md":
+        "---\nid: SPEC-001\ntitle: A\nstatus: active\ncreated: 2026-05-01\nupdated: 2026-05-01\n---\nbody\n",
+    });
+    // First build — creates a pack at indexes/context-packs/.
+    const first = await runContext({ cwd: tmp, task: "x", emitStdout: false });
+    expect(first.exitCode).toBe(0);
+    expect(first.outputPath).toBeTruthy();
+    const firstBody = first.outputPath ? readFileSync(first.outputPath, "utf8") : "";
+
+    // Second build with --if-stale and no memory change — should skip rebuild.
+    const second = await runContext({ cwd: tmp, task: "x", emitStdout: false, ifStale: true });
+    expect(second.exitCode).toBe(0);
+    expect(second.skippedFresh).toBe(true);
+    // Normalize separators — the rebuild path uses `/` literal, the cached lookup
+    // uses platform-native join, so on Windows the two strings can be ===-unequal
+    // while pointing at the same file.
+    const norm = (p: string | undefined): string | undefined => p?.replace(/\\/g, "/");
+    expect(norm(second.outputPath)).toBe(norm(first.outputPath));
+    // File contents unchanged (no rewrite happened).
+    if (second.outputPath) {
+      expect(readFileSync(second.outputPath, "utf8")).toBe(firstBody);
+    }
+  });
+
+  it("--if-stale rebuilds when a memory file is newer than the pack", async () => {
+    setup({
+      "index.md": baseIndex,
+      "specs/SPEC-001.md":
+        "---\nid: SPEC-001\ntitle: A\nstatus: active\ncreated: 2026-05-01\nupdated: 2026-05-01\n---\nbody\n",
+    });
+    const first = await runContext({ cwd: tmp, task: "x", emitStdout: false });
+    expect(first.exitCode).toBe(0);
+
+    // Bump the spec's mtime to simulate an out-of-session edit. The 50ms wait is
+    // because some filesystems have ~10ms mtime resolution and the staleness check
+    // is strict-greater-than: equal mtimes count as fresh.
+    await new Promise((r) => setTimeout(r, 50));
+    writeFileSync(
+      join(tmp, ".cairndex", "specs", "SPEC-001.md"),
+      "---\nid: SPEC-001\ntitle: A\nstatus: active\ncreated: 2026-05-01\nupdated: 2026-05-03\n---\nedited body\n",
+      "utf8",
+    );
+
+    const second = await runContext({ cwd: tmp, task: "x", emitStdout: false, ifStale: true });
+    expect(second.exitCode).toBe(0);
+    expect(second.skippedFresh).toBeUndefined();
+    expect(second.outputPath).toBeTruthy();
+  });
+
+  it("--if-stale rebuilds (does not crash) when no pack exists yet", async () => {
+    setup({
+      "index.md": baseIndex,
+      "specs/SPEC-001.md":
+        "---\nid: SPEC-001\ntitle: A\nstatus: active\ncreated: 2026-05-01\nupdated: 2026-05-01\n---\nbody\n",
+    });
+    // No prior build, so there's nothing to be "stale relative to" — fall through
+    // and build normally. The first run on a fresh project should not be a no-op.
+    const r = await runContext({ cwd: tmp, task: "x", emitStdout: false, ifStale: true });
+    expect(r.exitCode).toBe(0);
+    expect(r.skippedFresh).toBeUndefined();
+    expect(r.outputPath).toBeTruthy();
+    if (r.outputPath) expect(existsSync(r.outputPath)).toBe(true);
+  });
+
   it("respects custom budget via opts.budget", async () => {
     setup({
       "index.md": baseIndex,

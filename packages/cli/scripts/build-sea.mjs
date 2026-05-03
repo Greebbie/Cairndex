@@ -9,7 +9,15 @@
 // packages/web/dist/ both exist). Run via `pnpm -F cairndex package:sea`.
 
 import { execFileSync } from "node:child_process";
-import { copyFileSync, cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -81,6 +89,69 @@ if (isWin) {
     console.log("[sea] removed signature with signtool");
   } catch {
     console.log("[sea] no signtool available; continuing (exe will be unsigned)");
+  }
+}
+
+// 4b. Apply the Cairndex icon + version metadata to the PE on Windows. Pure-JS
+// via `resedit` — no native rcedit binary required. Skipped on macOS/Linux
+// because PE resources only exist on Windows .exe files.
+if (isWin) {
+  const icoPath = join(cliRoot, "assets", "icon.ico");
+  if (!existsSync(icoPath)) {
+    console.log(`[sea] skipping icon — ${icoPath} not found (run pnpm -F cairndex build:icon)`);
+  } else {
+    try {
+      const { NtExecutable, NtExecutableResource, Data, Resource } = await import("resedit");
+      const exeBuf = readFileSync(finalExe);
+      // ignoreCert: Node's official binary ships Authenticode-signed; resedit
+      // rejects parsing by default. Stripping the cert is fine because postject
+      // immediately invalidates the signature anyway when it injects the SEA blob.
+      const exe = NtExecutable.from(exeBuf, { ignoreCert: true });
+      const res = NtExecutableResource.from(exe);
+
+      // Replace the icon group used by Explorer (resource id 1, language neutral).
+      const iconBuf = readFileSync(icoPath);
+      const iconFile = Data.IconFile.from(iconBuf.buffer.slice(
+        iconBuf.byteOffset,
+        iconBuf.byteOffset + iconBuf.byteLength,
+      ));
+      Resource.IconGroupEntry.replaceIconsForResource(
+        res.entries,
+        1, // group id
+        1033, // language: en-US (most explorers also accept neutral)
+        iconFile.icons.map((i) => i.data),
+      );
+
+      // VersionInfo so right-click → Properties shows "Cairndex" instead of node.
+      // Mutate Node's existing VS_VERSION_INFO instead of appending a new one — PE
+      // readers (Explorer, PowerShell, Get-Item) resolve to the first matching
+      // language entry, which would otherwise show node.exe's strings.
+      const existingVis = Resource.VersionInfo.fromEntries(res.entries);
+      const vi = existingVis[0] ?? Resource.VersionInfo.createEmpty();
+      vi.setFileVersion(0, 2, 0, 0);
+      vi.setProductVersion(0, 2, 0, 0);
+      // Pick the first existing language entry if Node has one (it does — en-US),
+      // so we replace its strings rather than add an unread second translation.
+      const langs = vi.getAllLanguagesForStringValues();
+      const lang = langs[0] ?? { lang: 1033, codepage: 1200 };
+      vi.setStringValues(lang, {
+        ProductName: "Cairndex",
+        FileDescription: "Cairndex — persistent memory for AI coding agents",
+        CompanyName: "Cairndex",
+        LegalCopyright: "MIT",
+        OriginalFilename: "Cairndex.exe",
+        InternalName: "Cairndex",
+        FileVersion: "0.2.0",
+        ProductVersion: "0.2.0",
+      });
+      vi.outputToResourceEntries(res.entries);
+
+      res.outputResource(exe);
+      writeFileSync(finalExe, Buffer.from(exe.generate()));
+      console.log(`[sea] applied icon + version info to ${finalExe}`);
+    } catch (err) {
+      console.warn(`[sea] icon/version step failed (continuing): ${err.message}`);
+    }
   }
 }
 

@@ -6,10 +6,24 @@ export interface CentralVaultFixture {
   vaultRoot: string;
   projectId: string;
   projectRoot: string;
+  /** Repo root the project's manifest points to. Only set when the fixture was created with `repoRoot`. */
+  repoRoot?: string;
   cleanup: () => void;
 }
 
-export function makeCentralVaultFixture(projectId = "demo"): CentralVaultFixture {
+export interface CentralVaultFixtureOptions {
+  /**
+   * If set, the fixture also creates this directory and writes it into the project
+   * manifest's `repo_paths` so `listVaultProjects` exposes a `repoRoot`. Used by
+   * tests that need the route layer to distinguish vault-project-root vs repo-root.
+   */
+  repoRoot?: string;
+}
+
+export function makeCentralVaultFixture(
+  projectId = "demo",
+  options: CentralVaultFixtureOptions = {},
+): CentralVaultFixture {
   const vaultRoot = mkdtempSync(join(tmpdir(), "cairn-server-"));
   writeFileSync(
     join(vaultRoot, "vault.yaml"),
@@ -18,9 +32,18 @@ export function makeCentralVaultFixture(projectId = "demo"): CentralVaultFixture
   );
   const projectRoot = join(vaultRoot, "projects", projectId);
   mkdirSync(projectRoot, { recursive: true });
+  let repoPathsBlock: string;
+  if (options.repoRoot) {
+    mkdirSync(options.repoRoot, { recursive: true });
+    // JSON.stringify escapes backslashes for a valid YAML double-quoted scalar so
+    // the manifest preserves the OS-native path separators round-trip.
+    repoPathsBlock = `repo_paths:\n  - ${JSON.stringify(options.repoRoot)}`;
+  } else {
+    repoPathsBlock = "repo_paths: []";
+  }
   writeFileSync(
     join(projectRoot, "project.yaml"),
-    `id: ${projectId}\ntitle: Demo\nrepo_paths: []\naliases: ["${projectId}"]\nstatus: active\n`,
+    `id: ${projectId}\ntitle: Demo\n${repoPathsBlock}\naliases: ["${projectId}"]\nstatus: active\n`,
     "utf8",
   );
   for (const sub of [
@@ -59,11 +82,19 @@ export function makeCentralVaultFixture(projectId = "demo"): CentralVaultFixture
     vaultRoot,
     projectId,
     projectRoot,
+    ...(options.repoRoot ? { repoRoot: options.repoRoot } : {}),
     cleanup: () => {
       try {
         rmSync(vaultRoot, { recursive: true, force: true });
       } catch {
         // best-effort
+      }
+      if (options.repoRoot) {
+        try {
+          rmSync(options.repoRoot, { recursive: true, force: true });
+        } catch {
+          // best-effort
+        }
       }
     },
   };

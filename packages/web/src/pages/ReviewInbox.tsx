@@ -1,6 +1,12 @@
 import { ProposalDiff } from "@/components/inbox/ProposalDiff";
 import { ProposalPatchView } from "@/components/inbox/ProposalPatchView";
-import { useAcceptProposal, useInbox, useNode, useRejectProposal } from "@/lib/api";
+import {
+  useAcceptProposal,
+  useInbox,
+  useNode,
+  useRejectProposal,
+  useUserPreferences,
+} from "@/lib/api";
 import { nodeLink } from "@/lib/nodeLink";
 import type { Proposal } from "@/lib/types";
 import { useState } from "react";
@@ -73,6 +79,14 @@ function ProposalCard({
         </span>
         <span className="text-xs text-muted-foreground">{p.targetType}/</span>
         {targetLink}
+        {p.acceptedBy === "auto" ? (
+          <span
+            className="text-xs rounded bg-amber-100 text-amber-900 dark:bg-amber-950/40 dark:text-amber-300 px-1.5 py-0.5"
+            title="Auto-accepted because the proposal's confidence cleared your autoAcceptConfidenceThreshold preference."
+          >
+            ⚡ auto-accepted
+          </span>
+        ) : null}
         {p.status !== "pending" ? (
           <span className="ml-auto text-xs text-muted-foreground uppercase">{p.status}</span>
         ) : null}
@@ -82,6 +96,24 @@ function ProposalCard({
       <div className="text-xs text-muted-foreground">
         Proposed by <span className="font-mono">{p.provenance.createdBy}</span> · session{" "}
         <span className="font-mono">{p.provenance.session}</span>
+        {typeof p.provenance.confidence === "number" ? (
+          <>
+            {" · "}
+            <span
+              className="font-mono"
+              title={
+                "Heuristic confidence (0-1). Anything below 0.5 collapses below.\n" +
+                "0.60 — decision phrase + repeated IDs both fired\n" +
+                "0.50 — decision phrase only (e.g. 'we decided to ship X')\n" +
+                "0.40 — legacy default (pre-tier-split proposals); collapsed.\n" +
+                "0.25 — repeated IDs only — noisiest tier; collapsed.\n" +
+                "Source: extractInsightFromSessionBody (heuristic, no LLM)."
+              }
+            >
+              conf {p.provenance.confidence.toFixed(2)}
+            </span>
+          </>
+        ) : null}
       </div>
 
       <div className="flex items-center gap-2 pt-1">
@@ -203,6 +235,7 @@ export default function ReviewInbox() {
   const inbox = useInbox(alias);
   const accept = useAcceptProposal();
   const reject = useRejectProposal();
+  const prefs = useUserPreferences();
 
   if (!alias) return <div className="p-8">No project selected.</div>;
 
@@ -229,30 +262,138 @@ export default function ReviewInbox() {
         archive with a reason.
       </p>
 
+      {typeof prefs.data?.autoAcceptConfidenceThreshold === "number" ? (
+        <div
+          className="rounded border border-amber-300 bg-amber-50/60 dark:border-amber-700 dark:bg-amber-950/30 px-3 py-2 text-xs flex items-center justify-between gap-3"
+          data-testid="auto-accept-banner"
+        >
+          <div>
+            ⚡ Auto-accept enabled at{" "}
+            <span className="font-mono">
+              ≥ {prefs.data.autoAcceptConfidenceThreshold.toFixed(2)}
+            </span>{" "}
+            confidence — proposals at or above that threshold land in canonical memory without
+            review.
+          </div>
+          <Link to="/settings" className="text-primary hover:underline whitespace-nowrap">
+            Settings →
+          </Link>
+        </div>
+      ) : null}
+
       {inbox.isLoading ? (
         <div className="text-sm text-muted-foreground">Loading…</div>
       ) : inbox.isError ? (
         <div className="text-sm text-red-600">Failed to load inbox.</div>
       ) : inbox.data ? (
         <>
-          <section className="space-y-3">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-              Pending ({inbox.data.pending.length})
-            </h3>
-            {inbox.data.pending.length === 0 ? (
-              <div className="text-sm text-muted-foreground">No pending proposals. 🎉</div>
-            ) : (
-              inbox.data.pending.map((p) => (
-                <ProposalCard
-                  key={p.proposalId}
-                  alias={alias}
-                  p={p}
-                  onAccept={onAccept}
-                  onReject={onReject}
-                />
-              ))
-            )}
-          </section>
+          {(() => {
+            // Pending proposals are split twice for review ergonomics:
+            //   1. By confidence — noisy auto-distilled drafts (<0.5) collapse
+            //      into a folded "Low confidence" disclosure so they don't
+            //      crowd out the real signal.
+            //   2. Within high-confidence — by proposalType. "create" PROPs are
+            //      new directional decisions ("is this a new spec/decision/
+            //      insight I want?"); "update" PROPs are edits to existing
+            //      content ("does this update reflect intent?"). Different
+            //      review questions, different sections.
+            //
+            // Confidence tiers visible:
+            //   * decision-phrase only (0.5)
+            //   * decision + ID combined (0.6)
+            // Confidence tiers folded:
+            //   * legacy 0.4 (pre-tier-split)
+            //   * ID-only-recurrence (0.25)
+            const LOW_CONFIDENCE = 0.5;
+            const isLow = (p: Proposal): boolean =>
+              typeof p.provenance.confidence === "number" &&
+              p.provenance.confidence < LOW_CONFIDENCE;
+            const byConfDesc = (a: Proposal, b: Proposal): number =>
+              (b.provenance.confidence ?? 0) - (a.provenance.confidence ?? 0);
+            const pendingHigh = inbox.data.pending.filter((p) => !isLow(p));
+            const pendingLow = inbox.data.pending.filter(isLow);
+            const pendingCreate = pendingHigh
+              .filter((p) => p.proposalType === "create")
+              .sort(byConfDesc);
+            const pendingUpdate = pendingHigh
+              .filter((p) => p.proposalType === "update")
+              .sort(byConfDesc);
+            return (
+              <section className="space-y-4">
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                  Pending ({inbox.data.pending.length})
+                </h3>
+                {pendingHigh.length === 0 && pendingLow.length === 0 ? (
+                  <div className="text-sm text-muted-foreground">No pending proposals. 🎉</div>
+                ) : null}
+
+                {pendingCreate.length > 0 ? (
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                      <span>📥 New content</span>
+                      <span className="font-normal lowercase">
+                        ({pendingCreate.length} create proposal
+                        {pendingCreate.length === 1 ? "" : "s"})
+                      </span>
+                    </h4>
+                    <div className="space-y-3">
+                      {pendingCreate.map((p) => (
+                        <ProposalCard
+                          key={p.proposalId}
+                          alias={alias}
+                          p={p}
+                          onAccept={onAccept}
+                          onReject={onReject}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                {pendingUpdate.length > 0 ? (
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                      <span>✏️ Updates</span>
+                      <span className="font-normal lowercase">
+                        ({pendingUpdate.length} update proposal
+                        {pendingUpdate.length === 1 ? "" : "s"})
+                      </span>
+                    </h4>
+                    <div className="space-y-3">
+                      {pendingUpdate.map((p) => (
+                        <ProposalCard
+                          key={p.proposalId}
+                          alias={alias}
+                          p={p}
+                          onAccept={onAccept}
+                          onReject={onReject}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                {pendingLow.length > 0 ? (
+                  <details className="rounded border border-dashed bg-muted/20 p-3">
+                    <summary className="cursor-pointer text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Low confidence ({pendingLow.length}) — auto-distilled, review carefully
+                    </summary>
+                    <div className="space-y-3 pt-3">
+                      {pendingLow.map((p) => (
+                        <ProposalCard
+                          key={p.proposalId}
+                          alias={alias}
+                          p={p}
+                          onAccept={onAccept}
+                          onReject={onReject}
+                        />
+                      ))}
+                    </div>
+                  </details>
+                ) : null}
+              </section>
+            );
+          })()}
 
           {inbox.data.accepted.length > 0 ? (
             <section className="space-y-3">

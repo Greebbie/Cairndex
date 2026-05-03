@@ -5,6 +5,7 @@ import {
   ComposePackResponseSchema,
   ClaudeCodeStatusSchema,
   DashboardSchema,
+  ImplementationLineSchema,
   LastTurnSummaryResponseSchema,
   UserPreferencesSchema,
   InboxListSchema,
@@ -148,6 +149,15 @@ export function useDashboard(alias: string | undefined) {
   return useQuery({
     queryKey: ["dashboard", alias],
     queryFn: () => jsonFetch(`/api/vault/${alias}/dashboard`, DashboardSchema),
+    enabled: !!alias,
+  });
+}
+
+export function useImplementationLine(alias: string | undefined) {
+  return useQuery({
+    queryKey: ["implementation", alias],
+    queryFn: () =>
+      jsonFetch(`/api/vault/${alias}/implementation`, ImplementationLineSchema),
     enabled: !!alias,
   });
 }
@@ -410,6 +420,74 @@ export function useRegisterProject() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["projects"] });
+    },
+  });
+}
+
+/**
+ * Workflow-state mutations: task switch / complete and phase set. These hit the
+ * direct-mutation routes in `packages/server/src/routes/workflow.ts` (no inbox
+ * round-trip — workflow state advancement is too frequent for propose/accept).
+ *
+ * On success, invalidate `dashboard` (project state changes) and `vault` (counts
+ * by status change) so the UI reflects the new state without a manual refresh.
+ */
+export function useTaskSwitch() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { alias: string; taskId: string }) => {
+      const r = await fetch(`${API_BASE}/api/vault/${input.alias}/task/switch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId: input.taskId }),
+      });
+      if (!r.ok) throw new Error(await readErrorMessage(r));
+      return r.json();
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["dashboard", vars.alias] });
+      qc.invalidateQueries({ queryKey: ["vault", vars.alias] });
+      qc.invalidateQueries({ queryKey: ["nodesByType", vars.alias, "task"] });
+    },
+  });
+}
+
+export function useTaskComplete() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { alias: string; taskId?: string }) => {
+      const body = input.taskId ? { taskId: input.taskId } : {};
+      const r = await fetch(`${API_BASE}/api/vault/${input.alias}/task/complete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) throw new Error(await readErrorMessage(r));
+      return r.json();
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["dashboard", vars.alias] });
+      qc.invalidateQueries({ queryKey: ["vault", vars.alias] });
+      qc.invalidateQueries({ queryKey: ["nodesByType", vars.alias, "task"] });
+    },
+  });
+}
+
+export function usePhaseSet() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { alias: string; phase: string }) => {
+      const r = await fetch(`${API_BASE}/api/vault/${input.alias}/phase/set`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phase: input.phase }),
+      });
+      if (!r.ok) throw new Error(await readErrorMessage(r));
+      return r.json();
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["dashboard", vars.alias] });
+      qc.invalidateQueries({ queryKey: ["vault", vars.alias] });
     },
   });
 }

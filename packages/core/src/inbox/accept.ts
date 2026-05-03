@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { readFile, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { appendChangelog } from "../changelog.js";
 import { type Config, folderForNodeType, isImmutableType } from "../config.js";
@@ -44,7 +44,11 @@ function slugify(s: string): string {
   );
 }
 
-async function markAccepted(proposalPath: string, targetId: string): Promise<void> {
+async function markAccepted(
+  proposalPath: string,
+  targetId: string,
+  acceptedBy: "user" | "auto",
+): Promise<void> {
   const raw = await readFile(proposalPath, "utf8");
   const { data, content } = parseFrontmatter<Record<string, unknown>>(raw);
   const next: Record<string, unknown> = {
@@ -52,15 +56,29 @@ async function markAccepted(proposalPath: string, targetId: string): Promise<voi
     status: "accepted",
     acceptedAt: new Date().toISOString(),
     acceptedTarget: targetId,
+    acceptedBy,
   };
   await writeFile(proposalPath, serializeFrontmatter(next, content), "utf8");
+}
+
+export interface AcceptOptions {
+  /**
+   * Who triggered the accept — "user" (default, manual review) or "auto"
+   * (auto-accept gate fired because the proposal's confidence cleared the
+   * user's `autoAcceptConfidenceThreshold` preference). The marker lands on
+   * the proposal frontmatter (`acceptedBy:`) and in the changelog line so
+   * the timeline / UI can distinguish machine vs human approvals.
+   */
+  acceptedBy?: "user" | "auto";
 }
 
 export async function acceptProposal(
   repoRoot: string,
   cfg: Config,
   proposalId: string,
+  options: AcceptOptions = {},
 ): Promise<AcceptResult> {
+  const acceptedBy = options.acceptedBy ?? "user";
   const proposalPath = join(inboxProposalsPath(repoRoot), `${proposalId}.md`);
   const proposal = await readProposal(proposalPath);
   if (!proposal) throw new Error(`proposal ${proposalId} not found at ${proposalPath}`);
@@ -78,6 +96,10 @@ export async function acceptProposal(
   }
 
   const folder = nodeFolderPath(repoRoot, folderForNodeType(cfg, proposal.targetType));
+  // Self-heal: a proposal can target a folder that doesn't exist yet (fresh
+  // vault, custom node type). mkdir is idempotent and cheaper than failing
+  // the accept and asking the user to re-create the directory by hand.
+  await mkdir(folder, { recursive: true });
 
   if (proposal.proposalType === "update") {
     if (!proposal.target) throw new Error(`proposal ${proposalId} has no target`);
@@ -93,10 +115,11 @@ export async function acceptProposal(
     };
     const nextBody = proposal.patch ? applyPatch(currentBody, proposal.patch) : proposal.newBody;
     await writeFile(targetPath, serializeFrontmatter(nextFm, nextBody), "utf8");
-    await markAccepted(proposalPath, proposal.target);
+    await markAccepted(proposalPath, proposal.target, acceptedBy);
+    const verb = acceptedBy === "auto" ? "Auto-accepted" : "Accepted";
     await appendChangelog(
       repoRoot,
-      `Accepted ${proposalId} → updated ${proposal.targetType}/${proposal.target}`,
+      `${verb} ${proposalId} → updated ${proposal.targetType}/${proposal.target}`,
     );
     return {
       proposalId,
@@ -133,10 +156,11 @@ export async function acceptProposal(
   const slug = slugify(String(fm.title ?? newId));
   const filePath = join(folder, `${newId}-${slug}.md`);
   await writeFile(filePath, serializeFrontmatter(fm, proposal.newBody), "utf8");
-  await markAccepted(proposalPath, newId);
+  await markAccepted(proposalPath, newId, acceptedBy);
+  const verb = acceptedBy === "auto" ? "Auto-accepted" : "Accepted";
   await appendChangelog(
     repoRoot,
-    `Accepted ${proposalId} → created ${proposal.targetType}/${newId}`,
+    `${verb} ${proposalId} → created ${proposal.targetType}/${newId}`,
   );
   return { proposalId, targetId: newId, targetPath: filePath, action: "created" };
 }

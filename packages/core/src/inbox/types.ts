@@ -55,6 +55,10 @@ export interface ProposalFile {
   createdAt: string;
   duplicateOf?: string;
   acceptedAt?: string;
+  /** "user" for manual review accept; "auto" when the auto-accept gate fired. */
+  acceptedBy?: "user" | "auto";
+  /** ID of the durable target the accept created/updated. */
+  acceptedTarget?: string;
   rejectedAt?: string;
   rejectionReason?: string;
   provenance: ProposalProvenance;

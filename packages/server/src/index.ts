@@ -59,6 +59,8 @@ export async function createServer(input: CreateServerInput): Promise<CreateServ
   const { registerLastTurnSummaryRoutes } = await import("./routes/lastTurnSummary.js");
   const { registerUserPreferencesRoutes } = await import("./routes/userPreferences.js");
   const { registerClaudeCodeRoutes } = await import("./routes/claudeCode.js");
+  const { registerWorkflowRoutes } = await import("./routes/workflow.js");
+  const { registerImplementationRoutes } = await import("./routes/implementation.js");
 
   await registerProjectsRoutes(app);
   await registerVaultRoutes(app);
@@ -75,6 +77,8 @@ export async function createServer(input: CreateServerInput): Promise<CreateServ
   await registerLastTurnSummaryRoutes(app);
   await registerUserPreferencesRoutes(app);
   await registerClaudeCodeRoutes(app);
+  await registerWorkflowRoutes(app);
+  await registerImplementationRoutes(app);
 
   if (input.onboarding) {
     const { registerOnboardingRoutes } = await import("./routes/onboarding.js");

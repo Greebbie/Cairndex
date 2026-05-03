@@ -144,6 +144,55 @@ describe("callMcpTool — inbox_list", () => {
   });
 });
 
+describe("callMcpTool — task_switch / task_complete / phase_set (workflow state)", () => {
+  function writeTask(id: string, status: string): void {
+    mkdirSync(join(tmp, ".cairndex", "tasks"), { recursive: true });
+    writeFileSync(
+      join(tmp, ".cairndex", "tasks", `${id}.md`),
+      `---\nid: ${id}\ntitle: ${id} title\nstatus: ${status}\ncreated: 2026-04-01\nupdated: 2026-04-01\n---\nbody\n`,
+    );
+  }
+
+  it("task_switch promotes the target and demotes the previous in_progress", async () => {
+    writeTask("TASK-001", "in_progress");
+    writeTask("TASK-002", "pending");
+    const r = await callMcpTool(tmp, defaultConfig(), "task_switch", { taskId: "TASK-002" });
+    expect(r.isError).toBeFalsy();
+    const parsed = JSON.parse(r.content[0]?.text ?? "{}");
+    expect(parsed.summary).toMatch(/TASK-002/);
+    expect(parsed.changed).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "TASK-001", to: "pending" }),
+        expect.objectContaining({ id: "TASK-002", to: "in_progress" }),
+      ]),
+    );
+  });
+
+  it("task_complete with no taskId completes the active context current task", async () => {
+    writeTask("TASK-007", "in_progress");
+    const r = await callMcpTool(tmp, defaultConfig(), "task_complete", {});
+    expect(r.isError).toBeFalsy();
+    const parsed = JSON.parse(r.content[0]?.text ?? "{}");
+    expect(parsed.summary).toMatch(/task complete → TASK-007/);
+  });
+
+  it("phase_set reports from→to and bumps phase_since", async () => {
+    const r = await callMcpTool(tmp, defaultConfig(), "phase_set", { phase: "testing" });
+    expect(r.isError).toBeFalsy();
+    const parsed = JSON.parse(r.content[0]?.text ?? "{}");
+    expect(parsed.from).toBe("implementing");
+    expect(parsed.to).toBe("testing");
+    expect(parsed.since).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("listMcpTools advertises the workflow tools", () => {
+    const tools = listMcpTools().tools.map((t) => t.name);
+    expect(tools).toContain("task_switch");
+    expect(tools).toContain("task_complete");
+    expect(tools).toContain("phase_set");
+  });
+});
+
 describe("callMcpTool — error handling", () => {
   it("returns isError:true for unknown tool", async () => {
     const r = await callMcpTool(tmp, defaultConfig(), "nope", {});

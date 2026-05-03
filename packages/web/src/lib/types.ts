@@ -107,6 +107,14 @@ export const AgentContextSchema = z.object({
       id: z.string(),
       path: z.string(),
       builtAt: z.string(),
+      /**
+       * Newest mtime under the vault's memory folders at the time of this
+       * response. Null when the vault is empty. Optional for backward compat
+       * with older API builds that don't carry the field yet.
+       */
+      lastMemoryChangeAt: z.string().nullable().optional(),
+      /** True iff the pack was built before the most recent memory change. */
+      stale: z.boolean().optional(),
     })
     .nullable(),
 });
@@ -131,6 +139,16 @@ const LastTurnSummarySchema = z.object({
   }),
   newProposals: z.array(z.string()),
   latestSessionId: z.string().nullable(),
+  /**
+   * Changelog entries between the previous `Session ... recorded` line and the
+   * most recent one — the narrative of "what just happened" (proposals accepted/
+   * rejected, task switch/complete, phase change). Server-derived; optional for
+   * backward compat with older snapshots that don't carry the field.
+   */
+  events: z
+    .array(z.object({ date: z.string(), summary: z.string() }))
+    .optional()
+    .default([]),
 });
 export const LastTurnSummaryResponseSchema = z.object({
   summary: LastTurnSummarySchema.nullable(),
@@ -153,6 +171,11 @@ export const UserPreferencesSchema = z
     defaultFreshnessWarnDays: z.number().int().positive().nullable().default(null),
     autoAcceptConfidenceThreshold: z.number().min(0).max(1).nullable().default(null),
     personalRulesPath: z.string().nullable().default(null),
+    // Mirrors the core schema — the server returns this even when the user
+    // has never opened the GUI, and `.strict()` below rejects unknown keys,
+    // so this MUST be declared on the web side or the query throws and the
+    // banner / settings page silently see "no data."
+    lastVaultRoot: z.string().nullable().default(null),
   })
   .strict();
 export type UserPreferences = z.infer<typeof UserPreferencesSchema>;
@@ -229,6 +252,14 @@ export const ProposalSchema = z.object({
   createdAt: z.string(),
   duplicateOf: z.string().optional(),
   acceptedAt: z.string().optional(),
+  /**
+   * Who triggered the accept — "user" for manual review, "auto" when the
+   * proposal's confidence cleared the user's `autoAcceptConfidenceThreshold`.
+   * Optional for backward compat with proposals accepted before the marker
+   * was introduced.
+   */
+  acceptedBy: z.enum(["user", "auto"]).optional(),
+  acceptedTarget: z.string().optional(),
   rejectedAt: z.string().optional(),
   rejectionReason: z.string().optional(),
   provenance: ProposalProvenanceSchema,
@@ -237,6 +268,28 @@ export const ProposalSchema = z.object({
   patch: z.array(PatchOpSchema).optional(),
 });
 export type Proposal = z.infer<typeof ProposalSchema>;
+
+export const ImplementationLineEntrySchema = z.object({
+  taskId: z.string(),
+  title: z.string(),
+  status: z.string(),
+  created: z.string(),
+  updated: z.string(),
+  completed: z.string().nullable(),
+  sessionId: z.string().nullable(),
+  planId: z.string().nullable(),
+});
+export type ImplementationLineEntry = z.infer<typeof ImplementationLineEntrySchema>;
+
+export const ImplementationLineSchema = z.object({
+  generatedAt: z.string(),
+  entries: z.array(ImplementationLineEntrySchema),
+  // Plan-id keys to ordered task-id lists. The server uses the literal "(unlinked)"
+  // bucket key for tasks with no PLAN-* link in their frontmatter; the page renders
+  // it as a separate group at the bottom.
+  byPlan: z.record(z.array(z.string())),
+});
+export type ImplementationLine = z.infer<typeof ImplementationLineSchema>;
 
 export const InboxListSchema = z.object({
   pending: z.array(ProposalSchema),

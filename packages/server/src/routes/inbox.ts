@@ -1,7 +1,7 @@
 import {
   type NodeType,
   acceptProposal,
-  createProposal,
+  createWithAutoAccept,
   findDuplicate,
   listProposals,
   rejectProposal,
@@ -90,7 +90,7 @@ export async function registerInboxRoutes(app: FastifyInstance): Promise<void> {
       duplicateOf = await findDuplicate(project.path, cfg, dupInput);
     }
 
-    const createInput: Parameters<typeof createProposal>[2] = {
+    const createInput: Parameters<typeof createWithAutoAccept>[2] = {
       proposalType: parsed.data.proposalType,
       targetType: parsed.data.targetType as NodeType,
       summary: parsed.data.summary,
@@ -111,12 +111,18 @@ export async function registerInboxRoutes(app: FastifyInstance): Promise<void> {
     if (parsed.data.patch !== undefined) createInput.patch = parsed.data.patch;
 
     try {
-      const created = await createProposal(project.path, cfg, createInput);
+      // Routed through the auto-accept gate so `autoAcceptConfidenceThreshold`
+      // in user prefs is honored on every server-driven propose. The response
+      // surfaces `autoAccepted` so the client can render an "auto-accepted"
+      // affordance instead of leaving the proposal in pending.
+      const created = await createWithAutoAccept(project.path, cfg, createInput);
       const out: Record<string, unknown> = {
         proposalId: created.proposalId,
         path: created.path,
         contentHash: created.contentHash,
+        autoAccepted: created.autoAccepted,
       };
+      if (created.applied) out.applied = created.applied;
       if (duplicateOf) out.duplicateOf = duplicateOf;
       return out;
     } catch (e) {

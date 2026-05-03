@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import Browse from "./pages/Browse";
 import Dashboard from "./pages/Dashboard";
 import FileView from "./pages/FileView";
+import Implementation from "./pages/Implementation";
 import Onboarding from "./pages/Onboarding";
 import PackPreview from "./pages/PackPreview";
 import ReviewInbox from "./pages/ReviewInbox";
@@ -18,6 +19,7 @@ export function AppRoutes() {
       <Route path="/p/:alias/browse" element={<Browse />} />
       <Route path="/p/:alias/browse/:type" element={<Browse />} />
       <Route path="/p/:alias/browse/:type/:id" element={<FileView />} />
+      <Route path="/p/:alias/implementation" element={<Implementation />} />
       <Route path="/p/:alias/timeline" element={<Timeline />} />
       <Route path="/p/:alias/pack" element={<PackPreview />} />
       <Route path="/p/:alias/pack/:packId" element={<PackPreview />} />

@@ -27,20 +27,28 @@ packages/
   server/    @cairndex/server — Fastify HTTP + SSE
   web/       @cairndex/web    — React app
 templates/   default rules + 10 node templates shipped with the package
-docs/
-  superpowers/specs/          design specs
-  superpowers/plans/          implementation plans
+docs/        public-facing user docs (e.g. QUICKSTART.md)
 ```
 
 Each package has its own `package.json`, `tsconfig.json`, and tests.
 
+Architectural decisions are recorded as ADRs inside the project's vault under
+`projects/cairndex/decisions/`; the README's [Architecture](./README.md#architecture)
+section is the public-facing entry point.
+
 ## Workflow
 
-1. **Read the spec first.** `docs/superpowers/specs/2026-04-30-cairndex-design.md` is the source of truth for design decisions. If your change conflicts with the spec, update the spec first and explain why.
-2. **Check the plans.** `docs/superpowers/plans/` lists what's planned. If your change touches an unimplemented module, see the relevant plan.
-3. **TDD.** Every feature/fix follows: write the failing test → run it and confirm failure → implement minimal code → run test and confirm pass → commit. The plans are written this way; follow the same discipline for new work.
-4. **Small commits, conventional messages.** `<type>(<scope>): <short description>`, types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `ci`. Bodies wrap at 72 chars.
-5. **No `--no-verify`.** If a hook fails, fix the underlying issue.
+1. **Understand the architecture first.** The README's
+   [Architecture](./README.md#architecture) section names the four packages and
+   their responsibilities. Open ADRs in the project vault carry the design
+   history when more context is needed.
+2. **TDD.** Every feature or fix follows: write the failing test → run it and
+   confirm failure → implement minimal code → run test and confirm pass →
+   commit.
+3. **Small commits, conventional messages.** `<type>(<scope>): <short description>`,
+   types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `ci`.
+   Bodies wrap at 72 characters.
+4. **No `--no-verify`.** If a hook fails, fix the underlying issue.
 
 ## Coding style
 

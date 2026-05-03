@@ -97,15 +97,20 @@ export async function registerClaudeCodeRoutes(app: FastifyInstance): Promise<vo
     const alias = String((req.params as { alias: string }).alias);
     const project = resolveProject(app.projects, alias);
     if (!project) return reply.code(404).send({ error: "project not found" });
-    return readStatus(project.path);
+    // `.claude/settings.json` lives at the repo root. For central-vault projects
+    // `project.path` points at the vault project dir, not the repo, so prefer
+    // `project.repoRoot` when available. Legacy in-repo projects don't set
+    // `repoRoot`; for them `project.path` *is* the repo root.
+    return readStatus(project.repoRoot ?? project.path);
   });
 
   app.post("/api/projects/:alias/claude-code-wire", async (req, reply) => {
     const alias = String((req.params as { alias: string }).alias);
     const project = resolveProject(app.projects, alias);
     if (!project) return reply.code(404).send({ error: "project not found" });
+    const repoRoot = project.repoRoot ?? project.path;
     try {
-      await applyClaudeHooks(project.path);
+      await applyClaudeHooks(repoRoot);
     } catch (err) {
       app.log.error({ err, alias }, "applyClaudeHooks failed");
       return reply.code(500).send({
@@ -113,6 +118,6 @@ export async function registerClaudeCodeRoutes(app: FastifyInstance): Promise<vo
         message: err instanceof Error ? err.message : String(err),
       });
     }
-    return readStatus(project.path);
+    return readStatus(repoRoot);
   });
 }

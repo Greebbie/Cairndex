@@ -46,6 +46,88 @@ describe("runBootstrap", () => {
     expect(text).toContain("Pending proposals");
   });
 
+  it("surfaces top memory-health issues inline when yellow+red>0", async () => {
+    const repo = seedRepo();
+    // Add a node that triggers a freshness yellow (provenance + 90 day-old updated).
+    writeFileSync(
+      join(repo, ".cairndex", "specs", "SPEC-OLD.md"),
+      "---\nid: SPEC-OLD\ntitle: Stale\nstatus: active\ncreated: 2020-01-01\nupdated: 2020-01-01\nprovenance:\n  created_by: test\n  session: legacy\n---\nbody\n",
+      "utf8",
+    );
+    const r = await runBootstrap({ cwd: repo });
+    const text = r.body ?? "";
+    // Some rule fires on at least one of the SPEC nodes — assert the inline block
+    // appears with a severity tag and a node id, not the specific node (the rule
+    // ordering may surface SPEC-001's missing-provenance before SPEC-OLD's freshness).
+    expect(text).toMatch(/Top issues:/);
+    expect(text).toMatch(/(warn|error|info)\s+SPEC-/);
+  });
+
+  it("flags a stale latest pack so the agent doesn't trust outdated cached context", async () => {
+    const repo = seedRepo();
+    const packsDir = join(repo, ".cairndex", "indexes", "context-packs");
+    mkdirSync(packsDir, { recursive: true });
+    // Pack built before the SPEC was last updated → stale.
+    writeFileSync(
+      join(packsDir, "PACK-001.md"),
+      "---\nid: PACK-001\nbuiltAt: '2026-04-01T00:00:00Z'\n---\nbody\n",
+      "utf8",
+    );
+    // Touch a memory file with a newer mtime than the pack file's mtime so the
+    // staleness helper has something to compare against. (The pack frontmatter
+    // builtAt drives the comparison; setting mtime here just bypasses the file
+    // walker's check on the pack itself, which is excluded by design.)
+    const r = await runBootstrap({ cwd: repo });
+    expect(r.body).toMatch(/Latest context pack: PACK-001/);
+    expect(r.body).toMatch(/STALE — memory changed/);
+  });
+
+  it("calls a fresh latest pack 'current' when no memory has changed since builtAt", async () => {
+    const repo = seedRepo();
+    const packsDir = join(repo, ".cairndex", "indexes", "context-packs");
+    mkdirSync(packsDir, { recursive: true });
+    // Built far in the future relative to fixture files → not stale.
+    writeFileSync(
+      join(packsDir, "PACK-001.md"),
+      "---\nid: PACK-001\nbuiltAt: '2099-01-01T00:00:00Z'\n---\nbody\n",
+      "utf8",
+    );
+    const r = await runBootstrap({ cwd: repo });
+    expect(r.body).toMatch(/Latest context pack: PACK-001/);
+    expect(r.body).toMatch(/, current\)/);
+    expect(r.body).not.toMatch(/STALE/);
+  });
+
+  it("omits the latest-pack line entirely when no packs exist yet", async () => {
+    const repo = seedRepo();
+    const r = await runBootstrap({ cwd: repo });
+    expect(r.body).not.toMatch(/Latest context pack/);
+  });
+
+  it("includes CLI command examples in the reminder block (so the agent doesn't have to discover commands)", async () => {
+    const repo = seedRepo();
+    const r = await runBootstrap({ cwd: repo });
+    const text = r.body ?? "";
+    expect(text).toMatch(/cairndex inbox propose/);
+    expect(text).toMatch(/cairndex inbox propose-update/);
+    expect(text).toMatch(/cairndex task switch/);
+    expect(text).toMatch(/cairndex task complete/);
+    expect(text).toMatch(/cairndex phase set/);
+  });
+
+  it("emits an absolute Paths block — Project root, Repo root, Inbox at minimum", async () => {
+    const repo = seedRepo();
+    const r = await runBootstrap({ cwd: repo });
+    const text = r.body ?? "";
+    expect(text).toMatch(/Paths:/);
+    // Legacy fixture: vaultRoot === projectRoot so the Vault line is suppressed,
+    // but Project root, Repo root, and Inbox must all appear with absolute paths.
+    expect(text).toMatch(/Project root: .*\.cairndex/);
+    expect(text).toContain(`Repo root:    ${repo}`);
+    expect(text).toContain("Inbox:");
+    expect(text).toMatch(/Inbox:.*proposed-memory-updates/);
+  });
+
   it("says 'no pending proposals' when inbox is empty", async () => {
     const repo = seedRepo();
     rmSync(join(repo, ".cairndex", "inbox", "proposed-memory-updates", "PROP-001.md"));

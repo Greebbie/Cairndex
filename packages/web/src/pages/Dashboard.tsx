@@ -1,3 +1,4 @@
+import { ActivePlanPanel } from "@/components/cockpit/ActivePlanPanel";
 import { AgentContextPanel } from "@/components/cockpit/AgentContextPanel";
 import { InboxPanel } from "@/components/cockpit/InboxPanel";
 import { MemoryHealthPanel } from "@/components/cockpit/MemoryHealthPanel";
@@ -84,6 +85,7 @@ export default function Dashboard() {
       ) : data ? (
         <>
           <ProjectStatePanel alias={alias} state={data.projectState} />
+          <ActivePlanPanel alias={alias} state={data.projectState} />
           <AgentContextPanel alias={alias} agentContext={data.agentContext} />
           <MemoryHealthPanel alias={alias} health={data.memoryHealth} />
           <InboxPanel alias={alias} />

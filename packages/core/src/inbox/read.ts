@@ -25,6 +25,8 @@ interface RawProposalFrontmatter {
   created?: string;
   duplicateOf?: string;
   acceptedAt?: string;
+  acceptedBy?: string;
+  acceptedTarget?: string;
   rejectedAt?: string;
   rejectionReason?: string;
   provenance?: {
@@ -106,6 +108,10 @@ export async function readProposal(path: string): Promise<ProposalFile | null> {
   if (data.target !== undefined) file.target = data.target;
   if (data.duplicateOf !== undefined) file.duplicateOf = data.duplicateOf;
   if (data.acceptedAt !== undefined) file.acceptedAt = data.acceptedAt;
+  if (data.acceptedBy === "user" || data.acceptedBy === "auto") {
+    file.acceptedBy = data.acceptedBy;
+  }
+  if (data.acceptedTarget !== undefined) file.acceptedTarget = data.acceptedTarget;
   if (data.rejectedAt !== undefined) file.rejectedAt = data.rejectedAt;
   if (data.rejectionReason !== undefined) file.rejectionReason = data.rejectionReason;
   if (data.newFrontmatter !== undefined && typeof data.newFrontmatter === "object") {

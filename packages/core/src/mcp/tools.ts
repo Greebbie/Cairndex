@@ -7,10 +7,12 @@ import {
 import type { Config } from "../config.js";
 import { buildContextPack } from "../contextPack/build.js";
 import { renderContextPack } from "../contextPack/render.js";
-import { createProposal, findDuplicate } from "../inbox/create.js";
+import { findDuplicate } from "../inbox/create.js";
+import { createWithAutoAccept } from "../inbox/createWithAutoAccept.js";
 import { inferNodeTypeFromId } from "../inbox/idPrefix.js";
 import { listProposals } from "../inbox/read.js";
 import type { NodeType } from "../types.js";
+import { completeTask, setPhase, switchTask } from "../workflow/taskState.js";
 import type { ListToolsResult, McpToolResult } from "./types.js";
 
 const NODE_TYPE_VALUES = [
@@ -59,6 +61,16 @@ const ProposeMemoryUpdateArgs = z
   .refine((d) => d.patch === undefined || d.proposalType === "update", {
     message: "patch is only valid on update proposals",
   });
+
+const TaskSwitchArgs = z.object({
+  taskId: z.string().min(1),
+});
+const TaskCompleteArgs = z.object({
+  taskId: z.string().min(1).optional(),
+});
+const PhaseSetArgs = z.object({
+  phase: z.string().min(1),
+});
 
 const UpdateLivingDocArgs = z.object({
   targetId: z.string().min(1),
@@ -208,6 +220,44 @@ export function listMcpTools(projectId: string = LEGACY_PROJECT_ID): ListToolsRe
           "List pending / accepted / rejected / duplicate proposals in the review inbox.",
         inputSchema: { type: "object", properties: {} },
       },
+      {
+        name: "task_switch",
+        description:
+          "Workflow state: make <taskId> the current in_progress task. Demotes any sibling that was in_progress to pending so the active-context picker has an unambiguous answer. Direct mutation — does NOT go through the inbox (workflow advancement is a frequent loop, not durable-content change). Errors if the task is `done` or `archived`.",
+        inputSchema: {
+          type: "object",
+          required: ["taskId"],
+          properties: {
+            taskId: { type: "string", description: "The TASK id to make current (e.g. TASK-007)" },
+          },
+        },
+      },
+      {
+        name: "task_complete",
+        description:
+          "Workflow state: mark a task as done. Pass `taskId` to complete a specific one, or omit it to complete the active context's current task. Writes a `completed: <YYYY-MM-DD>` field so timeline / report queries can distinguish recently-done from long-archived. Direct mutation — see task_switch.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            taskId: {
+              type: "string",
+              description: "Optional. Defaults to the current task from active context.",
+            },
+          },
+        },
+      },
+      {
+        name: "phase_set",
+        description:
+          "Workflow state: advance the project phase (e.g. discovering | planning | implementing | testing). Mutates index.md frontmatter: `phase: <name>` and `phase_since: <YYYY-MM-DD>`. Direct mutation — see task_switch.",
+        inputSchema: {
+          type: "object",
+          required: ["phase"],
+          properties: {
+            phase: { type: "string", description: "New phase name (non-empty)" },
+          },
+        },
+      },
     ],
   };
 }
@@ -253,7 +303,7 @@ export async function callMcpTool(
         duplicateOf = await findDuplicate(repoRoot, cfg, dupInput);
       }
 
-      const createInput: Parameters<typeof createProposal>[2] = {
+      const createInput: Parameters<typeof createWithAutoAccept>[2] = {
         proposalType: input.proposalType,
         targetType: input.targetType as NodeType,
         summary: input.summary,
@@ -271,10 +321,16 @@ export async function callMcpTool(
       if (input.newBody !== undefined) createInput.newBody = input.newBody;
       if (input.patch !== undefined) createInput.patch = input.patch;
 
-      const created = await createProposal(repoRoot, cfg, createInput);
+      // Routed through the auto-accept gate so the agent's MCP-driven write is
+      // subject to the same threshold as CLI / server propose paths. Returns
+      // `autoAccepted: true` in the response so the agent can avoid asking the
+      // user "did you accept?" when the threshold has already applied.
+      const created = await createWithAutoAccept(repoRoot, cfg, createInput);
       const resp = {
         proposalId: created.proposalId,
         path: created.path,
+        autoAccepted: created.autoAccepted,
+        ...(created.applied ? { applied: created.applied } : {}),
         ...(duplicateOf ? { duplicateOf } : {}),
       };
       return ok(JSON.stringify(resp, null, 2));
@@ -295,7 +351,7 @@ export async function callMcpTool(
       const kind = input.mode === "append" ? "append-section" : "replace-section";
       const section = normalizeSectionHeading(input.section);
 
-      const createInput: Parameters<typeof createProposal>[2] = {
+      const createInput: Parameters<typeof createWithAutoAccept>[2] = {
         proposalType: "update",
         targetType,
         target: input.targetId,
@@ -311,7 +367,10 @@ export async function callMcpTool(
         },
       };
 
-      const created = await createProposal(repoRoot, cfg, createInput);
+      // Same auto-accept gate as `propose_memory_update` — the living-doc
+      // section update is the most frequent agent-driven write and benefits
+      // most from the threshold short-circuit when the user trusts the agent.
+      const created = await createWithAutoAccept(repoRoot, cfg, createInput);
       const resp = {
         proposalId: created.proposalId,
         path: created.path,
@@ -319,6 +378,8 @@ export async function callMcpTool(
         targetId: input.targetId,
         section,
         mode: input.mode,
+        autoAccepted: created.autoAccepted,
+        ...(created.applied ? { applied: created.applied } : {}),
       };
       return ok(JSON.stringify(resp, null, 2));
     }
@@ -326,6 +387,27 @@ export async function callMcpTool(
     if (name === "inbox_list") {
       const list = await listProposals(repoRoot, cfg);
       return ok(JSON.stringify(list, null, 2));
+    }
+
+    if (name === "task_switch") {
+      const parsed = TaskSwitchArgs.safeParse(args ?? {});
+      if (!parsed.success) return err(`bad args: ${parsed.error.message}`);
+      const r = await switchTask(repoRoot, cfg, parsed.data.taskId);
+      return ok(JSON.stringify(r, null, 2));
+    }
+
+    if (name === "task_complete") {
+      const parsed = TaskCompleteArgs.safeParse(args ?? {});
+      if (!parsed.success) return err(`bad args: ${parsed.error.message}`);
+      const r = await completeTask(repoRoot, cfg, parsed.data.taskId);
+      return ok(JSON.stringify(r, null, 2));
+    }
+
+    if (name === "phase_set") {
+      const parsed = PhaseSetArgs.safeParse(args ?? {});
+      if (!parsed.success) return err(`bad args: ${parsed.error.message}`);
+      const r = await setPhase(repoRoot, parsed.data.phase);
+      return ok(JSON.stringify(r, null, 2));
     }
 
     return err(`unknown tool: ${name}`);

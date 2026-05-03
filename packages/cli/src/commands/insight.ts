@@ -3,7 +3,7 @@ import { appendFile, copyFile, mkdir, readFile, readdir, writeFile } from "node:
 import { basename, join } from "node:path";
 import {
   centralSharedPath,
-  createProposal,
+  createWithAutoAccept,
   defaultConfig,
   extractInsightFromSessionBody,
   extractTranscriptText,
@@ -123,8 +123,26 @@ export interface InsightProposeFromSessionResult {
   /** Set when an existing proposal already covers this content. */
   duplicateOf?: string;
   /** Reason the heuristic chose to skip — present when no proposal was created. */
-  skipReason?: "no-signal" | "session-missing" | "duplicate";
+  skipReason?: "no-signal" | "session-missing" | "duplicate" | "low-confidence";
+  /**
+   * True when the user's `autoAcceptConfidenceThreshold` preference fired and
+   * the proposal was immediately accepted into canonical memory. The PROP file
+   * still exists in the inbox (now in `accepted` status); a durable insight
+   * was also created.
+   */
+  autoAccepted?: boolean;
+  /** Set when autoAccepted — the durable target id created (e.g. INS-007). */
+  appliedTargetId?: string;
 }
+
+/**
+ * Minimum heuristic confidence required to actually materialize a proposal in the
+ * inbox. The heuristic still emits 0.25 drafts for ID-recurrence-only signals, but
+ * those produced pure noise in dogfood (PROP-013/14/15/16/17 were all "Recurring
+ * focus on SPEC-X, TASK-Y" with no insight content). Gating at 0.5 means we only
+ * propose when at least one decision-like phrase fired.
+ */
+const MIN_PROPOSAL_CONFIDENCE = 0.5;
 
 /**
  * Heuristic auto-distillation. Reads the named session file, runs the
@@ -178,6 +196,13 @@ export async function runInsightProposeFromSession(
       skipReason: "no-signal",
     };
   }
+  if (draft.confidence < MIN_PROPOSAL_CONFIDENCE) {
+    return {
+      exitCode: 0,
+      message: `insight signal in session ${sessionId} below threshold (confidence ${draft.confidence})`,
+      skipReason: "low-confidence",
+    };
+  }
 
   // Dedupe against existing proposals via the standard content-hash check. The signal
   // is intentionally weak (hash of body+target+type) so we mostly use it to avoid
@@ -196,7 +221,11 @@ export async function runInsightProposeFromSession(
     };
   }
 
-  const result = await createProposal(root, cfg, {
+  // Routed through createWithAutoAccept so `autoAcceptConfidenceThreshold` in
+  // user prefs gets honored — without this gate the auto-distilled insights
+  // would always require manual review even when the user has explicitly
+  // raised their trust dial.
+  const result = await createWithAutoAccept(root, cfg, {
     proposalType: "create",
     targetType: "insight",
     newFrontmatter: {
@@ -213,10 +242,19 @@ export async function runInsightProposeFromSession(
     provenance: {
       createdBy: input.createdBy ?? "auto-distill",
       session: sessionId,
-      confidence: 0.4,
+      // Conditioned on which signals fired — see extractInsightFromSessionBody.
+      // The inbox UI default-collapses proposals below 0.4 so ID-only matches
+      // (which were the noisiest dogfood failures) stay out of the way.
+      confidence: draft.confidence,
     },
   });
-  return { exitCode: 0, proposalId: result.proposalId, path: result.path };
+  return {
+    exitCode: 0,
+    proposalId: result.proposalId,
+    path: result.path,
+    autoAccepted: result.autoAccepted,
+    ...(result.applied ? { appliedTargetId: result.applied.targetId } : {}),
+  };
 }
 
 export async function runInsightPull(input: InsightCmdInput): Promise<InsightCmdResult> {

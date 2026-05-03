@@ -84,8 +84,10 @@ test.afterAll(async () => {
 test("loads dashboard for a central vault project", async ({ page }) => {
   await page.goto(`http://localhost:${PORT}/p/demo`);
   await expect(page.getByRole("heading", { name: "demo" })).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByText("implementing")).toBeVisible();
-  await expect(page.getByText("ship it")).toBeVisible();
+  // "implementing" appears both in the NowBar pill and the ProjectStatePanel dd —
+  // strict-mode lookup needs first() to disambiguate.
+  await expect(page.getByText("implementing").first()).toBeVisible();
+  await expect(page.getByText("ship it").first()).toBeVisible();
 });
 
 test("browse spec/ lists central project SPEC-001", async ({ page }) => {

@@ -14,9 +14,10 @@
   "scripts": {
     "build": "tsup",
     "build:sea-entry": "tsup --config tsup.sea.config.ts",
+    "build:icon": "node scripts/build-icon.mjs",
     "typecheck": "tsc --noEmit",
     "prepublish": "node scripts/copy-web.mjs",
-    "package:sea": "pnpm run build:sea-entry && node scripts/build-sea.mjs"
+    "package:sea": "pnpm run build:sea-entry && pnpm run build:icon && node scripts/build-sea.mjs"
   },
   "dependencies": {
     "@cairndex/core": "workspace:*",
@@ -30,9 +31,12 @@
     "pino-pretty": "^11.3.0"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.0.0",
-    "postject": "1.0.0-alpha.6"
+    "png-to-ico": "^2.1.8",
+    "postject": "1.0.0-alpha.6",
+    "resedit": "^2.0.3"
   },
   "engines": {
     "node": ">=20"

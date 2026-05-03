@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -108,5 +108,75 @@ describe("POST /api/vault/:alias/inbox/:proposalId/reject", () => {
     const body = list.json() as { rejected: Array<{ rejectionReason?: string }> };
     expect(body.rejected.some((p) => p.rejectionReason === "stale context")).toBe(true);
     await app.close();
+  });
+});
+
+describe("POST /api/vault/:alias/inbox/propose — auto-accept gate", () => {
+  // The auto-accept gate is wired through the `createWithAutoAccept` helper.
+  // We control the user pref via CAIRNDEX_HOME so the test never touches the
+  // real ~/.cairndex/preferences.yaml. Each test sets/clears the threshold
+  // via a fresh per-test home directory.
+  function setHomeWithThreshold(value: number | null): string {
+    const home = mkdtempSync(join(tmpdir(), "cairn-srv-inbox-pref-"));
+    if (value !== null) {
+      writeFileSync(
+        join(home, "preferences.yaml"),
+        `schemaVersion: 1\nautoAcceptConfidenceThreshold: ${value}\n`,
+        "utf8",
+      );
+    }
+    process.env.CAIRNDEX_HOME = home;
+    return home;
+  }
+
+  it("returns autoAccepted: false and durable target NOT updated when threshold is unset", async () => {
+    const home = setHomeWithThreshold(null);
+    try {
+      const app = await makeApp();
+      const r = await postProposal(app);
+      const body = r.json() as { proposalId: string; autoAccepted: boolean };
+      expect(body.autoAccepted).toBe(false);
+      // Durable spec body unchanged because no auto-accept fired.
+      const specBody = readFileSync(join(tmp, ".cairndex/specs/SPEC-001.md"), "utf8");
+      expect(specBody).toMatch(/old body/);
+      await app.close();
+    } finally {
+      delete process.env.CAIRNDEX_HOME;
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it("auto-accepts and updates the durable target when confidence ≥ threshold", async () => {
+    const home = setHomeWithThreshold(0.4);
+    try {
+      const app = await makeApp();
+      const r = await app.inject({
+        method: "POST",
+        url: "/api/vault/demo/inbox/propose",
+        payload: {
+          proposalType: "update",
+          targetType: "spec",
+          target: "SPEC-001",
+          newBody: "shiny auto-accepted body\n",
+          summary: "tighten via auto",
+          reason: "high confidence",
+          provenance: { createdBy: "agent", session: "s", confidence: 0.8 },
+        },
+      });
+      const body = r.json() as {
+        proposalId: string;
+        autoAccepted: boolean;
+        applied?: { action: string; targetId: string };
+      };
+      expect(body.autoAccepted).toBe(true);
+      expect(body.applied?.action).toBe("updated");
+      // Durable spec body now reflects the auto-accepted content.
+      const specBody = readFileSync(join(tmp, ".cairndex/specs/SPEC-001.md"), "utf8");
+      expect(specBody).toMatch(/shiny auto-accepted body/);
+      await app.close();
+    } finally {
+      delete process.env.CAIRNDEX_HOME;
+      rmSync(home, { recursive: true, force: true });
+    }
   });
 });

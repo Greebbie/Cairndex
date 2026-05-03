@@ -1,6 +1,7 @@
 import { nodeLink } from "@/lib/nodeLink";
 import type { ProjectState } from "@/lib/types";
 import { Link } from "react-router-dom";
+import { WorkflowActions } from "./WorkflowActions";
 
 interface Props {
   alias: string;
@@ -88,6 +89,8 @@ export function ProjectStatePanel({ alias, state }: Props) {
           ))}
         </div>
       ) : null}
+
+      <WorkflowActions alias={alias} state={state} />
     </section>
   );
 }

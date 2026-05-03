@@ -17,6 +17,27 @@ describe("UserPreferencesSchema", () => {
     expect(parsed.defaultFreshnessWarnDays).toBeNull();
     expect(parsed.autoAcceptConfidenceThreshold).toBeNull();
     expect(parsed.personalRulesPath).toBeNull();
+    expect(parsed.lastVaultRoot).toBeNull();
+  });
+
+  it("round-trips lastVaultRoot through write/read", async () => {
+    const { mkdtempSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const dir = mkdtempSync(join(tmpdir(), "cairn-userprefs-lv-"));
+    const path = join(dir, "preferences.yaml");
+    try {
+      await writeUserPreferences({ lastVaultRoot: "C:/some/vault" }, path);
+      const read = await readUserPreferences(path);
+      expect(read.lastVaultRoot).toBe("C:/some/vault");
+      // overwrite with null clears the field
+      await writeUserPreferences({ lastVaultRoot: null }, path);
+      const cleared = await readUserPreferences(path);
+      expect(cleared.lastVaultRoot).toBeNull();
+    } finally {
+      const { rmSync } = await import("node:fs");
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it("rejects unknown keys", () => {

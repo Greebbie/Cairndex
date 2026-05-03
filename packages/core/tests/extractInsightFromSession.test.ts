@@ -26,15 +26,17 @@ describe("extractInsightFromSessionBody", () => {
 
   it("combines decision and id signals into a single draft", () => {
     const body = `
-      We agreed to migrate to McpServer in PROP-007.
-      PROP-007 also covers the SessionStart wiring.
-      PROP-007 ships this week.
+      We agreed to migrate to McpServer in SPEC-007.
+      SPEC-007 also covers the SessionStart wiring.
+      SPEC-007 ships this week.
     `;
     const draft = extractInsightFromSessionBody(body, "2026-05-03-1500");
     expect(draft).not.toBeNull();
-    expect(draft?.relatedIds).toContain("PROP-007");
+    expect(draft?.relatedIds).toContain("SPEC-007");
     expect(draft?.reason).toMatch(/decision-like/);
     expect(draft?.reason).toMatch(/repeated id/);
+    // Both signals fired → highest tier of confidence.
+    expect(draft?.confidence).toBe(0.6);
   });
 
   it("falls back to a generic title when only id signal fires", () => {
@@ -67,5 +69,48 @@ describe("extractInsightFromSessionBody", () => {
     const draft = extractInsightFromSessionBody(body, "session");
     expect(draft).not.toBeNull();
     expect(draft?.title).toMatch(/vaultPath/);
+  });
+
+  // Tighter quality gate (post-PROP-010/PROP-011 dogfood):
+
+  it("rejects single-token decision phrases (table cells / regex hits in identifiers)", () => {
+    // Captured phrase = "Z" — single token, would have passed the old letter check
+    // because tokens of length >=8 letters are allowed; new rule requires >=2 words.
+    const body = "agreed to identifierA";
+    expect(extractInsightFromSessionBody(body, "session")).toBeNull();
+  });
+
+  it("rejects short decision phrases (<12 letters of English)", () => {
+    // "agreed to a b c" → captured "a b c" — only 3 letters → rejected.
+    const body = "agreed to a b c";
+    expect(extractInsightFromSessionBody(body, "session")).toBeNull();
+  });
+
+  it("rejects decision phrases that contain a double quote — real decisions paraphrase, not quote", () => {
+    // Body mirrors PROP-010's actual captured fragment: a transcript that opened
+    // a string literal mid-line. Even with the matched-pair check, every quote is
+    // suspicious — drop them.
+    const body = `agreed to make X happen and "break things" along the way`;
+    expect(extractInsightFromSessionBody(body, "session")).toBeNull();
+  });
+
+  it("ignores PROP- / INBOX- / SESSION- IDs when counting recurrence — these are workflow metadata", () => {
+    // A session that's mostly *about* the inbox would otherwise auto-propose a
+    // useless insight (this is what produced PROP-011 in dogfood). Filtering
+    // those prefixes reduces it to no-signal.
+    const body = "Reviewed PROP-001. PROP-001 next. Then PROP-002 and PROP-002 again. PROP-003 PROP-003.";
+    expect(extractInsightFromSessionBody(body, "session")).toBeNull();
+  });
+
+  it("emits low confidence (0.25) for ID-recurrence-only signal", () => {
+    const body = "TASK-009 again. TASK-009 once more.";
+    const draft = extractInsightFromSessionBody(body, "session");
+    expect(draft?.confidence).toBe(0.25);
+  });
+
+  it("emits mid confidence (0.5) for a decision-phrase-only signal", () => {
+    const body = "We decided to ship the SEA build before Tauri because it has no Rust dependency.";
+    const draft = extractInsightFromSessionBody(body, "session");
+    expect(draft?.confidence).toBe(0.5);
   });
 });

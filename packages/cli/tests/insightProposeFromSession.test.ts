@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -66,11 +66,73 @@ describe("runInsightProposeFromSession", () => {
     expect(second.duplicateOf).toBe(first.proposalId);
   });
 
+  it("skips with low-confidence when only ID-recurrence signal fires (no decision phrase)", async () => {
+    // Reproduces the dogfood noise that flooded the inbox with PROP-013/14/15/16/17 —
+    // sessions that mention SPEC-X and TASK-Y a few times but contain no decision-
+    // like phrase. Confidence comes back as 0.25 from the heuristic; the CLI gate
+    // is supposed to suppress the proposal at that level.
+    const repo = seedRepo();
+    writeFileSync(
+      join(repo, ".cairndex", "sessions", "2026-05-03-1400.md"),
+      "---\n---\nLooked at SPEC-002 and TASK-001 again. SPEC-002 carries the work. TASK-001 is current. TASK-001 next steps: discuss.\n",
+      "utf8",
+    );
+    const r = await runInsightProposeFromSession({ cwd: repo, sessionId: "2026-05-03-1400" });
+    expect(r.exitCode).toBe(0);
+    expect(r.skipReason).toBe("low-confidence");
+    expect(r.proposalId).toBeUndefined();
+    // No proposal file should have been created.
+    const inbox = join(repo, ".cairndex", "inbox", "proposed-memory-updates");
+    const entries = existsSync(inbox)
+      ? readdirSync(inbox).filter((f) => f.endsWith(".md"))
+      : [];
+    expect(entries).toEqual([]);
+  });
+
   it("missing session reports skip-reason without erroring", async () => {
     const repo = seedRepo();
     const r = await runInsightProposeFromSession({ cwd: repo, sessionId: "2026-99-99-9999" });
     expect(r.exitCode).toBe(0);
     expect(r.skipReason).toBe("session-missing");
+  });
+
+  it("auto-accepts the distilled insight when user pref threshold is at or below the draft confidence", async () => {
+    // Stop hook auto-distill is the highest-frequency PROP source; if the user
+    // raised their `autoAcceptConfidenceThreshold`, the gate must fire here too.
+    const repo = seedRepo();
+    const home = mkdtempSync(join(tmpdir(), "cairn-cli-autoaccept-home-"));
+    dirs.push(home);
+    writeFileSync(
+      join(home, "preferences.yaml"),
+      "schemaVersion: 1\nautoAcceptConfidenceThreshold: 0.5\n",
+      "utf8",
+    );
+    process.env.CAIRNDEX_HOME = home;
+    try {
+      writeFileSync(
+        join(repo, ".cairndex", "sessions", "2026-05-03-1600.md"),
+        "---\n---\nWe decided to use central vault layout for all new projects.\nADR-002 carries this.\n",
+        "utf8",
+      );
+      const r = await runInsightProposeFromSession({
+        cwd: repo,
+        sessionId: "2026-05-03-1600",
+      });
+      expect(r.exitCode).toBe(0);
+      // Draft confidence is 0.5 (decision phrase only), threshold is 0.5,
+      // so the gate fires (>=). The proposal is auto-accepted, durable insight created.
+      expect(r.autoAccepted).toBe(true);
+      expect(r.appliedTargetId).toMatch(/^INS-\d+$/);
+      // Durable insight file exists.
+      const insightsDir = join(repo, ".cairndex", "insights");
+      const insightFiles = readdirSync(insightsDir);
+      const target = r.appliedTargetId ?? "";
+      expect(insightFiles.some((f) => f.startsWith(target))).toBe(true);
+      // Proposal frontmatter shows accepted.
+      expect(readFileSync(r.path ?? "", "utf8")).toMatch(/status:\s*accepted/);
+    } finally {
+      delete process.env.CAIRNDEX_HOME;
+    }
   });
 
   it("captures decision phrases from the transcript even when the session body is empty", async () => {

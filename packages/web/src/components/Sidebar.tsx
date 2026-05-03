@@ -14,9 +14,16 @@ export function Sidebar() {
   const location = useLocation();
   const current = aliasFromPath(location.pathname);
 
+  // Order matches the vibe-coding hot path: Dashboard for the at-a-glance state,
+  // then the two surfaces a user reaches for during a turn (Inbox for review,
+  // Context Pack for what the agent will see). Browse/Timeline/Settings sit
+  // below as reference / config, used less often.
   const navItems = current
     ? [
         { to: `/p/${current}`, label: "Dashboard" },
+        { to: `/p/${current}/inbox`, label: "Inbox" },
+        { to: `/p/${current}/pack`, label: "Context Pack" },
+        { to: `/p/${current}/implementation`, label: "Implementation" },
         { to: `/p/${current}/browse`, label: "Browse" },
         { to: `/p/${current}/timeline`, label: "Timeline" },
         { to: `/p/${current}/settings`, label: "Settings" },

@@ -5,6 +5,7 @@ import {
   buildContextPack,
   contextPacksPath,
   defaultConfig,
+  findLatestPackWithStaleness,
   loadProjectConfig,
   projectIdFromRoot,
   regenerateAllIndexes,
@@ -30,6 +31,13 @@ export interface ContextOptions {
   out?: string;
   /** Print pack body to stdout (default true). */
   emitStdout?: boolean;
+  /**
+   * When true: only rebuild if the latest pack is stale (memory-mtime newer than
+   * pack builtAt) or no pack exists yet. When the existing pack is fresh, skip
+   * the rebuild and return its path. Used by the Stop / SessionStart hooks so
+   * ending or starting a session doesn't unconditionally pay the rebuild cost.
+   */
+  ifStale?: boolean;
 }
 
 export interface ContextResult {
@@ -39,6 +47,8 @@ export interface ContextResult {
   /** Rendered body — callers may print or pipe. */
   body?: string;
   message?: string;
+  /** True when --if-stale was set and the existing pack was fresh, so no rebuild ran. */
+  skippedFresh?: boolean;
 }
 
 export async function runContext(opts: ContextOptions): Promise<ContextResult> {
@@ -52,6 +62,21 @@ export async function runContext(opts: ContextOptions): Promise<ContextResult> {
   }
 
   const cfg = existsSync(`${vaultPath(root)}/config.yaml`) ? loadProjectConfig(root) : defaultConfig();
+
+  // --if-stale: bail early when an existing pack is already fresher than memory.
+  // Used by the Stop / SessionStart hooks to avoid the rebuild cost on every turn.
+  // Only checked here (not at runIndex) because the staleness signal only makes
+  // sense relative to a built pack — there's nothing to skip if no pack exists.
+  if (opts.ifStale) {
+    const latest = await findLatestPackWithStaleness(root);
+    if (latest && !latest.stale) {
+      return {
+        exitCode: 0,
+        outputPath: latest.path,
+        skippedFresh: true,
+      };
+    }
+  }
 
   // Refresh derived indexes first so the pack reflects the latest vault state. Idempotent —
   // each regenerator skips writing when content is unchanged.

@@ -10,12 +10,15 @@ import {
   loadProjectConfig,
   type ProjectEntry,
   pruneDeadProjects,
+  readUserPreferences,
   vaultPath,
+  writeUserPreferences,
 } from "@cairndex/core";
 import { createServer, type CreateServerResult, type OnboardingHooks } from "@cairndex/server";
 import open from "open";
 import { findExeRelative } from "../utils/exePath.js";
 import { logger } from "../utils/logger.js";
+import { resolveActiveVault } from "../utils/resolveActiveVault.js";
 import { defaultProjectIdFromRepo, runProjectRegister } from "./project.js";
 import { runVaultInit } from "./vault.js";
 
@@ -101,12 +104,33 @@ async function startWatcherForProject(
 
 export async function runUi(opts: UiOptions): Promise<void> {
   const port = opts.port ?? 7777;
+  // Resolve the effective vault: explicit `--vault` > remembered `lastVaultRoot` >
+  // legacy registry. The remembered value lets a user double-click the exe and
+  // land back in the vault they were last working in.
+  const prefs = await readUserPreferences();
+  const selection = resolveActiveVault({
+    ...(opts.vaultRoot ? { optVaultRoot: opts.vaultRoot } : {}),
+    prefVaultRoot: prefs.lastVaultRoot,
+  });
+  if (selection.source === "pref-stale") {
+    logger.info(
+      { lastVaultRoot: prefs.lastVaultRoot },
+      "remembered vault no longer exists; clearing lastVaultRoot",
+    );
+    try {
+      await writeUserPreferences({ lastVaultRoot: null });
+    } catch (err) {
+      logger.warn({ err }, "failed to clear stale lastVaultRoot from prefs");
+    }
+  }
+  const activeVault: string | null = selection.vaultRoot;
+
   // Self-heal the global registry on every UI startup. Persistently removes
   // entries whose `path` no longer exists (test temp dirs, deleted repos, moved
   // checkouts). This is a write but only when there's something to remove —
   // a clean registry is a no-op. Logs how many it pruned so users can spot
   // surprises ("why did 16 projects disappear?").
-  if (!opts.vaultRoot) {
+  if (!activeVault) {
     try {
       const pruned = await pruneDeadProjects();
       if (pruned.length > 0) {
@@ -119,7 +143,17 @@ export async function runUi(opts: UiOptions): Promise<void> {
       logger.warn({ err }, "registry prune failed; continuing");
     }
   }
-  const projects = opts.vaultRoot ? await listVaultProjects(opts.vaultRoot) : await listProjects();
+  const projects = activeVault ? await listVaultProjects(activeVault) : await listProjects();
+  // Persist explicit `--vault` choices so the next startup remembers them.
+  // We do this after listVaultProjects succeeds (above) so a malformed vault
+  // path doesn't end up cached as the "last opened" entry.
+  if (selection.source === "opt" && activeVault) {
+    try {
+      await writeUserPreferences({ lastVaultRoot: activeVault });
+    } catch (err) {
+      logger.warn({ err }, "failed to persist lastVaultRoot to prefs");
+    }
+  }
 
   const webRoot = findWebDist();
   if (!webRoot) {
@@ -139,6 +173,13 @@ export async function runUi(opts: UiOptions): Promise<void> {
       const r = await runVaultInit(input);
       if (r.exitCode !== 0 || !r.vaultRoot) {
         throw new Error(r.message ?? "vault init failed");
+      }
+      // Persist the just-created vault as the new "last opened" so the user
+      // doesn't have to re-onboard on the next double-click of the exe.
+      try {
+        await writeUserPreferences({ lastVaultRoot: r.vaultRoot });
+      } catch (err) {
+        logger.warn({ err }, "failed to persist lastVaultRoot after onboarding");
       }
       return { vaultRoot: r.vaultRoot };
     },

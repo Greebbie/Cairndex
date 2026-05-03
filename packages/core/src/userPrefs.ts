@@ -37,6 +37,17 @@ export const UserPreferencesSchema = z
      * shared vault rules.
      */
     personalRulesPath: z.string().nullable().default(null),
+    /**
+     * Absolute path to the last vault the user opened with `cairndex ui`. Set after
+     * a successful `--vault <path>` launch (or vault init via the GUI onboarding
+     * flow). When `cairndex ui` is invoked with no `--vault` flag — e.g. by
+     * double-clicking the exe — the CLI uses this to reopen the same vault instead
+     * of falling back to the legacy `~/.cairndex/projects.json` registry.
+     *
+     * Cleared automatically when the path no longer exists, so a deleted/moved
+     * vault doesn't permanently break startup.
+     */
+    lastVaultRoot: z.string().nullable().default(null),
   })
   .strict();
 

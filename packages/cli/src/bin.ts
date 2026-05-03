@@ -27,6 +27,7 @@ import { runSweep } from "./commands/sweep.js";
 import { runSyncCmd } from "./commands/sync.js";
 import { runUi } from "./commands/ui.js";
 import { runVaultInit } from "./commands/vault.js";
+import { runPhaseSet, runTaskComplete, runTaskSwitch } from "./commands/workflow.js";
 
 const program = new Command();
 
@@ -222,10 +223,16 @@ program
   .option("--budget <n>", "Token budget cap", (v) => Number.parseInt(v, 10))
   .option("--out <path>", "Override output path (absolute or vault-relative)")
   .option("--no-stdout", "Do not print pack body to stdout (file only)")
+  .option(
+    "--if-stale",
+    "Only rebuild when the latest pack is older than the newest memory file. Used by the Stop / SessionStart hooks so each session boots with a fresh pack without paying the rebuild cost when nothing changed.",
+    false,
+  )
+  .option("--silent", "Suppress non-error output (still writes the pack file)", false)
   .action(async (task: string | undefined, opts) => {
     const callOpts: Parameters<typeof runContext>[0] = {
       cwd: opts.cwd,
-      emitStdout: opts.stdout !== false,
+      emitStdout: opts.stdout !== false && !opts.silent,
     };
     if (opts.vault) callOpts.vaultRoot = opts.vault;
     if (opts.project) callOpts.projectId = opts.project;
@@ -233,8 +240,9 @@ program
     if (typeof opts.budget === "number" && !Number.isNaN(opts.budget))
       callOpts.budget = opts.budget;
     if (opts.out) callOpts.out = opts.out;
+    if (opts.ifStale) callOpts.ifStale = true;
     const r = await runContext(callOpts);
-    if (r.message) console.error(r.message);
+    if (r.message && !opts.silent) console.error(r.message);
     process.exit(r.exitCode);
   });
 
@@ -799,6 +807,60 @@ session
       const verb = r.created ? "created" : "appended to";
       console.log(`${verb} ${r.sessionId} (${r.section}) -> ${r.path}`);
     }
+    process.exit(r.exitCode);
+  });
+
+// Workflow-state commands. Direct mutations (no inbox round-trip) — see
+// `packages/core/src/workflow/taskState.ts` for why these aren't proposals.
+const taskCmd = program
+  .command("task")
+  .description("Workflow-state commands: switch / complete the current task");
+
+taskCmd
+  .command("switch <id>")
+  .description("Make <id> the current in-progress task; demotes any other in_progress to pending")
+  .option("--cwd <path>", "Working directory", process.cwd())
+  .option("--vault <path>", "Vault root (overrides --cwd)")
+  .option("--project <id>", "Project id inside a central vault")
+  .action(async (id, opts) => {
+    const callOpts: Parameters<typeof runTaskSwitch>[0] = { cwd: opts.cwd, taskId: id };
+    if (opts.vault) callOpts.vaultRoot = opts.vault;
+    if (opts.project) callOpts.projectId = opts.project;
+    const r = await runTaskSwitch(callOpts);
+    if (r.message) (r.exitCode === 0 ? console.log : console.error)(r.message);
+    process.exit(r.exitCode);
+  });
+
+taskCmd
+  .command("complete [id]")
+  .description("Mark a task as done. Defaults to the active context's current task.")
+  .option("--cwd <path>", "Working directory", process.cwd())
+  .option("--vault <path>", "Vault root (overrides --cwd)")
+  .option("--project <id>", "Project id inside a central vault")
+  .action(async (id, opts) => {
+    const callOpts: Parameters<typeof runTaskComplete>[0] = { cwd: opts.cwd };
+    if (id) callOpts.taskId = id;
+    if (opts.vault) callOpts.vaultRoot = opts.vault;
+    if (opts.project) callOpts.projectId = opts.project;
+    const r = await runTaskComplete(callOpts);
+    if (r.message) (r.exitCode === 0 ? console.log : console.error)(r.message);
+    process.exit(r.exitCode);
+  });
+
+const phaseCmd = program.command("phase").description("Workflow-state commands: advance the project phase");
+
+phaseCmd
+  .command("set <name>")
+  .description("Set the project phase (e.g. discovering | planning | implementing | testing)")
+  .option("--cwd <path>", "Working directory", process.cwd())
+  .option("--vault <path>", "Vault root (overrides --cwd)")
+  .option("--project <id>", "Project id inside a central vault")
+  .action(async (name, opts) => {
+    const callOpts: Parameters<typeof runPhaseSet>[0] = { cwd: opts.cwd, phase: name };
+    if (opts.vault) callOpts.vaultRoot = opts.vault;
+    if (opts.project) callOpts.projectId = opts.project;
+    const r = await runPhaseSet(callOpts);
+    if (r.message) (r.exitCode === 0 ? console.log : console.error)(r.message);
     process.exit(r.exitCode);
   });
 

@@ -73,8 +73,10 @@ test.afterAll(async () => {
 test("loads dashboard for the registered project", async ({ page }) => {
   await page.goto(`http://localhost:${PORT}/p/e2e`);
   await expect(page.getByRole("heading", { name: "e2e" })).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByText("implementing")).toBeVisible();
-  await expect(page.getByText("ship it")).toBeVisible();
+  // "implementing" appears in both the NowBar pill and the ProjectStatePanel dd —
+  // either match is sufficient evidence the value flowed through.
+  await expect(page.getByText("implementing").first()).toBeVisible();
+  await expect(page.getByText("ship it").first()).toBeVisible();
 });
 
 test("navigates to browse", async ({ page }) => {
@@ -129,7 +131,7 @@ test("dashboard active-spec link opens the file view (no broken plural route)", 
   page,
 }) => {
   await page.goto(`http://localhost:${PORT}/p/e2e`);
-  await expect(page.getByText("implementing")).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText("implementing").first()).toBeVisible({ timeout: 10_000 });
   // ProjectStatePanel renders SPEC-001 as a Link; clicking it must land on
   // /browse/spec/SPEC-001 (singular type), not /browse/specs/... which the
   // server does not accept.

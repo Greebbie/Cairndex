@@ -126,7 +126,11 @@ export default function SettingsUserPreferences() {
             className="mt-1 w-32 px-2 py-1 text-sm border border-border rounded bg-background"
           />
           <span className="block text-xs text-muted-foreground mt-1">
-            Reserved for a future auto-accept feature; no proposals are auto-applied today.
+            Agent-proposed memory updates whose confidence is{" "}
+            <span className="font-mono">≥ this value</span> are auto-applied to canonical memory
+            without manual review. Leave blank to require manual review for every proposal
+            (default). Recommended starting point if you opt in: 0.85 — only proposals where
+            multiple heuristic signals fired (decision phrase + repeated IDs) clear that bar.
           </span>
         </label>
 

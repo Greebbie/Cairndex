@@ -51,29 +51,36 @@ describe("renderClaudeSettings", () => {
     }
   });
 
-  it("registers a SessionStart hook running cairndex bootstrap", () => {
+  it("registers a SessionStart hook running bootstrap and context-if-stale", () => {
     const repo = mkdtempSync(join(tmpdir(), "cairn-render-sessionstart-"));
     try {
       const json = renderClaudeSettings({ mode: "legacy" }, repo);
       expect(json.hooks.SessionStart).toBeDefined();
-      const cmd = json.hooks.SessionStart[0]?.hooks[0]?.command ?? "";
-      expect(cmd).toMatch(/bootstrap/);
-      expect(cmd).toContain("cairndex-managed");
+      const start = json.hooks.SessionStart[0]?.hooks ?? [];
+      expect(start).toHaveLength(2);
+      expect(start[0]?.command).toMatch(/bootstrap/);
+      expect(start[0]?.command).toContain("cairndex-managed");
+      // Refresh the context pack on session start so any out-of-session edits
+      // (web UI accept/reject, manual file edits) are reflected before Claude reads.
+      expect(start[1]?.command).toMatch(/context --if-stale/);
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }
   });
 
-  it("Stop chain runs auto-session, auto-distill, last-turn-summary, then sweep — in that order", () => {
+  it("Stop chain runs auto-session, auto-distill, last-turn-summary, sweep, then context-if-stale — in that order", () => {
     const repo = mkdtempSync(join(tmpdir(), "cairn-render-stop-chain-"));
     try {
       const json = renderClaudeSettings({ mode: "legacy" }, repo);
       const stop = json.hooks.Stop[0]?.hooks ?? [];
-      expect(stop).toHaveLength(4);
+      expect(stop).toHaveLength(5);
       expect(stop[0]?.command).toMatch(/auto-session/);
       expect(stop[1]?.command).toMatch(/insight propose-from-session/);
       expect(stop[2]?.command).toMatch(/last-turn-summary/);
       expect(stop[3]?.command).toMatch(/sweep/);
+      // Final step: rebuild the context pack if memory changed during the turn,
+      // so the next session boots with a fresh pack without the user re-running.
+      expect(stop[4]?.command).toMatch(/context --if-stale/);
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }

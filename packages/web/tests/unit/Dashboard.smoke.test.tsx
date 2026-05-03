@@ -94,6 +94,10 @@ beforeEach(() => {
     else if (u.endsWith("/dashboard")) body = dashboardPayload;
     else if (u.endsWith("/inbox")) body = inboxPayload;
     else if (u.endsWith("/doctor/demo")) body = { issues: [] };
+    else if (u.endsWith("/implementation"))
+      body = { generatedAt: "2026-05-02T00:00:00Z", entries: [], byPlan: {} };
+    else if (u.endsWith("/last-turn-summary")) body = { summary: null };
+    else if (u.endsWith("/api/vault/demo/task")) body = [];
     else body = {};
     return new Response(JSON.stringify(body), {
       status: 200,

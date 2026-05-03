@@ -133,6 +133,24 @@ function autoDistillCommand(layout: HookLayoutMode, bin: string): string {
 }
 
 /**
+ * Refresh the context pack, but only if memory has changed since the last build.
+ * Append to the Stop chain (so the next session inherits a fresh pack) and to the
+ * SessionStart chain (so any between-session edits are picked up before Claude reads
+ * anything). Cheap when nothing changed — just a stat + frontmatter scan.
+ */
+function contextIfStaleCommand(layout: HookLayoutMode, bin: string): string {
+  if (layout.mode === "central") {
+    return (
+      `${bin} context --if-stale --silent --no-stdout ` +
+      `--vault ${shellQuote(layout.vaultRoot)} ` +
+      `--project ${layout.projectId} ` +
+      `# ${CAIRNDEX_HOOK_TAG}`
+    );
+  }
+  return `${bin} context --if-stale --silent --no-stdout # ${CAIRNDEX_HOOK_TAG}`;
+}
+
+/**
  * Build the MCP server entry that Claude Code will spawn over stdio.
  *
  * Resolution mirrors resolveBinCommand: when running inside the cairndex source repo we
@@ -184,8 +202,10 @@ export function renderClaudeSettings(
       ],
       // Stop chain order: write the session note (auto-session reads transcript), distill
       // a draft insight from it (heuristic, no LLM), summarize the turn into state JSON
-      // for the GUI, then sweep (consolidate + archive). Each step is independent and
-      // silent on success — failure of any one step does not block the rest.
+      // for the GUI, sweep (consolidate + archive), and finally rebuild the context pack
+      // if memory changed during the turn — so the next session boots with a fresh pack.
+      // Each step is independent and silent on success; failure of any one step does not
+      // block the rest.
       Stop: [
         {
           hooks: [
@@ -193,15 +213,21 @@ export function renderClaudeSettings(
             { type: "command", command: autoDistillCommand(layout, bin) },
             { type: "command", command: lastTurnSummaryCommand(layout, bin) },
             { type: "command", command: sweepCommand(layout, bin) },
+            { type: "command", command: contextIfStaleCommand(layout, bin) },
           ],
         },
       ],
-      // SessionStart prints the bootstrap block to stdout. Claude Code captures it into
-      // the agent's first-turn input, so the agent sees phase + active task + pending
-      // proposals immediately without having to discover and read CLAUDE.md.
+      // SessionStart prints the bootstrap block to stdout, then refreshes the context pack
+      // if any out-of-session edits invalidated it. Claude Code captures bootstrap stdout
+      // into the agent's first-turn input, so the agent sees phase + active task + pending
+      // proposals immediately, and any subsequent context_pack MCP read returns a current
+      // pack instead of a stale one.
       SessionStart: [
         {
-          hooks: [{ type: "command", command: bootstrapCommand(layout, bin) }],
+          hooks: [
+            { type: "command", command: bootstrapCommand(layout, bin) },
+            { type: "command", command: contextIfStaleCommand(layout, bin) },
+          ],
         },
       ],
     },

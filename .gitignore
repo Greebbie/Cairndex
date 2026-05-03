@@ -5,12 +5,24 @@ dist/
 coverage/
 .vitest/
 /docs/superpowers
+/docs/dogfood
 /.playwright-mcp
+
+# Per-project Claude Code agent state — auto-generated, contains per-machine paths
+CLAUDE.md
 
 # Per-machine — never commit these (paths to local vault, hook bin, etc.)
 .cairndex-project.yaml
 .claude/settings.json
+.claude/settings.json.bak
 .claude/settings.local.json
+
+# Legacy repo-local vault — superseded by central-vault layout
+/.cairndex/
+
+# Stray screenshots that historically lived at the repo root
+/cairndex-*.png
+/cockpit-*.png
 
 # Playwright test artifacts
 packages/web/test-results/
@@ -19,6 +31,9 @@ packages/web/playwright-report/
 # SEA build outputs
 packages/cli/dist-sea/
 packages/cli/dist-sea-entry/
+
+# Icon ICO is generated from icon.svg on every package:sea build
+packages/cli/assets/icon.ico
 # Root-level copies of the SEA exe (produced by `pnpm -F cairndex package:sea`)
 /Cairndex.exe
 /Cairndex

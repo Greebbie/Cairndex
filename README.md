@@ -1,21 +1,84 @@
-# cairndex
+# Cairndex
 
-> Persistent, reviewable project memory for AI coding agents.
+> **A second brain for your AI coding agent.** Persistent, reviewable project
+> memory that survives the chat window.
 
-Cairndex is a structured memory layer for AI coding sessions. Your project's
-specs, decisions, plans, sessions, and insights live as typed Markdown in one
-central vault. AI coding agents (Claude Code, Cursor, and others) read this
-memory before they start work and propose updates after — every change goes
-through a review inbox before it lands. Memory survives the chat window, is
-human-readable, and version-controllable.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org/)
+[![pnpm](https://img.shields.io/badge/pnpm-%3E%3D9-orange.svg)](https://pnpm.io/)
+
+Think **Obsidian-style typed Markdown vault** + **Claude Code / MCP** + the
+**Building a Second Brain** methodology, fused for AI-assisted coding.
+
+Your project's goals, specs, decisions, plans, tasks, sessions, and insights
+live as structured Markdown files in a central vault. AI agents (Claude Code,
+Cursor, …) read this memory before they start work and propose updates after.
+Every change passes through a review inbox before it lands — the agent
+proposes, the human accepts.
+
+```
+┌──────────────┐    reads    ┌──────────────┐   proposes    ┌──────────────┐
+│  AI agent    │────────────▶│ Cairndex     │──────────────▶│ Review inbox │
+│ (Claude Code)│             │ vault        │               │  (you)       │
+└──────────────┘             │ (Markdown)   │◀──────────────└──────────────┘
+        ▲                    └──────────────┘    accepted
+        │                            │
+        └─── context pack (MCP) ─────┘
+```
+
+## Why
+
+LLM coding agents have goldfish memory. Every new session starts from zero,
+re-reads the same files, re-asks the same clarifying questions, and makes
+decisions the team has already made twice. Chat transcripts are not memory:
+they are a hostile place to store project knowledge.
+
+Cairndex flips it: durable memory lives outside the chat, structured as the
+kind of artifacts engineers already write — specs, ADRs, plans, tasks,
+session notes — but with typed cross-links, provenance, and verification
+rules a machine can enforce. The agent reads it, the agent proposes changes
+to it, and a human stays in the loop on what becomes canonical.
+
+## Table of contents
+
+- [Features](#features)
+- [Quickstart](#quickstart)
+- [Vault layout](#vault-layout)
+- [Agent integration](#agent-integration)
+- [CLI reference](#cli-reference)
+- [Architecture](#architecture)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Features
+
+- **Typed Markdown vault** — goals, intents, specs, decisions, plans, tasks,
+  sessions, changes, insights, and questions. Each node has frontmatter,
+  typed cross-links, and lives in plain `.md` files you can `grep` and commit.
+- **Inbox-first writes** — agents propose, humans accept or reject. Canonical
+  memory is never edited directly, so AI changes are always reviewable and
+  reversible.
+- **Claude Code / MCP integration** — first-class MCP server exposing
+  `context_pack`, `propose_memory_update`, `inbox_list`, and workflow tools.
+  One `cairndex init` wires hooks + MCP into `.claude/settings.json`.
+- **Web dashboard** — project state, review inbox, context pack composer,
+  plan progress, and a chronological implementation timeline. Quick-action
+  buttons for switching tasks and advancing phase without dropping to a CLI.
+- **Token-budgeted context packs** — prioritized assembly so the agent reads
+  the right slice of memory under a configurable token budget.
+- **Health doctor** — validation rules across the vault: staleness, broken
+  links, missing provenance, verification-bound completion. Runs on every
+  edit via PostToolUse hook.
 
 ## Quickstart
 
-**Prereqs:** Node 20+ and pnpm 9+ (only needed to *build* the exe; the resulting
-exe has Node baked in). See [docs/QUICKSTART.md](./docs/QUICKSTART.md) for the
-full 5-minute walkthrough including Claude Code wiring.
+### Requirements
 
-### 1. Build the single .exe and double-click it (recommended)
+- Node.js 20 or newer
+- pnpm 9 or newer
+
+### Build and run
 
 ```bash
 git clone https://github.com/Greebbie/Cairndex.git
@@ -25,42 +88,46 @@ pnpm -r build
 pnpm -F cairndex package:sea
 ```
 
-When the build finishes, **`Cairndex.exe`** sits right at the repo root next to
-this README. Double-click it → server starts on http://localhost:7777 →
-browser opens to the GUI. That's the whole story.
+The build produces `Cairndex.exe` at the repo root with Node.js embedded
+(approximately 84 MB, zero runtime dependencies). Launch the GUI by
+double-clicking the executable; the server starts on `http://localhost:7777`
+and the browser opens automatically.
 
-The exe is ~84 MB with Node.js embedded — zero runtime dependencies. It finds
-its web assets in `packages/web/dist/` and its vault templates in `templates/`
-(both already in the repo), so the root copy works as soon as it's built.
+For redistribution, the same build emits a portable bundle under
+`packages/cli/dist-sea/`. Copy the folder anywhere — keep the executable with
+its sibling `web/` and `templates/` directories.
 
-For redistribution, the same build also produces `packages/cli/dist-sea/`
-containing a self-contained portable bundle (`Cairndex.exe` + sibling `web/`
-and `templates/` folders). Drop that whole folder onto a USB stick or
-`~/Applications/` — keep the three siblings together — and double-click the
-exe to run.
+### First run
 
-> Future: pre-built binaries from [Releases](https://github.com/Greebbie/Cairndex/releases)
-> so you can skip the build step entirely.
+The GUI walks through three steps the first time it opens:
 
-### 2. Global CLI install (after npm publish; not yet)
+1. Choose a vault folder. It is created if it does not exist (typically
+   `~/CairndexVault`).
+2. Register a code repository as a project.
+3. Run `cairndex doctor` to validate the vault.
+
+The wizard ends on the project dashboard.
+
+### Wire Claude Code
+
+Inside any registered project's repo:
 
 ```bash
-pnpm add -g @cairndex/cli   # or: npm i -g @cairndex/cli
-cairndex ui
+cairndex init
 ```
 
-Your browser opens to a 3-step wizard:
+This injects three idempotent entries into `.claude/settings.json`:
 
-1. **Choose a vault folder** — created if it doesn't exist (e.g. `~/CairndexVault`).
-2. **Register a code repo** as your first project.
-3. **Run doctor** to verify, then land on the project Dashboard.
+- A `PostToolUse` hook that runs `cairndex doctor --fix` after every
+  Write/Edit.
+- A `Stop` hook that records the session note and refreshes the context pack.
+- An MCP server registration so the agent can call Cairndex tools directly.
 
-After that, `cairndex init` inside the repo wires Claude Code (hooks +
-MCP server) automatically. No config files, no schemas to learn first.
+For the deeper walkthrough see [docs/QUICKSTART.md](./docs/QUICKSTART.md).
 
-## How memory is organized
+## Vault layout
 
-A vault holds many projects, each as a tree of typed Markdown:
+A vault holds many projects. Each project is a tree of typed Markdown files:
 
 ```
 CairndexVault/
@@ -77,7 +144,7 @@ CairndexVault/
 └── indexes/               # vault-wide rollups
 ```
 
-A repo can opt-in via a one-line pointer file:
+A repo opts in via a one-line pointer file:
 
 ```yaml
 # <repo>/.cairndex-project.yaml
@@ -85,82 +152,74 @@ vault: "C:/Users/<you>/CairndexVault"
 project: "my-app"
 ```
 
-That pointer is not memory — the vault is. Repo-local `.cairndex/` folders
-remain supported for migration but new projects should live in the central vault.
+The pointer is metadata; the vault is memory.
 
 ### Node types
 
-| Folder | Role | Mutability |
-|---|---|---|
-| `goals/` | Project north stars | living |
-| `intents/` | User asks captured verbatim | immutable |
-| `specs/` | What we are building | living + history |
-| `decisions/` | ADR-style decisions | immutable once accepted |
-| `plans/` | How we will build | living, supersedable |
-| `tasks/` | Current work breakdown | living |
-| `sessions/` | Per-session work narrative | immutable |
-| `changes/` | Project event stream | append-only |
-| `insights/` | Lessons; promotable to shared memory | append-only |
-| `questions/` | Open uncertainties | living, status-tracked |
+| Folder       | Role                                  | Mutability               |
+| ------------ | ------------------------------------- | ------------------------ |
+| `goals/`     | Project north stars                   | living                   |
+| `intents/`   | User asks captured verbatim           | immutable                |
+| `specs/`     | What we are building                  | living, history-tracked  |
+| `decisions/` | ADR-style decisions                   | immutable once accepted  |
+| `plans/`     | How we will build                     | living, supersedable     |
+| `tasks/`     | Current work breakdown                | living                   |
+| `sessions/`  | Per-session work narrative            | immutable                |
+| `changes/`   | Project event stream                  | append-only              |
+| `insights/`  | Lessons; promotable to shared memory  | append-only              |
+| `questions/` | Open uncertainties                    | living, status-tracked   |
 
-Three load-bearing properties:
+Every node carries:
 
-- **Typed edges** in frontmatter (`links: [{type: supersedes, target: ADR-002}]`)
-  plus `[[wikilinks]]` in body.
-- **Provenance**: every node records who created it, in which session, with what
+- **Typed edges** — `links: [{type: supersedes, target: ADR-002}]` plus
+  `[[wikilinks]]` in body content.
+- **Provenance** — who created the node, in which session, with what
   confidence.
-- **Verification-bound completion**: marking `status: done` requires a
-  `verification` block, enforced by `cairndex doctor`.
+- **Verification-bound completion** — marking `status: done` requires a
+  `verification` block; `cairndex doctor` enforces it.
 
-## How agents interact
+## Agent integration
 
-The contract is simple and enforceable:
+The contract between Cairndex and any agent is small and enforceable:
 
 1. Resolve the current repo to `{ vaultRoot, projectId }`.
-2. Read `projects/<id>/index.md`, `shared/rules/`, and a generated context pack.
-3. Propose durable memory changes by writing to
-   `projects/<id>/inbox/proposed-memory-updates/`. The user accepts or rejects
-   from the GUI's Review Inbox or via `cairndex inbox`.
-4. Never edit canonical memory directly.
+2. Read `projects/<id>/index.md`, `shared/rules/`, and a generated context
+   pack.
+3. Propose memory changes by writing to
+   `projects/<id>/inbox/proposed-memory-updates/`.
+4. The user accepts or rejects from the GUI's *Review Inbox* page or via
+   `cairndex inbox`.
+5. Never edit canonical memory directly.
 
-Agents can read the vault three ways:
+Agents read the vault three ways:
 
-- **Files**: grep / read the Markdown directly.
-- **CLAUDE.md region**: an auto-generated `<!-- cairndex:start -->` block in
-  your repo's `CLAUDE.md` summarising current phase, active task, and pointers.
-- **MCP**: `cairndex mcp` exposes `context_pack`, `propose_memory_update`,
-  `inbox_list`, and resources over stdio.
+- **Files.** Grep or read the Markdown directly.
+- **CLAUDE.md region.** An auto-generated `<!-- cairndex:start -->` block in
+  the repo's `CLAUDE.md` summarising current phase, active task, and pointers.
+- **MCP.** `cairndex mcp` exposes tools and resources over stdio for
+  protocol-aware agents.
 
 ## CLI reference
 
-The GUI wizard wraps these — you rarely need to type them, but they're there:
-
 ```bash
-cairndex vault init <path>                              # create a central vault
-cairndex project register --vault <path> --project <id> --repo <repo-path>
-cairndex project import-repo-vault ...                  # migrate from legacy .cairndex/
+# Vault and project setup
+cairndex vault init <path>
+cairndex project register --vault <path> --project <id> --repo <repo>
+cairndex project import-repo-vault ...
 
-cairndex ui [--vault <path>] [--port 7777]              # launch GUI + watcher
+# Run the GUI
+cairndex ui [--vault <path>] [--port 7777]
+
+# Daily usage
 cairndex context [task] [--vault <path>] [--project <id>]
-cairndex doctor [--vault <path>] [--project <id>] [--fix]
-cairndex emit claude-md ...                             # regenerate CLAUDE.md region
+cairndex doctor [--fix]
 cairndex inbox list | accept <id> | reject <id> | propose ...
-cairndex sweep                                          # consolidate + archive (idempotent)
-cairndex mcp                                            # MCP server over stdio
+cairndex task switch <id>
+cairndex task complete [<id>]
+cairndex phase set <name>
+cairndex sweep
+cairndex mcp
 ```
-
-## Status
-
-**v0.2** — central vault model is GA. The CLI, web GUI, MCP server, watcher,
-review inbox, context packs, and doctor all run against the central layout.
-345+ tests, end-to-end smoke verified via headless browser.
-
-What's next:
-
-- Desktop packaging (Tauri) so users get a double-click install instead of
-  `npm i -g`.
-- Cross-vault search and read-only project sharing.
-- Richer graph views in the GUI.
 
 ## Architecture
 
@@ -174,9 +233,23 @@ packages/
 └── web/       @cairndex/web     # React GUI
 ```
 
-Build with `pnpm -r build`, test with `pnpm test`. See
-[CONTRIBUTING.md](./CONTRIBUTING.md) for development setup.
+Build with `pnpm -r build`. Test with `pnpm test`. Type-check with
+`pnpm typecheck`. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full
+development setup.
+
+## Roadmap
+
+- Pre-built binaries published to GitHub Releases.
+- Desktop packaging (Tauri) for a one-click install.
+- Cross-vault search and read-only project sharing.
+- Richer graph views and timeline visualisations in the GUI.
+
+## Contributing
+
+Issues and pull requests are welcome. See
+[CONTRIBUTING.md](./CONTRIBUTING.md) for development setup, coding style, and
+testing conventions.
 
 ## License
 
-MIT. See [LICENSE](./LICENSE).
+[MIT](./LICENSE)

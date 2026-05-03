@@ -1,5 +1,7 @@
+import { useComposePack } from "@/lib/api";
 import type { Dashboard } from "@/lib/types";
-import { Link } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 
 interface Props {
   alias: string;
@@ -15,6 +17,22 @@ function fmtDate(iso: string): string {
 
 export function AgentContextPanel({ alias, agentContext }: Props) {
   const latest = agentContext.latestPack;
+  const compose = useComposePack();
+  const navigate = useNavigate();
+  const [rebuildError, setRebuildError] = useState<string | null>(null);
+
+  const onRebuild = async () => {
+    setRebuildError(null);
+    try {
+      // No task scope — the user is rebuilding the latest pack to refresh against
+      // current memory, not changing what it covers. Default-scope is correct.
+      const r = await compose.mutateAsync({ alias });
+      navigate(`/p/${alias}/pack/${r.packId}`);
+    } catch (err) {
+      setRebuildError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
   return (
     <section className="rounded border bg-card text-card-foreground p-4 space-y-2">
       <div className="flex items-center justify-between">
@@ -42,6 +60,38 @@ export function AgentContextPanel({ alias, agentContext }: Props) {
           <div className="text-xs text-muted-foreground">
             Built {fmtDate(latest.builtAt)}
           </div>
+          {latest.stale ? (
+            <div className="text-xs rounded border border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200 px-2 py-1 space-y-1">
+              <div>
+                ⚠ Pack is stale — vault memory has changed since it was built
+                {latest.lastMemoryChangeAt
+                  ? ` (last change ${fmtDate(latest.lastMemoryChangeAt)})`
+                  : ""}
+                .
+              </div>
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={onRebuild}
+                  disabled={compose.isPending}
+                  className="rounded bg-amber-600 text-white px-2 py-0.5 text-xs disabled:opacity-50"
+                >
+                  {compose.isPending ? "Rebuilding…" : "Rebuild now"}
+                </button>
+                <Link
+                  to={`/p/${alias}/pack`}
+                  className="text-xs text-primary hover:underline"
+                >
+                  Compose with different scope →
+                </Link>
+              </div>
+              {rebuildError ? (
+                <div className="text-xs text-red-700 dark:text-red-300">
+                  Rebuild failed: {rebuildError}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ) : (
         <div className="text-sm text-muted-foreground">
