@@ -1,6 +1,6 @@
 # Cairndex
 
-> **A second brain for your AI coding agent.** Persistent, reviewable project
+> **A context managing layer for your AI coding agent.** Persistent, reviewable project
 > memory that survives the chat window.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
@@ -18,10 +18,10 @@ proposes, the human accepts.
 
 ```
 ┌──────────────┐    reads    ┌──────────────┐   proposes    ┌──────────────┐
-│  AI agent    │────────────▶│ Cairndex     │──────────────▶│ Review inbox │
+│  AI agent    │────────────▶│ Cairndex     │──────────────▶│ Dashboard │
 │ (Claude Code)│             │ vault        │               │  (you)       │
 └──────────────┘             │ (Markdown)   │◀──────────────└──────────────┘
-        ▲                    └──────────────┘    accepted
+        ▲                    └──────────────┘    action
         │                            │
         └─── context pack (MCP) ─────┘
 ```
