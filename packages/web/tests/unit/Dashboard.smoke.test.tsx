@@ -1,6 +1,6 @@
 import Dashboard from "@/pages/Dashboard";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -106,6 +106,7 @@ beforeEach(() => {
   }) as unknown as typeof fetch;
 });
 afterEach(() => {
+  cleanup();
   globalThis.fetch = originalFetch;
 });
 
@@ -123,7 +124,7 @@ function withRouting() {
 }
 
 describe("Dashboard (smoke)", () => {
-  it("renders all four panels (Project State / Agent Context / Memory Health / Activity) and the Inbox panel", async () => {
+  it("renders the dashboard panels with humanized headlines (titles, not IDs)", async () => {
     const Wrapper = withRouting();
     render(
       <Wrapper>
@@ -131,15 +132,69 @@ describe("Dashboard (smoke)", () => {
       </Wrapper>,
     );
     expect(await screen.findByText("Project State")).toBeDefined();
-    expect(await screen.findByText("Agent Context")).toBeDefined();
-    expect(await screen.findByText("Memory Health")).toBeDefined();
+    // "Agent Context" panel was removed from the dashboard front door — the
+    // pack composer remains reachable at /p/:alias/pack but doesn't take
+    // dashboard real estate from the vibe coder. Asserting it is GONE here
+    // pins the design rule against accidental re-mount.
+    expect(screen.queryByText("Agent Context")).toBeNull();
+    // Memory Health panel renders only when red+yellow > 0 (this fixture has
+    // red:1, yellow:3). The heading is now "Vault status" — humans don't
+    // think of their project notes as "memory."
+    expect(await screen.findByText("Vault status")).toBeDefined();
     expect(await screen.findByText("Recent Activity")).toBeDefined();
     expect(await screen.findByText("Review Inbox")).toBeDefined();
-    expect(await screen.findByText("Phase")).toBeDefined();
-    // Phase + active spec now appear in both the sticky NowBar and the ProjectStatePanel —
-    // either one matching is enough to confirm the data flowed through.
+    // Phase + the active spec both appear. The spec now appears as its TITLE
+    // ("Memory cockpit"), not its ID — IDs are link-target / tooltip only on
+    // human surfaces. Verifying the title shows up in visible text confirms
+    // the headline-vs-ID rule is in force in ProjectStatePanel.
     expect((await screen.findAllByText("implementing")).length).toBeGreaterThan(0);
-    expect((await screen.findAllByText("SPEC-003")).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("Memory cockpit")).length).toBeGreaterThan(0);
+  });
+
+  it("collapses Memory Health to a one-line badge when all green (no warnings/errors)", async () => {
+    // Override the dashboard payload for this test only — counts all healthy.
+    const greenPayload = {
+      ...dashboardPayload,
+      memoryHealth: {
+        generatedAt: "2026-05-02T00:00:00Z",
+        counts: { red: 0, yellow: 0, green: 32 },
+        issues: [],
+      },
+    };
+    const prevFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async (url: string | URL | Request) => {
+      const u = typeof url === "string" ? url : url.toString();
+      let body: unknown;
+      if (u.endsWith("/api/projects")) body = projectsPayload;
+      else if (u.endsWith("/dashboard")) body = greenPayload;
+      else if (u.endsWith("/inbox")) body = inboxPayload;
+      else if (u.endsWith("/doctor/demo")) body = { issues: [] };
+      else if (u.endsWith("/implementation"))
+        body = { generatedAt: "2026-05-02T00:00:00Z", entries: [], byPlan: {} };
+      else if (u.endsWith("/last-turn-summary")) body = { summary: null };
+      else if (u.endsWith("/api/vault/demo/task")) body = [];
+      else body = {};
+      return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as unknown as typeof fetch;
+    try {
+      const Wrapper = withRouting();
+      render(
+        <Wrapper>
+          <Dashboard />
+        </Wrapper>,
+      );
+      const badge = await screen.findByTestId("memory-health-badge");
+      expect(badge).toBeDefined();
+      expect(badge.textContent).toMatch(/Vault healthy/);
+      expect(badge.textContent).toMatch(/32/);
+      // The full-panel heading should NOT appear when collapsed.
+      expect(screen.queryByText("Vault status")).toBeNull();
+    } finally {
+      globalThis.fetch = prevFetch;
+    }
   });
 
   it("renders the sticky Now bar with phase + current task + next action", async () => {

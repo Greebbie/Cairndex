@@ -1,4 +1,6 @@
+import { EventLine } from "@/components/EventLine";
 import { useLastTurnSummary } from "@/lib/api";
+import { foldChangelogForDisplay } from "@/lib/changelogFormat";
 import { humanizeDateString } from "@/lib/time";
 import type { LastTurnSummary } from "@/lib/types";
 
@@ -35,11 +37,11 @@ export function LastTurnCard({ alias }: Props) {
   const s = data?.summary ?? null;
   if (!s) return null;
   // events is added by the server route; the schema makes it optional with default
-  // []. Filter out the trailing "Session ... recorded" line — it's the turn anchor,
-  // not an event the user cares about as narrative.
-  const narrative = (s.events ?? []).filter(
-    (e) => !/^Session\s+\S+\s+recorded\b/.test(e.summary),
-  );
+  // []. foldChangelogForDisplay drops session-receipts and heuristic proposals
+  // (system housekeeping, not project narrative), AND collapses runs of ≥3
+  // accept/reject events into a single batch row — without this, an auto-accept
+  // sweep buries the actual narrative under 20 routing-id lines.
+  const narrative = foldChangelogForDisplay(s.events ?? []);
   return (
     <div
       data-testid="last-turn-card"
@@ -63,7 +65,7 @@ export function LastTurnCard({ alias }: Props) {
           {narrative.map((e, idx) => (
             <li key={`${e.date}-${idx}`} className="flex gap-2">
               <span className="text-emerald-700/70 dark:text-emerald-300/70 select-none">·</span>
-              <span>{e.summary}</span>
+              <EventLine alias={alias} event={e} />
             </li>
           ))}
         </ul>

@@ -1,7 +1,22 @@
-import { useImplementationLine, useProjects } from "@/lib/api";
+import { useImplementationLine, useNode, useProjects } from "@/lib/api";
 import { nodeLink } from "@/lib/nodeLink";
+import { humanizeDateString } from "@/lib/time";
 import type { ImplementationLineEntry } from "@/lib/types";
 import { Link, Navigate, useParams } from "react-router-dom";
+
+/**
+ * Resolve a plan ID to its title via the existing node fetch (cached). Falls back
+ * to the bare ID while loading or when the lookup fails. Mirrors the same rule
+ * in ReviewInbox: titles are headlines on human surfaces; IDs go in tooltips.
+ */
+function PlanTitle({ alias, planId }: { alias: string; planId: string }) {
+  const node = useNode(alias, "plan", planId);
+  const title =
+    node.data?.frontmatter && typeof (node.data.frontmatter as { title?: unknown }).title === "string"
+      ? (node.data.frontmatter as { title: string }).title
+      : null;
+  return <span className="italic">{title ?? planId}</span>;
+}
 
 const STATUS_LABEL: Record<string, string> = {
   done: "Done",
@@ -105,8 +120,8 @@ export default function Implementation() {
         <h2 className="text-2xl font-semibold">Implementation</h2>
         <p className="text-sm text-muted-foreground">
           Tasks grouped by plan, in priority order: shipped first (newest), then in
-          progress, then pending. Generated{" "}
-          <span className="font-mono text-xs">{data.generatedAt}</span>.
+          progress, then pending. Updated{" "}
+          <span title={data.generatedAt}>{humanizeDateString(data.generatedAt)}</span>.
         </p>
       </header>
 
@@ -133,9 +148,10 @@ export default function Implementation() {
                   ) : (
                     <Link
                       to={nodeLink(alias, "plan", planKey)}
-                      className="font-mono text-primary hover:underline"
+                      title={planKey}
+                      className="text-primary hover:underline"
                     >
-                      {planKey}
+                      <PlanTitle alias={alias} planId={planKey} />
                     </Link>
                   )}
                 </div>

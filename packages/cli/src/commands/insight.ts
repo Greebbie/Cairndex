@@ -2,12 +2,14 @@ import { existsSync } from "node:fs";
 import { appendFile, copyFile, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import {
+  buildActiveContext,
   centralSharedPath,
   createWithAutoAccept,
   defaultConfig,
   extractInsightFromSessionBody,
   extractTranscriptText,
   findDuplicate,
+  listProposals,
   loadProjectConfig,
   parseFrontmatter,
   resolveProjectRef,
@@ -123,7 +125,12 @@ export interface InsightProposeFromSessionResult {
   /** Set when an existing proposal already covers this content. */
   duplicateOf?: string;
   /** Reason the heuristic chose to skip — present when no proposal was created. */
-  skipReason?: "no-signal" | "session-missing" | "duplicate" | "low-confidence";
+  skipReason?:
+    | "no-signal"
+    | "session-missing"
+    | "duplicate"
+    | "low-confidence"
+    | "active-focus-only";
   /**
    * True when the user's `autoAcceptConfidenceThreshold` preference fired and
    * the proposal was immediately accepted into canonical memory. The PROP file
@@ -143,6 +150,34 @@ export interface InsightProposeFromSessionResult {
  * propose when at least one decision-like phrase fired.
  */
 const MIN_PROPOSAL_CONFIDENCE = 0.5;
+
+/**
+ * Coarse-match key for semantic dedupe of insight proposals: lowercase title with
+ * any node IDs (e.g. SPEC-001, TASK-007) stripped, whitespace collapsed. Two drafts
+ * with the same coarse key + same set of related IDs are "the same insight" even if
+ * their bodies differ (e.g. different `## Source - Session: ...` line).
+ *
+ * Catches the auto-distill noise pattern where every session that mentions the same
+ * IDs writes a unique-bodied PROP that the contentHash dedupe couldn't catch.
+ */
+function coarseInsightKey(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/\b[a-z]{2,}-\d+\b/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function linkTargetSignature(links: unknown): string {
+  if (!Array.isArray(links)) return "";
+  const targets: string[] = [];
+  for (const l of links) {
+    if (l && typeof l === "object" && "target" in l && typeof (l as { target: unknown }).target === "string") {
+      targets.push((l as { target: string }).target);
+    }
+  }
+  return targets.slice().sort().join(",");
+}
 
 /**
  * Heuristic auto-distillation. Reads the named session file, runs the
@@ -196,12 +231,68 @@ export async function runInsightProposeFromSession(
       skipReason: "no-signal",
     };
   }
+  // Active-focus-only skip. When the *only* signal that fired is "this session
+  // mentioned the active spec/plan/task/goal a few times" — that's not new
+  // information, just confirmation of where we already are. Always 0.25 confidence
+  // (ID-recurrence-only). Decision-phrase signals bypass this because confidence
+  // climbs to 0.5 or 0.6 and a phrase-bearing draft is genuine signal even if it's
+  // about the active node.
+  if (draft.confidence === 0.25 && draft.relatedIds.length > 0) {
+    const activeCtx = await buildActiveContext(root, cfg);
+    const activeIds = new Set<string>();
+    if (activeCtx.activeGoal) activeIds.add(activeCtx.activeGoal.id);
+    if (activeCtx.activeSpec) activeIds.add(activeCtx.activeSpec.id);
+    if (activeCtx.activePlan) {
+      activeIds.add(activeCtx.activePlan.id);
+      if (activeCtx.activePlan.currentTaskId) activeIds.add(activeCtx.activePlan.currentTaskId);
+    }
+    if (activeCtx.currentTask) activeIds.add(activeCtx.currentTask.id);
+    if (activeIds.size > 0 && draft.relatedIds.every((id) => activeIds.has(id))) {
+      return {
+        exitCode: 0,
+        message: `insight in session ${sessionId} only confirms current active focus — nothing new to propose`,
+        skipReason: "active-focus-only",
+      };
+    }
+  }
+
   if (draft.confidence < MIN_PROPOSAL_CONFIDENCE) {
     return {
       exitCode: 0,
       message: `insight signal in session ${sessionId} below threshold (confidence ${draft.confidence})`,
       skipReason: "low-confidence",
     };
+  }
+
+  // Semantic dedupe — a coarse-match key on title (with IDs stripped) plus the
+  // sorted set of related-id link targets. Catches the dogfood pattern where each
+  // session's auto-distilled draft has a distinct body (different `## Source` line)
+  // but is conceptually the same proposal. The standard contentHash dedupe below
+  // would miss these because the body differs. Includes pending AND rejected — a
+  // user who already rejected "Recurring focus on SPEC-X" doesn't want the next
+  // session to re-propose it.
+  const draftLinkSig = draft.relatedIds.slice().sort().join(",");
+  const draftCoarse = coarseInsightKey(draft.title);
+  if (draftCoarse.length > 0 || draftLinkSig.length > 0) {
+    const existing = await listProposals(root, cfg);
+    for (const cand of [...existing.pending, ...existing.rejected]) {
+      if (cand.targetType !== "insight") continue;
+      const candTitle = String(
+        (cand.newFrontmatter as Record<string, unknown> | undefined)?.title ?? "",
+      );
+      const candLinks = (cand.newFrontmatter as Record<string, unknown> | undefined)?.links;
+      if (
+        coarseInsightKey(candTitle) === draftCoarse &&
+        linkTargetSignature(candLinks) === draftLinkSig
+      ) {
+        return {
+          exitCode: 0,
+          message: `insight draft semantically matches ${cand.proposalId}`,
+          duplicateOf: cand.proposalId,
+          skipReason: "duplicate",
+        };
+      }
+    }
   }
 
   // Dedupe against existing proposals via the standard content-hash check. The signal

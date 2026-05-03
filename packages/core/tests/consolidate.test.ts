@@ -95,6 +95,25 @@ describe("consolidateRecentSessions", () => {
     expect(result.proposalsCreated).toBe(0);
   });
 
+  it("ignores PROP- / INBOX- / SESSION- IDs — these are workflow housekeeping, not subject matter", async () => {
+    // The exact dogfood failure: sessions where the agent triaged the inbox
+    // mention PROP-028 / PROP-020 a few times each. consolidateRecentSessions
+    // would then auto-draft "Pattern around PROP-028" meta-proposals — noise
+    // about the noise. Same workflow-prefix filter as extractFromSession.ts.
+    writeSession("2026-04-25-1000", "2026-04-25", "triage", "Reviewed [[PROP-028]] and PROP-028 again");
+    writeSession("2026-04-26-1000", "2026-04-26", "triage", "[[PROP-028]] still pending — PROP-028");
+    writeSession(
+      "2026-04-27-1000",
+      "2026-04-27",
+      "triage",
+      "Looked at PROP-028 and INBOX-007 plus [[SESSION-2026-04-26-1000]]",
+    );
+    const result = await consolidateRecentSessions(tmp, defaultConfig());
+    expect(result.proposalsCreated).toBe(0);
+    const inbox = await listProposals(tmp, defaultConfig());
+    expect(inbox.pending.filter((p) => p.targetType === "insight")).toHaveLength(0);
+  });
+
   it("skips nodes that already have an insight covering them", async () => {
     writeSession("2026-04-25-1000", "2026-04-25", "a", "[[SPEC-001]]");
     writeSession("2026-04-26-1000", "2026-04-26", "b", "[[SPEC-001]]");

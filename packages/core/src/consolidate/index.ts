@@ -6,6 +6,21 @@ import { listNodeFiles, type NodeFile } from "../vault.js";
 const WIKILINK_RE = /\[\[([A-Z]+-\d+|\d{4}-\d{2}-\d{2}-\d{4})\]\]/g;
 const ID_RE = /\b([A-Z]+-\d+)\b/g;
 
+/**
+ * ID prefixes that represent inbox / workflow metadata, not durable domain entities.
+ * Sessions where the agent triages the inbox naturally repeat PROP-* IDs many
+ * times — counting those repetitions is what produced the dogfood "Pattern around
+ * PROP-XXX" meta-noise (PROP-029, PROP-030 in 2026-05-03). Mirrors the same
+ * filter in `insight/extractFromSession.ts` (WORKFLOW_ID_PREFIXES).
+ */
+const WORKFLOW_ID_PREFIXES = new Set(["PROP", "INBOX", "SESSION"]);
+
+function isWorkflowId(id: string): boolean {
+  const dash = id.indexOf("-");
+  const prefix = dash > 0 ? id.slice(0, dash) : id;
+  return WORKFLOW_ID_PREFIXES.has(prefix);
+}
+
 export interface ConsolidateOptions {
   /** Window in days to consider sessions "recent". Default 30. */
   lookbackDays?: number;
@@ -44,14 +59,20 @@ function withinWindow(sessionDate: string, lookbackDays: number, now: Date): boo
   return Math.abs(ageDays) <= lookbackDays;
 }
 
-/** Extract all node id references from a session — both [[wikilinks]] and bare IDs in body. */
+/**
+ * Extract durable node id references from a session — both [[wikilinks]] and bare
+ * IDs in body. Workflow / inbox prefixes (PROP-, INBOX-, SESSION-) are filtered
+ * out — they're inbox housekeeping, not subject matter, and counting them as
+ * "this session is about X" produced the dogfood "Pattern around PROP-XXX"
+ * meta-noise. See WORKFLOW_ID_PREFIXES above.
+ */
 function collectMentions(body: string): Set<string> {
   const out = new Set<string>();
   for (const m of body.matchAll(WIKILINK_RE)) {
-    if (m[1]) out.add(m[1]);
+    if (m[1] && !isWorkflowId(m[1])) out.add(m[1]);
   }
   for (const m of body.matchAll(ID_RE)) {
-    if (m[1]) out.add(m[1]);
+    if (m[1] && !isWorkflowId(m[1])) out.add(m[1]);
   }
   return out;
 }

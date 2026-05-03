@@ -103,9 +103,20 @@ describe("extractInsightFromSessionBody", () => {
   });
 
   it("emits low confidence (0.25) for ID-recurrence-only signal", () => {
-    const body = "TASK-009 again. TASK-009 once more.";
+    // Threshold is now 3 (raised from 2 in 2026-05-03 to keep the active spec/plan/task
+    // out of the auto-distill stream). Three mentions still hit.
+    const body = "TASK-009 again. TASK-009 once more. TASK-009 once more again.";
     const draft = extractInsightFromSessionBody(body, "session");
     expect(draft?.confidence).toBe(0.25);
+  });
+
+  it("does NOT fire on 2 mentions of an ID (below new threshold of 3)", () => {
+    // The active spec/plan/task is naturally referenced ≥2 times in any substantive
+    // session — at threshold 2 this produced a steady trickle of "Recurring focus on
+    // SPEC-X" drafts (PROP-019..PROP-028 in the dogfood vault). Threshold 3 means
+    // "the session was *about* X," not "X was mentioned in passing twice."
+    const body = "TASK-009 again. TASK-009 once more.";
+    expect(extractInsightFromSessionBody(body, "session")).toBeNull();
   });
 
   it("emits mid confidence (0.5) for a decision-phrase-only signal", () => {

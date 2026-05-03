@@ -135,6 +135,87 @@ describe("runInsightProposeFromSession", () => {
     }
   });
 
+  it("skips active-focus-only when the only repeated IDs are active spec/plan/task", async () => {
+    // Active-focus-only is the dogfood pattern: a session that mentions the active
+    // spec a few times in passing has nothing new to propose — it just confirms
+    // where we already are. Even at threshold-3 (which the heuristic now uses),
+    // a session that's substantively about the active spec shouldn't auto-propose.
+    const repo = seedRepo();
+    // Seed an active spec so buildActiveContext finds it.
+    mkdirSync(join(repo, ".cairndex", "specs"), { recursive: true });
+    writeFileSync(
+      join(repo, ".cairndex", "specs", "SPEC-001-active.md"),
+      "---\nid: SPEC-001\ntitle: Active spec\nstatus: active\ncreated: '2026-05-01'\n---\nbody\n",
+      "utf8",
+    );
+    writeFileSync(
+      join(repo, ".cairndex", "sessions", "2026-05-03-1700.md"),
+      "---\n---\nWorked on SPEC-001 some more. SPEC-001 is the focus. SPEC-001 has a few open questions still.\n",
+      "utf8",
+    );
+    const r = await runInsightProposeFromSession({ cwd: repo, sessionId: "2026-05-03-1700" });
+    expect(r.exitCode).toBe(0);
+    expect(r.skipReason).toBe("active-focus-only");
+    expect(r.proposalId).toBeUndefined();
+    const inbox = join(repo, ".cairndex", "inbox", "proposed-memory-updates");
+    const entries = existsSync(inbox)
+      ? readdirSync(inbox).filter((f) => f.endsWith(".md"))
+      : [];
+    expect(entries).toEqual([]);
+  });
+
+  it("does NOT skip active-focus-only when a decision phrase also fires", async () => {
+    // Decision-bearing drafts have new information even when the related ID happens
+    // to be the active spec. Confidence climbs to 0.6, bypassing the active-focus
+    // check (which only applies to ID-recurrence-only 0.25 drafts).
+    const repo = seedRepo();
+    mkdirSync(join(repo, ".cairndex", "specs"), { recursive: true });
+    writeFileSync(
+      join(repo, ".cairndex", "specs", "SPEC-001-active.md"),
+      "---\nid: SPEC-001\ntitle: Active spec\nstatus: active\ncreated: '2026-05-01'\n---\nbody\n",
+      "utf8",
+    );
+    writeFileSync(
+      join(repo, ".cairndex", "sessions", "2026-05-03-1730.md"),
+      "---\n---\nWe decided to change SPEC-001 to use central-vault-pointer routing for all routes.\nSPEC-001 needs the routing rework. SPEC-001 also covers the fallback path.\n",
+      "utf8",
+    );
+    const r = await runInsightProposeFromSession({ cwd: repo, sessionId: "2026-05-03-1730" });
+    expect(r.exitCode).toBe(0);
+    expect(r.proposalId).toMatch(/^PROP-\d+$/);
+    expect(r.skipReason).toBeUndefined();
+  });
+
+  it("semantic dedupe — second session with same coarse title and same relatedIds is skipped as duplicate", async () => {
+    // Two different sessions write the same decision phrase + the same SPEC-077
+    // mentions. The drafts have identical titles + relatedIds but distinct bodies
+    // (each carries its own `## Source - Session: ...` line). contentHash dedupe
+    // would miss them because the body bytes differ. Semantic dedupe (coarse
+    // title with IDs stripped + sorted link targets) catches them.
+    const repo = seedRepo();
+    // Non-active spec so active-focus-only doesn't fire — we want to exercise
+    // the semantic-dedupe path specifically.
+    mkdirSync(join(repo, ".cairndex", "specs"), { recursive: true });
+    writeFileSync(
+      join(repo, ".cairndex", "specs", "SPEC-077-not-active.md"),
+      "---\nid: SPEC-077\ntitle: Not active spec\nstatus: draft\ncreated: '2026-05-01'\n---\nbody\n",
+      "utf8",
+    );
+    const sessionBody =
+      "---\n---\nWe decided to factor SPEC-077 helpers into a single shared module. SPEC-077 reuses helpers. SPEC-077 helpers ship next.\n";
+    writeFileSync(join(repo, ".cairndex", "sessions", "2026-05-03-1800.md"), sessionBody, "utf8");
+    const first = await runInsightProposeFromSession({ cwd: repo, sessionId: "2026-05-03-1800" });
+    expect(first.proposalId).toBeDefined();
+    expect(first.skipReason).toBeUndefined();
+    // Same body content, different sessionId → distinct draft body bytes
+    // (Source line embeds the sessionId), but the same coarse title and
+    // relatedIds. The first proposal already covers this conceptually.
+    writeFileSync(join(repo, ".cairndex", "sessions", "2026-05-03-1830.md"), sessionBody, "utf8");
+    const second = await runInsightProposeFromSession({ cwd: repo, sessionId: "2026-05-03-1830" });
+    expect(second.skipReason).toBe("duplicate");
+    expect(second.duplicateOf).toBe(first.proposalId);
+  });
+
   it("captures decision phrases from the transcript even when the session body is empty", async () => {
     const repo = seedRepo();
     // Session body is the boilerplate TODO placeholder produced by doctor --auto-session.

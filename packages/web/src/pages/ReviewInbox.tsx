@@ -1,5 +1,6 @@
 import { ProposalDiff } from "@/components/inbox/ProposalDiff";
 import { ProposalPatchView } from "@/components/inbox/ProposalPatchView";
+import { TextWithResolvedIds } from "@/components/InlineNodeRef";
 import {
   useAcceptProposal,
   useInbox,
@@ -41,6 +42,77 @@ function UpdateBodyDiff({ alias, p }: { alias: string; p: Proposal }) {
   return <ProposalDiff currentBody={node.data.body} newBody={p.newBody} />;
 }
 
+/**
+ * Resolves a target node's title for display. Falls back to the bare ID when the
+ * lookup is loading or the target can't be fetched (e.g. target was renamed or
+ * deleted, or this is a "create" proposal with no target yet). The point of the
+ * resolver is the same headline-vs-ID rule: a human reading the inbox cares about
+ * "Tighten retry semantics," not "SPEC-001."
+ */
+function TargetTitle({
+  alias,
+  type,
+  id,
+}: {
+  alias: string;
+  type: string | undefined;
+  id: string | undefined;
+}) {
+  const node = useNode(alias, type, id);
+  if (!id) return <span className="italic text-muted-foreground">(new)</span>;
+  const title =
+    node.data?.frontmatter && typeof (node.data.frontmatter as { title?: unknown }).title === "string"
+      ? ((node.data.frontmatter as { title: string }).title)
+      : null;
+  return (
+    <span className="italic" title={id}>
+      {title ?? id}
+    </span>
+  );
+}
+
+/**
+ * Strip the auto-distill summary prefix when present so the card headline is the
+ * actual insight title rather than the bookkeeping word "Auto-distilled insight."
+ * The "AUTO" badge already conveys the heuristic provenance — no need to
+ * substitute the headline; we want the user to see *what* the heuristic flagged
+ * so they can scan a stack of pending PROPs and reject only the noise.
+ *
+ * Returns the original summary unchanged when no recognized prefix matches.
+ */
+function summaryHeadline(summary: string): string {
+  const a = summary.match(/^Auto-distilled insight:\s*(.+)$/);
+  if (a) return a[1] ?? summary;
+  return summary;
+}
+
+/**
+ * Friendly per-type verb for the action line. "update spec" reads as a database
+ * operation; "Edit to a spec" reads as a thing the human is being asked to
+ * approve. Falls back to a generic phrasing for unknown combinations.
+ */
+function actionPhrase(proposalType: "create" | "update", targetType: string): string {
+  const isUpdate = proposalType === "update";
+  switch (targetType) {
+    case "spec":
+      return isUpdate ? "Edit to a spec" : "New spec";
+    case "decision":
+      return isUpdate ? "Edit to a decision" : "New decision";
+    case "plan":
+      return isUpdate ? "Edit to a plan" : "New plan";
+    case "task":
+      return isUpdate ? "Edit to a task" : "New task";
+    case "goal":
+      return isUpdate ? "Edit to a goal" : "New goal";
+    case "insight":
+      return isUpdate ? "Edit to an insight" : "New insight";
+    case "question":
+      return isUpdate ? "Edit to a question" : "New question";
+    default:
+      return `${isUpdate ? "Edit to" : "New"} ${targetType}`;
+  }
+}
+
 function ProposalCard({
   alias,
   p,
@@ -58,41 +130,85 @@ function ProposalCard({
   const [rejectReason, setRejectReason] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const targetLink =
-    p.target && p.targetType ? (
-      <Link
-        to={nodeLink(alias, p.targetType, p.target)}
-        className="font-mono text-primary hover:underline"
-      >
-        {p.target}
-      </Link>
-    ) : (
-      <span className="font-mono text-muted-foreground">(new)</span>
-    );
+  // Both heuristic-only paths get the "auto" badge: extractFromSession
+  // (auto-distill) and the consolidate sweep (cairndex-consolidate). They produce
+  // proposals without an explicit agent decision behind them — the human reviewer
+  // needs to know that at a glance to calibrate trust.
+  const isAutoDistill =
+    p.provenance.createdBy === "auto-distill" ||
+    p.provenance.createdBy === "cairndex-consolidate";
+  const isLowConf =
+    typeof p.provenance.confidence === "number" && p.provenance.confidence < 0.5;
+  const headline = summaryHeadline(p.summary);
 
   return (
     <article className="rounded border bg-card text-card-foreground p-4 space-y-2">
-      <div className="flex items-center gap-3 text-sm flex-wrap">
-        <span className="font-mono text-primary">{p.proposalId}</span>
-        <span className="text-xs uppercase tracking-wide text-muted-foreground rounded bg-muted px-1.5 py-0.5">
-          {p.proposalType}
-        </span>
-        <span className="text-xs text-muted-foreground">{p.targetType}/</span>
-        {targetLink}
-        {p.acceptedBy === "auto" ? (
-          <span
-            className="text-xs rounded bg-amber-100 text-amber-900 dark:bg-amber-950/40 dark:text-amber-300 px-1.5 py-0.5"
-            title="Auto-accepted because the proposal's confidence cleared your autoAcceptConfidenceThreshold preference."
-          >
-            ⚡ auto-accepted
-          </span>
-        ) : null}
-        {p.status !== "pending" ? (
-          <span className="ml-auto text-xs text-muted-foreground uppercase">{p.status}</span>
-        ) : null}
+      {/* Headline — the human-readable summary lifted to the top. The PROP ID and
+          the target ID are agent surface and live in the action-line + tooltip
+          below so they don't compete for the eye. */}
+      <div className="flex items-start gap-3">
+        <h4 className="text-base font-medium leading-snug flex-1">
+          <TextWithResolvedIds alias={alias} text={headline} />
+        </h4>
+        <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
+          {isAutoDistill ? (
+            <span
+              className="text-[10px] uppercase tracking-wide rounded bg-amber-100 text-amber-900 dark:bg-amber-950/40 dark:text-amber-300 px-1.5 py-0.5"
+              title="Auto-distilled by a heuristic — review carefully. Not an explicit agent decision."
+            >
+              auto
+            </span>
+          ) : null}
+          {isLowConf ? (
+            <span
+              className="text-[10px] uppercase tracking-wide rounded bg-muted text-muted-foreground px-1.5 py-0.5"
+              title="Heuristic confidence below 0.5 — likely noise."
+            >
+              low conf
+            </span>
+          ) : null}
+          {p.acceptedBy === "auto" ? (
+            <span
+              className="text-[10px] uppercase tracking-wide rounded bg-amber-100 text-amber-900 dark:bg-amber-950/40 dark:text-amber-300 px-1.5 py-0.5"
+              title="Auto-accepted because the proposal's confidence cleared your autoAcceptConfidenceThreshold preference."
+            >
+              ⚡ auto-accepted
+            </span>
+          ) : null}
+          {p.status !== "pending" ? (
+            <span className="text-[10px] uppercase tracking-wide rounded bg-muted text-muted-foreground px-1.5 py-0.5">
+              {p.status}
+            </span>
+          ) : null}
+        </div>
       </div>
-      <div className="text-sm font-medium">{p.summary}</div>
-      {p.reason ? <div className="text-xs text-muted-foreground">Reason: {p.reason}</div> : null}
+
+      {/* Action line — what the proposal does, in English. PROP ID is a small
+          muted link at the end (still useful for cross-reference / debugging /
+          CLI handoff, but not the headline). */}
+      <div className="text-xs text-muted-foreground flex flex-wrap items-baseline gap-x-1.5">
+        <span>{actionPhrase(p.proposalType, p.targetType)}:</span>
+        {p.target && p.targetType ? (
+          <Link
+            to={nodeLink(alias, p.targetType, p.target)}
+            className="text-primary hover:underline"
+          >
+            <TargetTitle alias={alias} type={p.targetType} id={p.target} />
+          </Link>
+        ) : (
+          <span className="italic">(new {p.targetType})</span>
+        )}
+        <span className="text-muted-foreground/70">·</span>
+        <span className="font-mono text-muted-foreground/80" title={`Proposal id: ${p.proposalId}`}>
+          {p.proposalId}
+        </span>
+      </div>
+
+      {p.reason ? (
+        <div className="text-xs text-muted-foreground">
+          Why: <TextWithResolvedIds alias={alias} text={p.reason} />
+        </div>
+      ) : null}
       <div className="text-xs text-muted-foreground">
         Proposed by <span className="font-mono">{p.provenance.createdBy}</span> · session{" "}
         <span className="font-mono">{p.provenance.session}</span>

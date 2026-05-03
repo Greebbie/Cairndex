@@ -58,11 +58,11 @@ export function ActivePlanPanel({ alias, state }: Props) {
         <div className="text-sm">
           <Link
             to={nodeLink(alias, "plan", activePlanId)}
-            className="font-mono text-primary hover:underline"
+            title={activePlanId}
+            className="italic text-foreground hover:underline"
           >
-            {activePlanId}
-          </Link>{" "}
-          — {state.activePlan?.title ?? ""}
+            {state.activePlan?.title ?? activePlanId}
+          </Link>
         </div>
       ) : (
         <div className="text-sm text-muted-foreground italic">
@@ -72,8 +72,7 @@ export function ActivePlanPanel({ alias, state }: Props) {
 
       {total === 0 ? (
         <div className="text-sm text-muted-foreground">
-          No tasks linked to this plan yet. Tasks pick up the link via{" "}
-          <code className="font-mono text-xs">links: [PLAN-XXX]</code> in their frontmatter.
+          No tasks linked to this plan yet — pick one with the Switch action in Project State above.
         </div>
       ) : (
         <>

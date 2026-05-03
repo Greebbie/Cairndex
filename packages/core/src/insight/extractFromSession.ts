@@ -8,8 +8,15 @@
  * Heuristics applied (intentionally simple — false positives are cheap because the
  * proposal goes to the inbox, not directly to canonical memory):
  *   - decision-like phrases ("decided to ...", "we chose ...", "agreed to ...")
- *   - repeated ID references (≥2 mentions of the same SPEC/ADR/PLAN/TASK id)
+ *   - repeated ID references (≥3 mentions of the same SPEC/ADR/PLAN/TASK id)
  *   - if neither signal fires, return null — no insight to propose
+ *
+ * The repeated-ID threshold is 3 (not 2): the *active* spec/plan/task naturally
+ * crosses 2 mentions in any non-trivial session, so 2 produces a constant trickle
+ * of low-confidence "Recurring focus on SPEC-X" drafts that crowd the inbox.
+ * Threshold 3 means "this session was *substantively* about X," which is rarer
+ * and more likely to be real signal. (The CLI caller layers an additional
+ * active-focus-only skip on top — see runInsightProposeFromSession.)
  */
 
 export interface SessionInsightDraft {
@@ -115,7 +122,7 @@ function extractIdMentions(text: string): Map<string, number> {
   return counts;
 }
 
-function repeatedIds(counts: Map<string, number>, threshold = 2): string[] {
+function repeatedIds(counts: Map<string, number>, threshold = 3): string[] {
   return Array.from(counts.entries())
     .filter(([, n]) => n >= threshold)
     .map(([id]) => id)
