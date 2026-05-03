@@ -7,7 +7,7 @@
 [![Node.js](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org/)
 [![pnpm](https://img.shields.io/badge/pnpm-%3E%3D9-orange.svg)](https://pnpm.io/)
 
-Think **Obsidian-style typed Markdown vault** + **Claude Code / MCP** + the
+Think **Structured Markdown vault** + **Claude Code / MCP** + the
 **Building a Second Brain** methodology, fused for AI-assisted coding.
 
 Your project's goals, specs, decisions, plans, tasks, sessions, and insights
