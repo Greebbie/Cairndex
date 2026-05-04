@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import {
   completeTask,
   defaultConfig,
@@ -7,8 +9,6 @@ import {
   vaultExists,
   vaultPath,
 } from "@cairndex/core";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
 import { missingVaultMessage } from "../utils/missingVaultMessage.js";
 import { resolveMemoryRoot } from "../utils/resolveMemoryRoot.js";
 

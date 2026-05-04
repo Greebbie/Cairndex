@@ -61,7 +61,10 @@ describe("GET /api/vault/:alias/implementation", () => {
     const app = await makeApp();
     const r = await app.inject({ method: "GET", url: "/api/vault/demo/implementation" });
     expect(r.statusCode).toBe(200);
-    const body = r.json() as { entries: Array<{ taskId: string }>; byPlan: Record<string, string[]> };
+    const body = r.json() as {
+      entries: Array<{ taskId: string }>;
+      byPlan: Record<string, string[]>;
+    };
     expect(body.entries.map((e) => e.taskId)).toEqual(["TASK-001"]);
     expect(body.byPlan["(unlinked)"]).toEqual(["TASK-001"]);
     await app.close();

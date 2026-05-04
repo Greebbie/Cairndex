@@ -5,7 +5,7 @@ import { join } from "node:path";
 import type { ProjectEntry } from "@cairndex/core";
 import yaml from "js-yaml";
 import { afterEach, describe, expect, it } from "vitest";
-import { createServer, type OnboardingHooks } from "../src/index.js";
+import { type OnboardingHooks, createServer } from "../src/index.js";
 
 interface Fixture {
   vaultRoot: string;

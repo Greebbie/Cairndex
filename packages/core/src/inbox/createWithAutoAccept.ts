@@ -1,7 +1,7 @@
 import type { Config } from "../config.js";
 import { readUserPreferences } from "../userPrefs.js";
 import { acceptProposal } from "./accept.js";
-import { createProposal, type CreateProposalResult } from "./create.js";
+import { type CreateProposalResult, createProposal } from "./create.js";
 import type { AcceptResult, CreateProposalInput } from "./types.js";
 
 /**
@@ -51,8 +51,7 @@ export async function createWithAutoAccept(
   const threshold = prefs.autoAcceptConfidenceThreshold;
   const conf = input.provenance.confidence;
 
-  const eligible =
-    threshold !== null && typeof conf === "number" && conf >= threshold;
+  const eligible = threshold !== null && typeof conf === "number" && conf >= threshold;
 
   if (!eligible) {
     return { ...created, autoAccepted: false, thresholdAtDecision: threshold };

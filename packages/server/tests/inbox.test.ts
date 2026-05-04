@@ -141,7 +141,7 @@ describe("POST /api/vault/:alias/inbox/propose — auto-accept gate", () => {
       expect(specBody).toMatch(/old body/);
       await app.close();
     } finally {
-      delete process.env.CAIRNDEX_HOME;
+      process.env.CAIRNDEX_HOME = undefined;
       rmSync(home, { recursive: true, force: true });
     }
   });
@@ -175,7 +175,7 @@ describe("POST /api/vault/:alias/inbox/propose — auto-accept gate", () => {
       expect(specBody).toMatch(/shiny auto-accepted body/);
       await app.close();
     } finally {
-      delete process.env.CAIRNDEX_HOME;
+      process.env.CAIRNDEX_HOME = undefined;
       rmSync(home, { recursive: true, force: true });
     }
   });

@@ -60,9 +60,7 @@ describe("central vault end-to-end", () => {
     expect(ctx.exitCode).toBe(0);
     expect(ctx.outputPath).toBeDefined();
     expect(
-      ctx.outputPath?.includes(
-        join(vaultRoot, "projects", "demo", "indexes", "context-packs"),
-      ),
+      ctx.outputPath?.includes(join(vaultRoot, "projects", "demo", "indexes", "context-packs")),
     ).toBe(true);
 
     const emit = await runEmitClaudeMd({

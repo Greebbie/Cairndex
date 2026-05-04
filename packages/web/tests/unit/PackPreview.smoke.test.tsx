@@ -30,7 +30,13 @@ const packPayload = {
 
 const packListPayload = {
   packs: [
-    { packId: "pack-fix-web-e2e-abc12345", task: "fix web e2e", builtAt: "2026-05-02T01:00:00Z", tokenEstimate: 6234, path: "/tmp/pack.md" },
+    {
+      packId: "pack-fix-web-e2e-abc12345",
+      task: "fix web e2e",
+      builtAt: "2026-05-02T01:00:00Z",
+      tokenEstimate: 6234,
+      path: "/tmp/pack.md",
+    },
   ],
 };
 

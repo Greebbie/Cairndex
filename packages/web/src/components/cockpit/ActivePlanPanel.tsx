@@ -46,10 +46,7 @@ export function ActivePlanPanel({ alias, state }: Props) {
         <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
           Plan progress
         </h3>
-        <Link
-          to={`/p/${alias}/implementation`}
-          className="text-xs text-primary hover:underline"
-        >
+        <Link to={`/p/${alias}/implementation`} className="text-xs text-primary hover:underline">
           Full implementation line →
         </Link>
       </div>
@@ -87,6 +84,7 @@ export function ActivePlanPanel({ alias, state }: Props) {
                 aria-valuemin={0}
                 aria-valuemax={100}
                 aria-label={`${pctDone}% of plan tasks done`}
+                tabIndex={0}
               />
             </div>
             <div className="text-xs text-muted-foreground flex flex-wrap gap-x-4">
@@ -106,9 +104,7 @@ export function ActivePlanPanel({ alias, state }: Props) {
 
           {recentDone.length > 0 ? (
             <div>
-              <div className="text-xs font-medium text-muted-foreground mb-1">
-                Recently shipped
-              </div>
+              <div className="text-xs font-medium text-muted-foreground mb-1">Recently shipped</div>
               <ul className="text-sm space-y-1">
                 {recentDone.map((e) => (
                   <li key={e.taskId} className="flex gap-2 items-baseline">

@@ -63,9 +63,7 @@ export default function SettingsCustomTypes() {
       return;
     }
     // Don't let users overwrite a built-in by accident
-    const builtIn = (typesQ.data?.types ?? []).find(
-      (t) => t.builtIn && t.name === trimmedName,
-    );
+    const builtIn = (typesQ.data?.types ?? []).find((t) => t.builtIn && t.name === trimmedName);
     if (builtIn) {
       setError(`"${trimmedName}" is a built-in type — pick a different name.`);
       return;
@@ -89,7 +87,11 @@ export default function SettingsCustomTypes() {
   };
 
   const onDelete = (typeName: string): void => {
-    if (!confirm(`Remove custom type "${typeName}"?\n\nThis only removes the configuration entry — files in the folder are NOT deleted.`)) {
+    if (
+      !confirm(
+        `Remove custom type "${typeName}"?\n\nThis only removes the configuration entry — files in the folder are NOT deleted.`,
+      )
+    ) {
       return;
     }
     const nextNodeTypes: Record<string, { folder: string; id_prefix: string }> = {
@@ -109,8 +111,8 @@ export default function SettingsCustomTypes() {
         <p className="text-xs text-muted-foreground">
           Add your own first-class types beyond the built-ins (spec, decision, plan, task, …).
           Examples: <code>experiment</code>, <code>risk</code>, <code>hypothesis</code>. They show
-          up in Browse and don't trigger doctor warnings. Pair with a Rules entry to tell the
-          agent how to write them.
+          up in Browse and don't trigger doctor warnings. Pair with a Rules entry to tell the agent
+          how to write them.
         </p>
       </div>
 

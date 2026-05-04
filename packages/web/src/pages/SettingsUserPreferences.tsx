@@ -76,8 +76,8 @@ export default function SettingsUserPreferences() {
     <div className="space-y-5">
       <p className="text-xs text-muted-foreground">
         These preferences are <strong>machine-scoped</strong> and live at{" "}
-        <code>{`~/${".cairndex"}/preferences.yaml`}</code>. Vault config takes precedence where
-        keys overlap — your personal defaults apply only when the active vault hasn't set them.
+        <code>{`~/${".cairndex"}/preferences.yaml`}</code>. Vault config takes precedence where keys
+        overlap — your personal defaults apply only when the active vault hasn't set them.
       </p>
       <form onSubmit={onSubmit} className="space-y-4 max-w-md">
         <label className="block">
@@ -101,9 +101,7 @@ export default function SettingsUserPreferences() {
             type="number"
             min={1}
             value={form.defaultFreshnessWarnDays}
-            onChange={(e) =>
-              setForm({ ...form, defaultFreshnessWarnDays: e.target.value })
-            }
+            onChange={(e) => setForm({ ...form, defaultFreshnessWarnDays: e.target.value })}
             placeholder="30"
             className="mt-1 w-32 px-2 py-1 text-sm border border-border rounded bg-background"
           />
@@ -119,9 +117,7 @@ export default function SettingsUserPreferences() {
             max={1}
             step={0.05}
             value={form.autoAcceptConfidenceThreshold}
-            onChange={(e) =>
-              setForm({ ...form, autoAcceptConfidenceThreshold: e.target.value })
-            }
+            onChange={(e) => setForm({ ...form, autoAcceptConfidenceThreshold: e.target.value })}
             placeholder="0.85"
             className="mt-1 w-32 px-2 py-1 text-sm border border-border rounded bg-background"
           />
@@ -157,9 +153,7 @@ export default function SettingsUserPreferences() {
           </button>
           {savedFlash && <span className="text-sm text-green-600">Saved</span>}
           {update.isError && (
-            <span className="text-sm text-destructive">
-              Error: {String(update.error)}
-            </span>
+            <span className="text-sm text-destructive">Error: {String(update.error)}</span>
           )}
         </div>
       </form>

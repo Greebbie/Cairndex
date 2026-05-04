@@ -24,8 +24,7 @@ export function renderAgentSurface(
     const cur = ctx.activePlan.currentTaskId ? ` → current ${ctx.activePlan.currentTaskId}` : "";
     lines.push(`Active plan: ${ctx.activePlan.id}${cur}`);
   }
-  if (ctx.currentTask)
-    lines.push(`Current task: ${ctx.currentTask.id} — ${ctx.currentTask.title}`);
+  if (ctx.currentTask) lines.push(`Current task: ${ctx.currentTask.id} — ${ctx.currentTask.title}`);
   if (ctx.nextAction) lines.push(`Next action: ${ctx.nextAction}`);
   lines.push("");
   lines.push(

@@ -2,12 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  configPath,
-  inboxProposalsPath,
-  nodeFolderPath,
-  vaultPath,
-} from "../src/paths.js";
+import { configPath, inboxProposalsPath, nodeFolderPath, vaultPath } from "../src/paths.js";
 
 /**
  * Regression: a repo with a `.cairndex-project.yaml` pointer must have its memory
@@ -48,9 +43,7 @@ describe("vaultPath: central-vault pointer following", () => {
     const { repo, vault } = setup();
     const projectRoot = join(vault, "projects", "demo");
     expect(configPath(repo)).toBe(join(projectRoot, "config.yaml"));
-    expect(inboxProposalsPath(repo)).toBe(
-      join(projectRoot, "inbox", "proposed-memory-updates"),
-    );
+    expect(inboxProposalsPath(repo)).toBe(join(projectRoot, "inbox", "proposed-memory-updates"));
     expect(nodeFolderPath(repo, "specs")).toBe(join(projectRoot, "specs"));
   });
 
@@ -64,11 +57,7 @@ describe("vaultPath: central-vault pointer following", () => {
   it("malformed pointer (missing fields) falls back to legacy without throwing", () => {
     const repo = mkdtempSync(join(tmpdir(), "cairn-vp-malformed-"));
     dirs.push(repo);
-    writeFileSync(
-      join(repo, ".cairndex-project.yaml"),
-      "vault:\n  - not\n  - a string\n",
-      "utf8",
-    );
+    writeFileSync(join(repo, ".cairndex-project.yaml"), "vault:\n  - not\n  - a string\n", "utf8");
     expect(vaultPath(repo)).toBe(join(repo, ".cairndex"));
   });
 

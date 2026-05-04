@@ -24,7 +24,14 @@ describe("acceptProposal — provenance preservation (create branch)", () => {
     const r = mkdtempSync(join(tmpdir(), "cairn-prov-"));
     dirs.push(r);
     // Pre-create the durable folders so accept's nodeFolderPath finds them.
-    for (const sub of ["specs", "decisions", "plans", "tasks", "insights", "inbox/proposed-memory-updates"]) {
+    for (const sub of [
+      "specs",
+      "decisions",
+      "plans",
+      "tasks",
+      "insights",
+      "inbox/proposed-memory-updates",
+    ]) {
       mkdirSync(join(r, ".cairndex", sub), { recursive: true });
     }
     return r;

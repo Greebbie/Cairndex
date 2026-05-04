@@ -142,8 +142,7 @@ describe("runContext", () => {
   it("respects custom budget via opts.budget", async () => {
     setup({
       "index.md": baseIndex,
-      "sessions/2026-05-01-1000.md":
-        "---\nid: 2026-05-01-1000\ndate: 2026-05-01\nsummary: 'a'\n---\n" + "x".repeat(40_000) + "\n",
+      "sessions/2026-05-01-1000.md": `---\nid: 2026-05-01-1000\ndate: 2026-05-01\nsummary: 'a'\n---\n${"x".repeat(40_000)}\n`,
     });
     const r = await runContext({ cwd: tmp, task: "x", emitStdout: false, budget: 200 });
     expect(r.exitCode).toBe(0);

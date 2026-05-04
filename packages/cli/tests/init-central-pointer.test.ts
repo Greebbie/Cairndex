@@ -69,10 +69,7 @@ describe("runInit (central-pointer layout)", () => {
     });
     const settingsPath = join(repo, ".claude", "settings.json");
     expect(existsSync(settingsPath)).toBe(true);
-    const settings = JSON.parse(
-      // biome-ignore lint/correctness/noNodejsModules: tests load from disk
-      require("node:fs").readFileSync(settingsPath, "utf8"),
-    ) as {
+    const settings = JSON.parse(require("node:fs").readFileSync(settingsPath, "utf8")) as {
       hooks?: { SessionStart?: unknown; Stop?: unknown };
       mcpServers?: { cairndex?: unknown };
     };

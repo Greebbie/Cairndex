@@ -132,11 +132,10 @@ describe("Dashboard (smoke)", () => {
       </Wrapper>,
     );
     expect(await screen.findByText("Project State")).toBeDefined();
-    // "Agent Context" panel was removed from the dashboard front door — the
-    // pack composer remains reachable at /p/:alias/pack but doesn't take
-    // dashboard real estate from the vibe coder. Asserting it is GONE here
-    // pins the design rule against accidental re-mount.
-    expect(screen.queryByText("Agent Context")).toBeNull();
+    // Agent Context is on the dashboard front door so stale/current context-pack
+    // state is visible without asking the user to know about the Pack page.
+    expect(await screen.findByText("Agent Context")).toBeDefined();
+    expect(await screen.findByText("pack-fix-web-e2e-abc12345")).toBeDefined();
     // Memory Health panel renders only when red+yellow > 0 (this fixture has
     // red:1, yellow:3). The heading is now "Vault status" — humans don't
     // think of their project notes as "memory."

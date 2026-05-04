@@ -97,7 +97,11 @@ export default function SettingsRules() {
         <p className="text-xs text-muted-foreground">
           Markdown rules the agent reads in every context pack. Author your own to enforce
           conventions, schemas, or behaviors specific to this project. Files live under{" "}
-          {list.data ? <code className="font-mono text-xs">{list.data.dir}</code> : "the rules folder"}
+          {list.data ? (
+            <code className="font-mono text-xs">{list.data.dir}</code>
+          ) : (
+            "the rules folder"
+          )}
           .
         </p>
       </div>
@@ -147,11 +151,11 @@ export default function SettingsRules() {
           {isNew && (
             <label className="block">
               <span className="text-xs text-muted-foreground">
-                Rule name (letters, digits, dot, dash, underscore — no spaces, .md is added automatically)
+                Rule name (letters, digits, dot, dash, underscore — no spaces, .md is added
+                automatically)
               </span>
               <input
                 type="text"
-                autoFocus
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="my-team-conventions"

@@ -100,11 +100,11 @@ export function listMcpTools(projectId: string = LEGACY_PROJECT_ID): ListToolsRe
       {
         name: "context_pack",
         description:
-          "Build a token-budgeted context pack for the current vault state. Returns the rendered Markdown body. The optional `task` is a label only — it does not affect selection (rules-only).",
+          "Build a token-budgeted context pack for the current vault state. Returns the rendered Markdown body. The optional `task` is a focus hint: direct node IDs and strong title matches pull in related memory.",
         inputSchema: {
           type: "object",
           properties: {
-            task: { type: "string", description: "Task label for logging/caching" },
+            task: { type: "string", description: "Task label or focus hint" },
             budget: {
               type: "integer",
               description: "Override token budget (default 8000)",

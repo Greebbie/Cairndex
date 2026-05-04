@@ -12,7 +12,8 @@ import { Link, Navigate, useParams } from "react-router-dom";
 function PlanTitle({ alias, planId }: { alias: string; planId: string }) {
   const node = useNode(alias, "plan", planId);
   const title =
-    node.data?.frontmatter && typeof (node.data.frontmatter as { title?: unknown }).title === "string"
+    node.data?.frontmatter &&
+    typeof (node.data.frontmatter as { title?: unknown }).title === "string"
       ? (node.data.frontmatter as { title: string }).title
       : null;
   return <span className="italic">{title ?? planId}</span>;
@@ -83,7 +84,9 @@ export default function Implementation() {
 
   if (!alias) {
     if (projects.data && projects.data.length === 0) return <Navigate to="/onboard" replace />;
-    return <div className="p-8 text-sm text-muted-foreground">Pick a project from the sidebar.</div>;
+    return (
+      <div className="p-8 text-sm text-muted-foreground">Pick a project from the sidebar.</div>
+    );
   }
 
   if (line.isLoading) {
@@ -119,16 +122,16 @@ export default function Implementation() {
       <header className="space-y-1">
         <h2 className="text-2xl font-semibold">Implementation</h2>
         <p className="text-sm text-muted-foreground">
-          Tasks grouped by plan, in priority order: shipped first (newest), then in
-          progress, then pending. Updated{" "}
+          Tasks grouped by plan, in priority order: shipped first (newest), then in progress, then
+          pending. Updated{" "}
           <span title={data.generatedAt}>{humanizeDateString(data.generatedAt)}</span>.
         </p>
       </header>
 
       {data.entries.length === 0 ? (
         <div className="text-sm text-muted-foreground">
-          No tasks yet. Add one with <code>cairndex inbox propose --target-type task …</code> or
-          via the dashboard's Switch picker.
+          No tasks yet. Add one with <code>cairndex inbox propose --target-type task …</code> or via
+          the dashboard's Switch picker.
         </div>
       ) : (
         planOrder.map((planKey) => {

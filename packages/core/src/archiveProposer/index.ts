@@ -6,7 +6,7 @@ import { parseFrontmatter } from "../frontmatter.js";
 import { createProposal, findDuplicate } from "../inbox/create.js";
 import { indexPath } from "../paths.js";
 import type { NodeType } from "../types.js";
-import { listNodeFiles, type NodeFile } from "../vault.js";
+import { type NodeFile, listNodeFiles } from "../vault.js";
 
 const MS_PER_DAY = 86_400_000;
 
@@ -131,7 +131,9 @@ function buildArchiveBody(
   lines.push("- frontmatter `status` flips to `archived`");
   lines.push(`- watcher moves the file under \`${archiveDestinationHint(projectId)}\``);
   lines.push("");
-  lines.push("_Reject if this node is still authoritative — the proposer will not re-suggest the same body._");
+  lines.push(
+    "_Reject if this node is still authoritative — the proposer will not re-suggest the same body._",
+  );
   return lines.join("\n");
 }
 

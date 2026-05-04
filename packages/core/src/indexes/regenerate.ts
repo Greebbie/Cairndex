@@ -1,10 +1,7 @@
 import type { Config } from "../config.js";
 import { type ActiveContext, regenerateActiveContext } from "./activeContext.js";
 import { type BacklinksSnapshot, regenerateBacklinksSnapshot } from "./backlinksSnapshot.js";
-import {
-  type ImplementationLine,
-  regenerateImplementationLine,
-} from "./implementationLine.js";
+import { type ImplementationLine, regenerateImplementationLine } from "./implementationLine.js";
 import { type MemoryHealth, regenerateMemoryHealth } from "./memoryHealth.js";
 import { type NodeSummary, regenerateNodeSummary } from "./nodeSummary.js";
 
@@ -53,7 +50,6 @@ export async function regenerateAllIndexes(
       backlinks: bl.snapshot,
       implementationLine: il.line,
     },
-    anyChanged:
-      ac.changed || ns.changed || mh.changed || bl.changed || il.changed,
+    anyChanged: ac.changed || ns.changed || mh.changed || bl.changed || il.changed,
   };
 }

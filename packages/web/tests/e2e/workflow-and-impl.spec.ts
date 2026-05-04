@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
+import { getFreePort } from "./ports";
 
 /**
  * E2E coverage for Phase 1-3 features that don't yet have a Playwright
@@ -20,13 +21,14 @@ import { expect, test } from "@playwright/test";
 let proc: ChildProcess;
 let vaultRoot: string;
 let home: string;
-const PORT = 7891;
+let PORT: number;
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO = join(__dirname, "..", "..", "..", "..");
 
 let projectRoot: string;
 
 test.beforeAll(async () => {
+  PORT = await getFreePort();
   vaultRoot = mkdtempSync(join(tmpdir(), "cairn-wi-vault-"));
   home = mkdtempSync(join(tmpdir(), "cairn-wi-home-"));
   writeFileSync(join(vaultRoot, "vault.yaml"), "schemaVersion: 1\ntitle: E2E Vault\n");
@@ -150,8 +152,8 @@ test.describe("read-only views", () => {
     await expect(page.getByRole("heading", { name: "Implementation" })).toBeVisible({
       timeout: 10_000,
     });
-    // PLAN-001 group header is the linked plan id at the top of the section.
-    const planLink = page.getByRole("link", { name: "PLAN-001" });
+    // The group header leads with the plan title; the ID lives in the link title.
+    const planLink = page.getByRole("link", { name: "First plan" });
     await expect(planLink.first()).toBeVisible();
     // The done task should appear in the table with the "Done" status badge.
     await expect(page.getByText("TASK-002").first()).toBeVisible();
@@ -161,9 +163,7 @@ test.describe("read-only views", () => {
     await expect(page).toHaveURL(/\/p\/demo\/browse\/task\/TASK-002$/);
   });
 
-  test("Sidebar has the Implementation link and it routes to /implementation", async ({
-    page,
-  }) => {
+  test("Sidebar has the Implementation link and it routes to /implementation", async ({ page }) => {
     await page.goto(`http://localhost:${PORT}/p/demo`);
     await expect(page.getByRole("heading", { name: "demo" })).toBeVisible({ timeout: 10_000 });
     await page.getByRole("link", { name: "Implementation" }).click();
@@ -171,9 +171,7 @@ test.describe("read-only views", () => {
     await expect(page.getByRole("heading", { name: "Implementation" })).toBeVisible();
   });
 
-  test("ActivePlanPanel shows the plan and progress counts on the dashboard", async ({
-    page,
-  }) => {
+  test("ActivePlanPanel shows the plan and progress counts on the dashboard", async ({ page }) => {
     await page.goto(`http://localhost:${PORT}/p/demo`);
     // Scope to the panel by its heading — the same words ("pending", "in progress")
     // appear inside the WorkflowActions Switch dropdown's option text on this
@@ -198,8 +196,8 @@ test.describe("read-only views", () => {
     await expect(card).toBeVisible({ timeout: 10_000 });
     // The events list should include the mid-turn entries between the two
     // `Session ... recorded` boundary lines.
-    await expect(card.getByText(/Accepted PROP-003/)).toBeVisible();
-    await expect(card.getByText(/Rejected PROP-005/)).toBeVisible();
+    await expect(card.getByText(/Accepted:/)).toBeVisible();
+    await expect(card.getByText(/Rejected a proposal/)).toBeVisible();
     await expect(card.getByText(/task switch → TASK-001/)).toBeVisible();
     // The trailing `Session 2026-05-02-2242 recorded` line is the boundary,
     // not narrative — the card's filter should suppress it from the events list.
@@ -209,150 +207,138 @@ test.describe("read-only views", () => {
   });
 });
 
-test.describe.serial("smart inbox: auto-accept + create/update split", () => {
-  // Threshold is set on this fixture's CAIRNDEX_HOME (a preferences.yaml the
-  // server reads at request time). The test seeds preferences before opening
-  // the page, then verifies:
-  //   1. an agent-proposed PROP with confidence >= threshold lands in
-  //      `accepted` status with `acceptedBy: auto` written to its frontmatter
-  //   2. the durable target on disk reflects the auto-applied content
-  //   3. the UI surfaces the auto-accept banner + ⚡ badge in Recently accepted
-  //   4. a mixed inbox renders "New content" + "Updates" subsection headings
+test.describe
+  .serial("smart inbox: auto-accept + create/update split", () => {
+    // Threshold is set on this fixture's CAIRNDEX_HOME (a preferences.yaml the
+    // server reads at request time). The test seeds preferences before opening
+    // the page, then verifies:
+    //   1. an agent-proposed PROP with confidence >= threshold lands in
+    //      `accepted` status with `acceptedBy: auto` written to its frontmatter
+    //   2. the durable target on disk reflects the auto-applied content
+    //   3. the UI surfaces the auto-accept banner + ⚡ badge in Recently accepted
+    //   4. a mixed inbox renders "New content" + "Updates" subsection headings
 
-  test("auto-accept gate fires when user threshold is set + UI renders ⚡ badge", async ({
-    page,
-  }) => {
-    // Set the threshold on this fixture's HOME by writing preferences.yaml.
-    const prefsPath = join(home, "preferences.yaml");
-    writeFileSync(
-      prefsPath,
-      "schemaVersion: 1\nautoAcceptConfidenceThreshold: 0.4\n",
-      "utf8",
-    );
-    // Submit a proposal with confidence 0.6 (cleared the 0.4 gate).
-    const propRes = await fetch(`http://localhost:${PORT}/api/vault/demo/inbox/propose`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        proposalType: "create",
-        targetType: "insight",
-        newFrontmatter: {
-          title: "Auto-accepted via E2E",
-          status: "active",
-          created: "2026-05-03",
-        },
-        newBody: "auto-accepted body\n",
-        summary: "agent-proposed insight",
-        reason: "high signal",
-        provenance: { createdBy: "agent", session: "e2e", confidence: 0.6 },
-      }),
+    test("auto-accept gate fires when user threshold is set + UI renders ⚡ badge", async ({
+      page,
+    }) => {
+      // Set the threshold on this fixture's HOME by writing preferences.yaml.
+      const prefsPath = join(home, "preferences.yaml");
+      writeFileSync(prefsPath, "schemaVersion: 1\nautoAcceptConfidenceThreshold: 0.4\n", "utf8");
+      // Submit a proposal with confidence 0.6 (cleared the 0.4 gate).
+      const propRes = await fetch(`http://localhost:${PORT}/api/vault/demo/inbox/propose`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          proposalType: "create",
+          targetType: "insight",
+          newFrontmatter: {
+            title: "Auto-accepted via E2E",
+            status: "active",
+            created: "2026-05-03",
+          },
+          newBody: "auto-accepted body\n",
+          summary: "agent-proposed insight",
+          reason: "high signal",
+          provenance: { createdBy: "agent", session: "e2e", confidence: 0.6 },
+        }),
+      });
+      expect(propRes.status).toBe(200);
+      const json = (await propRes.json()) as { autoAccepted: boolean };
+      expect(json.autoAccepted).toBe(true);
+
+      // Open the inbox UI; banner reflects the user pref, badge reflects the PROP.
+      await page.goto(`http://localhost:${PORT}/p/demo/inbox`);
+      await page.waitForLoadState("networkidle");
+      await expect(page.getByText(/Auto-accept enabled/)).toBeVisible({ timeout: 10_000 });
+      const acceptedSection = page.locator("section").filter({ hasText: "Recently accepted" });
+      await expect(acceptedSection).toBeVisible({ timeout: 10_000 });
+      await expect(acceptedSection.getByText(/auto-accepted/).first()).toBeVisible();
+
+      // Cleanup: remove the threshold so subsequent tests don't auto-accept.
+      rmSync(join(home, "preferences.yaml"), { force: true });
     });
-    expect(propRes.status).toBe(200);
-    const json = (await propRes.json()) as { autoAccepted: boolean };
-    expect(json.autoAccepted).toBe(true);
 
-    // Open the inbox UI; banner reflects the user pref, badge reflects the PROP.
-    await page.goto(`http://localhost:${PORT}/p/demo/inbox`);
-    await page.waitForLoadState("networkidle");
-    await expect(page.getByText(/Auto-accept enabled/)).toBeVisible({ timeout: 10_000 });
-    const acceptedSection = page
-      .locator("section")
-      .filter({ hasText: "Recently accepted" });
-    await expect(acceptedSection).toBeVisible({ timeout: 10_000 });
-    await expect(acceptedSection.getByText(/auto-accepted/).first()).toBeVisible();
+    test("inbox splits pending into Create / Update sections when both types present", async ({
+      page,
+    }) => {
+      // Seed two pending proposals — one create, one update — both above
+      // confidence 0.5 so they land in pendingHigh and the split is visible.
+      // No threshold set, so neither auto-accepts.
+      const create = await fetch(`http://localhost:${PORT}/api/vault/demo/inbox/propose`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          proposalType: "create",
+          targetType: "insight",
+          newFrontmatter: { title: "Split test create", status: "active", created: "2026-05-03" },
+          newBody: "create body\n",
+          summary: "create proposal",
+          reason: "x",
+          provenance: { createdBy: "agent", session: "e2e", confidence: 0.6 },
+        }),
+      });
+      expect(create.status).toBe(200);
 
-    // Cleanup: remove the threshold so subsequent tests don't auto-accept.
-    rmSync(join(home, "preferences.yaml"), { force: true });
-  });
+      const update = await fetch(`http://localhost:${PORT}/api/vault/demo/inbox/propose`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          proposalType: "update",
+          targetType: "task",
+          target: "TASK-003",
+          newBody: "updated body for TASK-003\n",
+          summary: "update proposal",
+          reason: "x",
+          provenance: { createdBy: "agent", session: "e2e", confidence: 0.6 },
+        }),
+      });
+      expect(update.status).toBe(200);
 
-  test("inbox splits pending into Create / Update sections when both types present", async ({
-    page,
-  }) => {
-    // Seed two pending proposals — one create, one update — both above
-    // confidence 0.5 so they land in pendingHigh and the split is visible.
-    // No threshold set, so neither auto-accepts.
-    const create = await fetch(`http://localhost:${PORT}/api/vault/demo/inbox/propose`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        proposalType: "create",
-        targetType: "insight",
-        newFrontmatter: { title: "Split test create", status: "active", created: "2026-05-03" },
-        newBody: "create body\n",
-        summary: "create proposal",
-        reason: "x",
-        provenance: { createdBy: "agent", session: "e2e", confidence: 0.6 },
-      }),
+      await page.goto(`http://localhost:${PORT}/p/demo/inbox`);
+      // The two new section headings render only when both kinds are present.
+      await expect(page.getByText(/📥 New content/)).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByText(/✏️ Updates/)).toBeVisible();
     });
-    expect(create.status).toBe(200);
+  });
 
-    const update = await fetch(`http://localhost:${PORT}/api/vault/demo/inbox/propose`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        proposalType: "update",
-        targetType: "task",
-        target: "TASK-003",
-        newBody: "updated body for TASK-003\n",
-        summary: "update proposal",
-        reason: "x",
-        provenance: { createdBy: "agent", session: "e2e", confidence: 0.6 },
-      }),
+test.describe
+  .serial("workflow actions (mutate vault state)", () => {
+    test("Mark current task done → file frontmatter flips to done with completed:", async ({
+      page,
+    }) => {
+      await page.goto(`http://localhost:${PORT}/p/demo`);
+      await expect(page.getByText("Plan progress")).toBeVisible({ timeout: 10_000 });
+      await page.getByRole("button", { name: /Mark current task done/ }).click();
+      // Wait for the network round-trip + invalidation.
+      await page.waitForResponse((r) => r.url().includes("/task/complete") && r.status() === 200);
+      // Read the file back from disk to confirm the mutation actually landed.
+      const file = readFileSync(join(projectRoot, "tasks/TASK-001.md"), "utf8");
+      expect(file).toMatch(/status:\s*done/);
+      expect(file).toMatch(/completed:\s*['"]?\d{4}-\d{2}-\d{2}/);
     });
-    expect(update.status).toBe(200);
 
-    await page.goto(`http://localhost:${PORT}/p/demo/inbox`);
-    // The two new section headings render only when both kinds are present.
-    await expect(page.getByText(/📥 New content/)).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText(/✏️ Updates/)).toBeVisible();
-  });
-});
+    test("Switch task → previously-pending task becomes in_progress on disk", async ({ page }) => {
+      await page.goto(`http://localhost:${PORT}/p/demo`);
+      // After the prior test TASK-001 is done. Eligible-to-switch dropdown should
+      // contain TASK-003 (still pending). Pick it and click Switch.
+      const select = page.getByRole("combobox", { name: "Switch to task" });
+      await expect(select).toBeVisible({ timeout: 10_000 });
+      await select.selectOption("TASK-003");
+      await page.getByRole("button", { name: "Switch", exact: true }).click();
+      await page.waitForResponse((r) => r.url().includes("/task/switch") && r.status() === 200);
+      const file = readFileSync(join(projectRoot, "tasks/TASK-003.md"), "utf8");
+      expect(file).toMatch(/status:\s*in_progress/);
+    });
 
-test.describe.serial("workflow actions (mutate vault state)", () => {
-  test("Mark current task done → file frontmatter flips to done with completed:", async ({
-    page,
-  }) => {
-    await page.goto(`http://localhost:${PORT}/p/demo`);
-    await expect(page.getByText("Plan progress")).toBeVisible({ timeout: 10_000 });
-    await page.getByRole("button", { name: /Mark current task done/ }).click();
-    // Wait for the network round-trip + invalidation.
-    await page.waitForResponse(
-      (r) => r.url().includes("/task/complete") && r.status() === 200,
-    );
-    // Read the file back from disk to confirm the mutation actually landed.
-    const file = readFileSync(join(projectRoot, "tasks/TASK-001.md"), "utf8");
-    expect(file).toMatch(/status:\s*done/);
-    expect(file).toMatch(/completed:\s*['"]?\d{4}-\d{2}-\d{2}/);
+    test("Phase set → index.md frontmatter updates phase + phase_since", async ({ page }) => {
+      await page.goto(`http://localhost:${PORT}/p/demo`);
+      const select = page.getByRole("combobox", { name: "Advance phase" });
+      await expect(select).toBeVisible({ timeout: 10_000 });
+      // Phase dropdown filters out the current phase; pick "testing" (current is
+      // "implementing"). The select's onChange handler fires the mutation.
+      await select.selectOption("testing");
+      await page.waitForResponse((r) => r.url().includes("/phase/set") && r.status() === 200);
+      const idx = readFileSync(join(projectRoot, "index.md"), "utf8");
+      expect(idx).toMatch(/phase:\s*testing/);
+    });
   });
-
-  test("Switch task → previously-pending task becomes in_progress on disk", async ({
-    page,
-  }) => {
-    await page.goto(`http://localhost:${PORT}/p/demo`);
-    // After the prior test TASK-001 is done. Eligible-to-switch dropdown should
-    // contain TASK-003 (still pending). Pick it and click Switch.
-    const select = page.getByRole("combobox", { name: "Switch to task" });
-    await expect(select).toBeVisible({ timeout: 10_000 });
-    await select.selectOption("TASK-003");
-    await page.getByRole("button", { name: "Switch", exact: true }).click();
-    await page.waitForResponse(
-      (r) => r.url().includes("/task/switch") && r.status() === 200,
-    );
-    const file = readFileSync(join(projectRoot, "tasks/TASK-003.md"), "utf8");
-    expect(file).toMatch(/status:\s*in_progress/);
-  });
-
-  test("Phase set → index.md frontmatter updates phase + phase_since", async ({ page }) => {
-    await page.goto(`http://localhost:${PORT}/p/demo`);
-    const select = page.getByRole("combobox", { name: "Advance phase" });
-    await expect(select).toBeVisible({ timeout: 10_000 });
-    // Phase dropdown filters out the current phase; pick "testing" (current is
-    // "implementing"). The select's onChange handler fires the mutation.
-    await select.selectOption("testing");
-    await page.waitForResponse(
-      (r) => r.url().includes("/phase/set") && r.status() === 200,
-    );
-    const idx = readFileSync(join(projectRoot, "index.md"), "utf8");
-    expect(idx).toMatch(/phase:\s*testing/);
-  });
-});

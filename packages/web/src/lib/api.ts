@@ -2,20 +2,20 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import {
   ChangesSchema,
-  ComposePackResponseSchema,
   ClaudeCodeStatusSchema,
+  ComposePackResponseSchema,
   DashboardSchema,
   ImplementationLineSchema,
-  LastTurnSummaryResponseSchema,
-  UserPreferencesSchema,
   InboxListSchema,
   IssueSchema,
+  LastTurnSummaryResponseSchema,
   NodeListItemSchema,
   NodeResponseSchema,
   PackListSchema,
   PackResponseSchema,
   type Project,
   ProjectSchema,
+  UserPreferencesSchema,
   VaultOverviewSchema,
 } from "./types.js";
 
@@ -156,8 +156,7 @@ export function useDashboard(alias: string | undefined) {
 export function useImplementationLine(alias: string | undefined) {
   return useQuery({
     queryKey: ["implementation", alias],
-    queryFn: () =>
-      jsonFetch(`/api/vault/${alias}/implementation`, ImplementationLineSchema),
+    queryFn: () => jsonFetch(`/api/vault/${alias}/implementation`, ImplementationLineSchema),
     enabled: !!alias,
   });
 }
@@ -197,8 +196,7 @@ export function useUpdateUserPreferences() {
 export function useClaudeCodeStatus(alias: string | undefined) {
   return useQuery({
     queryKey: ["claude-code-status", alias],
-    queryFn: () =>
-      jsonFetch(`/api/projects/${alias}/claude-code-status`, ClaudeCodeStatusSchema),
+    queryFn: () => jsonFetch(`/api/projects/${alias}/claude-code-status`, ClaudeCodeStatusSchema),
     enabled: !!alias,
   });
 }
@@ -312,9 +310,7 @@ export function useRules(alias: string | undefined) {
       jsonFetch(
         `/api/vault/${alias}/rules`,
         z.object({
-          rules: z.array(
-            z.object({ name: z.string(), size: z.number(), updated: z.string() }),
-          ),
+          rules: z.array(z.object({ name: z.string(), size: z.number(), updated: z.string() })),
           dir: z.string(),
         }),
       ),

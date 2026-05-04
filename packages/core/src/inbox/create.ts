@@ -77,10 +77,7 @@ export async function createProposal(
 
   if (input.proposalType === "update" && isImmutableType(cfg, input.targetType)) {
     throw new Error(
-      `createProposal: cannot create update proposal for immutable type '${input.targetType}' ` +
-        `(target ${input.target}). Immutable types are append-only by convention — ` +
-        `create a new ${input.targetType} entry that supersedes the old one instead. ` +
-        `(Configurable via .cairndex/config.yaml → immutable_types.)`,
+      `createProposal: cannot create update proposal for immutable type '${input.targetType}' (target ${input.target}). Immutable types are append-only by convention — create a new ${input.targetType} entry that supersedes the old one instead. (Configurable via .cairndex/config.yaml → immutable_types.)`,
     );
   }
 

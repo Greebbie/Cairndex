@@ -44,10 +44,9 @@ async function exchange(
     let stdout = "";
     let stderr = "";
     const responses: JsonRpcResponse[] = [];
-    let timer: NodeJS.Timeout | undefined;
 
-    const finish = (err?: Error) => {
-      if (timer) clearTimeout(timer);
+    function finish(err?: Error) {
+      clearTimeout(timer);
       try {
         child.stdin.end();
       } catch {
@@ -56,7 +55,12 @@ async function exchange(
       child.kill();
       if (err) reject(err);
       else resolve(responses);
-    };
+    }
+
+    const timer = setTimeout(
+      () => finish(new Error(`MCP exchange timed out\nstderr: ${stderr}\nstdout: ${stdout}`)),
+      10_000,
+    );
 
     child.on("error", finish);
     child.stderr.on("data", (d) => {
@@ -76,16 +80,13 @@ async function exchange(
             return;
           }
         } catch (e) {
-          finish(new Error(`bad JSON-RPC line: ${line}\nstderr: ${stderr}\n${(e as Error).message}`));
+          finish(
+            new Error(`bad JSON-RPC line: ${line}\nstderr: ${stderr}\n${(e as Error).message}`),
+          );
           return;
         }
       }
     });
-
-    timer = setTimeout(
-      () => finish(new Error(`MCP exchange timed out\nstderr: ${stderr}\nstdout: ${stdout}`)),
-      10_000,
-    );
 
     for (const req of requests) {
       child.stdin.write(`${JSON.stringify(req)}\n`);

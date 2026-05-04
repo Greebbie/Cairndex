@@ -17,11 +17,12 @@ export interface SyncCmdResult {
 export async function runSyncCmd(opts: SyncCmdOptions): Promise<SyncCmdResult> {
   if (opts.silent) makeSilent();
   const projectDir = resolveMemoryRoot(opts);
-  const ref = opts.vaultRoot && opts.projectId
-    ? resolveProjectRef({ cwd: opts.cwd, vaultRoot: opts.vaultRoot, projectId: opts.projectId })
-    : opts.vaultRoot
-      ? null
-      : resolveProjectRef({ cwd: opts.cwd });
+  const ref =
+    opts.vaultRoot && opts.projectId
+      ? resolveProjectRef({ cwd: opts.cwd, vaultRoot: opts.vaultRoot, projectId: opts.projectId })
+      : opts.vaultRoot
+        ? null
+        : resolveProjectRef({ cwd: opts.cwd });
   const sourceShared =
     ref && ref.projectId !== "legacy" ? centralSharedPath(ref.vaultRoot) : sharedDir();
   const r = await runSync({ globalDir: sourceShared, projectDir });

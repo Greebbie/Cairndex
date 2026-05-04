@@ -167,7 +167,9 @@ export function extractInsightFromSessionBody(
   const lines: string[] = [];
   lines.push(`# Insight draft from session ${sessionId}`);
   lines.push("");
-  lines.push("> Auto-distilled by `cairndex insight propose-from-session`. Heuristic only — no LLM call. Review carefully before accepting.");
+  lines.push(
+    "> Auto-distilled by `cairndex insight propose-from-session`. Heuristic only — no LLM call. Review carefully before accepting.",
+  );
   lines.push("");
   if (decisions.length > 0) {
     lines.push("## Decision-like phrases");

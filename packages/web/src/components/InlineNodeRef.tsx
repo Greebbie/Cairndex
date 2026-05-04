@@ -41,12 +41,11 @@ export function InlineNodeRef({ alias, id }: InlineNodeRefProps) {
   const node = useNode(alias, type ?? undefined, type ? id : undefined);
   if (!type) {
     // Workflow / non-durable id — just print the ID. Tooltip notes why.
-    return (
-      <span title={`${id} (workflow id — no durable node)`}>{id}</span>
-    );
+    return <span title={`${id} (workflow id — no durable node)`}>{id}</span>;
   }
   const title =
-    node.data?.frontmatter && typeof (node.data.frontmatter as { title?: unknown }).title === "string"
+    node.data?.frontmatter &&
+    typeof (node.data.frontmatter as { title?: unknown }).title === "string"
       ? (node.data.frontmatter as { title: string }).title
       : null;
   return (

@@ -18,6 +18,12 @@ export interface LastTurnSummaryOptions {
   /** Optional path to the Claude Code transcript JSONL. Normally read from stdin payload. */
   transcriptPath?: string;
   /**
+   * When true, refuse to write a zero-activity summary unless a real transcript
+   * path is present. CLI use sets this by default so manual invocations do not
+   * erase the last useful dashboard card.
+   */
+  requireTranscript?: boolean;
+  /**
    * How far back to consider a proposal "new this turn". Defaults to 60 minutes —
    * Stop hooks fire close to write time, but we leave some slack for slow hosts.
    */
@@ -47,11 +53,7 @@ export interface LastTurnSummaryResult {
 
 const DEFAULT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 
-async function recentProposals(
-  vault: string,
-  windowMs: number,
-  now: number,
-): Promise<string[]> {
+async function recentProposals(vault: string, windowMs: number, now: number): Promise<string[]> {
   const dir = join(vault, "inbox", "proposed-memory-updates");
   if (!existsSync(dir)) return [];
   let entries: string[];
@@ -117,10 +119,18 @@ export async function runLastTurnSummary(
   const now = opts.now ?? Date.now();
   const windowMs = opts.newProposalWindowMs ?? DEFAULT_WINDOW_MS;
 
-  const transcript =
-    opts.transcriptPath && existsSync(opts.transcriptPath)
-      ? await parseTranscriptJsonl(opts.transcriptPath)
-      : { touchedPaths: [], idsReferenced: [], toolCounts: { Edit: 0, Write: 0, Bash: 0, Read: 0 } };
+  const hasTranscript = opts.transcriptPath !== undefined && existsSync(opts.transcriptPath);
+  if (opts.requireTranscript && !hasTranscript) {
+    return {
+      exitCode: 1,
+      message:
+        "last-turn-summary requires a Claude Code Stop-hook transcript payload; pass --allow-empty for manual/debug zero-activity summaries.",
+    };
+  }
+
+  const transcript = hasTranscript
+    ? await parseTranscriptJsonl(opts.transcriptPath as string)
+    : { touchedPaths: [], idsReferenced: [], toolCounts: { Edit: 0, Write: 0, Bash: 0, Read: 0 } };
 
   const newProposals = await recentProposals(vault, windowMs, now);
   const latestSession = await latestSessionId(vault);

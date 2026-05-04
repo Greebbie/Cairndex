@@ -23,7 +23,7 @@ export interface ContextOptions {
   vaultRoot?: string;
   /** Project id inside a central vault. */
   projectId?: string;
-  /** Task label (pure label — does not affect selection). */
+  /** Task label or focus hint; direct node IDs and strong title matches affect selection. */
   task?: string;
   /** Token budget override. */
   budget?: number;
@@ -61,7 +61,9 @@ export async function runContext(opts: ContextOptions): Promise<ContextResult> {
     };
   }
 
-  const cfg = existsSync(`${vaultPath(root)}/config.yaml`) ? loadProjectConfig(root) : defaultConfig();
+  const cfg = existsSync(`${vaultPath(root)}/config.yaml`)
+    ? loadProjectConfig(root)
+    : defaultConfig();
 
   // --if-stale: bail early when an existing pack is already fresher than memory.
   // Used by the Stop / SessionStart hooks to avoid the rebuild cost on every turn.

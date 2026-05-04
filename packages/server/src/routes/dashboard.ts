@@ -45,15 +45,13 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
     // is shared with bootstrap so both surfaces report the same shape.
     const latest = await findLatestPackWithStaleness(project.path);
     const agentContext: {
-      latestPack:
-        | {
-            id: string;
-            path: string;
-            builtAt: string;
-            lastMemoryChangeAt: string | null;
-            stale: boolean;
-          }
-        | null;
+      latestPack: {
+        id: string;
+        path: string;
+        builtAt: string;
+        lastMemoryChangeAt: string | null;
+        stale: boolean;
+      } | null;
     } = { latestPack: latest };
 
     // Recent activity from changes/changelog.md (top 10).

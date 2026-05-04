@@ -4,11 +4,11 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 import yaml from "js-yaml";
 import { z } from "zod";
 import {
+  REPO_POINTER_FILE,
+  VAULT_DIR,
   centralProjectPath,
   projectManifestPath,
   repoPointerPath,
-  REPO_POINTER_FILE,
-  VAULT_DIR,
   vaultPath,
 } from "./paths.js";
 

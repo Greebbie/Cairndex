@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { readdir, readFile, stat } from "node:fs/promises";
+import { readFile, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { contextPacksPath } from "../paths.js";
 import { lastMemoryChangeAt } from "./staleness.js";

@@ -27,8 +27,7 @@ function summaryHeadline(summary: string): string {
  */
 function isHeuristicNoise(p: Proposal): boolean {
   return (
-    p.provenance.createdBy === "auto-distill" ||
-    p.provenance.createdBy === "cairndex-consolidate"
+    p.provenance.createdBy === "auto-distill" || p.provenance.createdBy === "cairndex-consolidate"
   );
 }
 
@@ -115,96 +114,97 @@ export function InboxPanel({ alias }: Props) {
             {autoCount > 0 ? ` · ${autoCount} auto` : ""} · {rejected.length} rejected)
           </span>
         </div>
-      ) : (() => {
-        // Split signal vs noise. The headline answers the user's actual question
-        // ("does anything need me?"), then the heuristic suggestions are surfaced
-        // as a separate, opt-in line — never as the primary count.
-        const decision = pending.filter((p) => !isHeuristicNoise(p));
-        const noise = pending.filter(isHeuristicNoise);
-        return (
-        <div className="text-sm space-y-1">
-          <div>
-            {decision.length > 0 ? (
-              <>
-                <span className="font-mono text-amber-700 dark:text-amber-300">
-                  {decision.length}
-                </span>{" "}
-                {decision.length === 1 ? "thing" : "things"} need
-                {decision.length === 1 ? "s" : ""} your decision
-              </>
-            ) : (
-              <span className="text-muted-foreground">
-                Nothing needing your decision.
-              </span>
-            )}
-            {noise.length > 0 ? (
-              <span className="text-xs text-muted-foreground">
-                {" "}
-                · {noise.length} heuristic suggestion{noise.length === 1 ? "" : "s"} (auto-noise)
-              </span>
-            ) : null}
-            {decision.length > 0 ? (
-              <span className="text-xs text-muted-foreground">
-                {" "}
-                ({newCount} new · {updateCount} update{updateCount === 1 ? "" : "s"})
-              </span>
-            ) : null}
-          </div>
-          <ul className="text-xs space-y-0.5">
-            {groups.slice(0, 3).map((g) => {
-              const lead = g.members[0];
-              if (!lead) return null;
-              if (g.members.length > 1) {
-                // Grouped: a single line collapses N near-duplicate proposals (the
-                // dogfood "Recurring focus on SPEC-X" pile-up). Each member's PROP
-                // ID lives in the title tooltip — agent surface, not visible text.
-                const idsTip = g.members.map((m) => m.proposalId).join(", ");
-                const lowConfTag =
-                  g.allAutoDistilled || (g.minConfidence !== null && g.minConfidence < 0.5)
-                    ? " (low confidence)"
-                    : "";
-                return (
-                  <li key={g.key} className="text-muted-foreground">
-                    <Link
-                      to={`/p/${alias}/inbox`}
-                      title={idsTip}
-                      className="text-primary hover:underline"
-                    >
-                      <em className="not-italic font-medium">
-                        <TextWithResolvedIds alias={alias} text={g.headline} />
-                      </em>{" "}
-                      ×{g.members.length}
-                    </Link>
-                    {lowConfTag}
-                  </li>
-                );
-              }
-              // Singleton: title-as-headline. The PROP ID becomes the link's
-              // title attribute so power users can hover-reveal it without it
-              // dominating the row.
-              return (
-                <li key={g.key} className="text-muted-foreground">
-                  <Link
-                    to={`/p/${alias}/inbox`}
-                    title={lead.proposalId}
-                    className="text-primary hover:underline"
-                  >
-                    <em className="not-italic">
-                      <TextWithResolvedIds alias={alias} text={g.headline} />
-                    </em>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-          {groups.length > 3 ? (
-            <div className="text-xs text-muted-foreground">
-              + {groups.length - 3} more group{groups.length - 3 === 1 ? "" : "s"}
+      ) : (
+        (() => {
+          // Split signal vs noise. The headline answers the user's actual question
+          // ("does anything need me?"), then the heuristic suggestions are surfaced
+          // as a separate, opt-in line — never as the primary count.
+          const decision = pending.filter((p) => !isHeuristicNoise(p));
+          const noise = pending.filter(isHeuristicNoise);
+          return (
+            <div className="text-sm space-y-1">
+              <div>
+                {decision.length > 0 ? (
+                  <>
+                    <span className="font-mono text-amber-700 dark:text-amber-300">
+                      {decision.length}
+                    </span>{" "}
+                    {decision.length === 1 ? "thing" : "things"} need
+                    {decision.length === 1 ? "s" : ""} your decision
+                  </>
+                ) : (
+                  <span className="text-muted-foreground">Nothing needing your decision.</span>
+                )}
+                {noise.length > 0 ? (
+                  <span className="text-xs text-muted-foreground">
+                    {" "}
+                    · {noise.length} heuristic suggestion{noise.length === 1 ? "" : "s"}{" "}
+                    (auto-noise)
+                  </span>
+                ) : null}
+                {decision.length > 0 ? (
+                  <span className="text-xs text-muted-foreground">
+                    {" "}
+                    ({newCount} new · {updateCount} update{updateCount === 1 ? "" : "s"})
+                  </span>
+                ) : null}
+              </div>
+              <ul className="text-xs space-y-0.5">
+                {groups.slice(0, 3).map((g) => {
+                  const lead = g.members[0];
+                  if (!lead) return null;
+                  if (g.members.length > 1) {
+                    // Grouped: a single line collapses N near-duplicate proposals (the
+                    // dogfood "Recurring focus on SPEC-X" pile-up). Each member's PROP
+                    // ID lives in the title tooltip — agent surface, not visible text.
+                    const idsTip = g.members.map((m) => m.proposalId).join(", ");
+                    const lowConfTag =
+                      g.allAutoDistilled || (g.minConfidence !== null && g.minConfidence < 0.5)
+                        ? " (low confidence)"
+                        : "";
+                    return (
+                      <li key={g.key} className="text-muted-foreground">
+                        <Link
+                          to={`/p/${alias}/inbox`}
+                          title={idsTip}
+                          className="text-primary hover:underline"
+                        >
+                          <em className="not-italic font-medium">
+                            <TextWithResolvedIds alias={alias} text={g.headline} />
+                          </em>{" "}
+                          ×{g.members.length}
+                        </Link>
+                        {lowConfTag}
+                      </li>
+                    );
+                  }
+                  // Singleton: title-as-headline. The PROP ID becomes the link's
+                  // title attribute so power users can hover-reveal it without it
+                  // dominating the row.
+                  return (
+                    <li key={g.key} className="text-muted-foreground">
+                      <Link
+                        to={`/p/${alias}/inbox`}
+                        title={lead.proposalId}
+                        className="text-primary hover:underline"
+                      >
+                        <em className="not-italic">
+                          <TextWithResolvedIds alias={alias} text={g.headline} />
+                        </em>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+              {groups.length > 3 ? (
+                <div className="text-xs text-muted-foreground">
+                  + {groups.length - 3} more group{groups.length - 3 === 1 ? "" : "s"}
+                </div>
+              ) : null}
             </div>
-          ) : null}
-        </div>
-        );
-      })()}
+          );
+        })()
+      )}
     </section>
   );
 }

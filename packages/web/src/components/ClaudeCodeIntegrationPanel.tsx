@@ -52,11 +52,10 @@ export function ClaudeCodeIntegrationPanel({ alias }: Props) {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Installs cairndex hooks (PostToolUse / Stop / SessionStart) and the MCP
-        server entry into <code>{s?.settingsPath ?? ".claude/settings.json"}</code>.
-        Equivalent to running <code>cairndex init</code> in a terminal — idempotent;
-        re-running just refreshes the cairndex-managed entries and leaves any
-        third-party hooks alone.
+        Installs cairndex hooks (PostToolUse / Stop / SessionStart) and the MCP server entry into{" "}
+        <code>{s?.settingsPath ?? ".claude/settings.json"}</code>. Equivalent to running{" "}
+        <code>cairndex init</code> in a terminal — idempotent; re-running just refreshes the
+        cairndex-managed entries and leaves any third-party hooks alone.
       </p>
 
       <div className="text-xs grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1">
@@ -74,9 +73,7 @@ export function ClaudeCodeIntegrationPanel({ alias }: Props) {
         <span className="text-muted-foreground">MCP server:</span>
         <span
           className={
-            s?.mcpRegistered
-              ? "text-emerald-600 dark:text-emerald-400"
-              : "text-muted-foreground"
+            s?.mcpRegistered ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
           }
         >
           {s?.mcpRegistered ? "registered (cairndex)" : "not registered"}
@@ -93,14 +90,10 @@ export function ClaudeCodeIntegrationPanel({ alias }: Props) {
           {wire.isPending ? "Wiring…" : fullyWired ? "Re-wire / refresh" : "Wire Claude Code"}
         </button>
         {wire.isSuccess && !wire.isPending && (
-          <span className="text-xs text-emerald-600 dark:text-emerald-400">
-            Refreshed
-          </span>
+          <span className="text-xs text-emerald-600 dark:text-emerald-400">Refreshed</span>
         )}
         {wire.isError && (
-          <span className="text-xs text-destructive">
-            Error: {String(wire.error)}
-          </span>
+          <span className="text-xs text-destructive">Error: {String(wire.error)}</span>
         )}
       </div>
     </section>

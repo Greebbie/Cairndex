@@ -1,8 +1,8 @@
+import { ClaudeCodeIntegrationPanel } from "@/components/ClaudeCodeIntegrationPanel";
 import { useConfig, useUpdateConfig } from "@/lib/api";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useParams } from "react-router-dom";
-import { ClaudeCodeIntegrationPanel } from "@/components/ClaudeCodeIntegrationPanel";
 import SettingsCustomTypes from "./SettingsCustomTypes";
 import SettingsRules from "./SettingsRules";
 import SettingsUserPreferences from "./SettingsUserPreferences";
@@ -146,140 +146,140 @@ export default function Settings() {
       {tab === "user" && <SettingsUserPreferences />}
 
       {tab === "config" && (
-      <>
-      <div className="flex gap-2">
-        {(["project", "global"] as const).map((s) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => setScope(s)}
-            className={`px-3 py-1 rounded text-sm ${scope === s ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
-          >
-            {s}
-          </button>
-        ))}
-      </div>
+        <>
+          <div className="flex gap-2">
+            {(["project", "global"] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setScope(s)}
+                className={`px-3 py-1 rounded text-sm ${scope === s ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
 
-      <form onSubmit={onSubmit} className="space-y-6">
-        <section className="space-y-2">
-          <h3 className="text-sm font-semibold">Validation</h3>
-          <label className="block">
-            <span className="text-xs text-muted-foreground">freshness_warn_days</span>
-            <input
-              type="number"
-              min={1}
-              {...register("freshness_warn_days", { valueAsNumber: true })}
-              className="mt-1 w-32 px-2 py-1 text-sm border border-border rounded bg-background"
-            />
-          </label>
-          <label className="block">
-            <span className="text-xs text-muted-foreground">
-              verification_required_for_status (comma-separated)
-            </span>
-            <input
-              type="text"
-              {...register("verification_required")}
-              className="mt-1 w-full px-2 py-1 text-sm border border-border rounded bg-background"
-              placeholder="done, accepted"
-            />
-          </label>
-        </section>
-
-        <section className="space-y-2">
-          <h3 className="text-sm font-semibold">Folders</h3>
-          <div className="grid grid-cols-2 gap-3">
-            {(
-              [
-                ["folder_specs", "specs"],
-                ["folder_decisions", "decisions"],
-                ["folder_plans", "plans"],
-                ["folder_tasks", "tasks"],
-              ] as const
-            ).map(([name, label]) => (
-              <label key={name} className="block">
-                <span className="text-xs text-muted-foreground">{label}/</span>
+          <form onSubmit={onSubmit} className="space-y-6">
+            <section className="space-y-2">
+              <h3 className="text-sm font-semibold">Validation</h3>
+              <label className="block">
+                <span className="text-xs text-muted-foreground">freshness_warn_days</span>
+                <input
+                  type="number"
+                  min={1}
+                  {...register("freshness_warn_days", { valueAsNumber: true })}
+                  className="mt-1 w-32 px-2 py-1 text-sm border border-border rounded bg-background"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs text-muted-foreground">
+                  verification_required_for_status (comma-separated)
+                </span>
                 <input
                   type="text"
-                  {...register(name)}
+                  {...register("verification_required")}
                   className="mt-1 w-full px-2 py-1 text-sm border border-border rounded bg-background"
+                  placeholder="done, accepted"
                 />
               </label>
-            ))}
-          </div>
-        </section>
+            </section>
 
-        <section className="space-y-2">
-          <h3 className="text-sm font-semibold">ID prefixes</h3>
-          <div className="grid grid-cols-2 gap-3">
-            {(
-              [
-                ["id_spec", "spec"],
-                ["id_decision", "decision"],
-                ["id_plan", "plan"],
-                ["id_task", "task"],
-              ] as const
-            ).map(([name, label]) => (
-              <label key={name} className="block">
-                <span className="text-xs text-muted-foreground">{label}</span>
-                <input
-                  type="text"
-                  {...register(name)}
-                  className="mt-1 w-full px-2 py-1 text-sm border border-border rounded bg-background uppercase"
-                />
-              </label>
-            ))}
-          </div>
-        </section>
+            <section className="space-y-2">
+              <h3 className="text-sm font-semibold">Folders</h3>
+              <div className="grid grid-cols-2 gap-3">
+                {(
+                  [
+                    ["folder_specs", "specs"],
+                    ["folder_decisions", "decisions"],
+                    ["folder_plans", "plans"],
+                    ["folder_tasks", "tasks"],
+                  ] as const
+                ).map(([name, label]) => (
+                  <label key={name} className="block">
+                    <span className="text-xs text-muted-foreground">{label}/</span>
+                    <input
+                      type="text"
+                      {...register(name)}
+                      className="mt-1 w-full px-2 py-1 text-sm border border-border rounded bg-background"
+                    />
+                  </label>
+                ))}
+              </div>
+            </section>
 
-        <div className="flex items-center gap-3">
-          <button
-            type="submit"
-            disabled={update.isPending || !formState.isDirty}
-            className="px-4 py-2 rounded bg-primary text-primary-foreground text-sm disabled:opacity-50"
+            <section className="space-y-2">
+              <h3 className="text-sm font-semibold">ID prefixes</h3>
+              <div className="grid grid-cols-2 gap-3">
+                {(
+                  [
+                    ["id_spec", "spec"],
+                    ["id_decision", "decision"],
+                    ["id_plan", "plan"],
+                    ["id_task", "task"],
+                  ] as const
+                ).map(([name, label]) => (
+                  <label key={name} className="block">
+                    <span className="text-xs text-muted-foreground">{label}</span>
+                    <input
+                      type="text"
+                      {...register(name)}
+                      className="mt-1 w-full px-2 py-1 text-sm border border-border rounded bg-background uppercase"
+                    />
+                  </label>
+                ))}
+              </div>
+            </section>
+
+            <div className="flex items-center gap-3">
+              <button
+                type="submit"
+                disabled={update.isPending || !formState.isDirty}
+                className="px-4 py-2 rounded bg-primary text-primary-foreground text-sm disabled:opacity-50"
+              >
+                {update.isPending ? "Saving..." : "Save"}
+              </button>
+              <button
+                type="button"
+                onClick={() => reset(initialFields)}
+                className="px-3 py-2 rounded bg-muted text-muted-foreground text-sm"
+              >
+                Reset
+              </button>
+              {update.isSuccess && <span className="text-sm text-green-600">Saved</span>}
+              {update.isError && (
+                <span className="text-sm text-destructive">Error: {String(update.error)}</span>
+              )}
+            </div>
+          </form>
+
+          {scope === "project" && <SettingsCustomTypes />}
+
+          <details
+            className="rounded border border-border bg-muted/10"
+            open={advancedOpen}
+            onToggle={(e) => setAdvancedOpen((e.target as HTMLDetailsElement).open)}
           >
-            {update.isPending ? "Saving..." : "Save"}
-          </button>
-          <button
-            type="button"
-            onClick={() => reset(initialFields)}
-            className="px-3 py-2 rounded bg-muted text-muted-foreground text-sm"
-          >
-            Reset
-          </button>
-          {update.isSuccess && <span className="text-sm text-green-600">Saved</span>}
-          {update.isError && (
-            <span className="text-sm text-destructive">Error: {String(update.error)}</span>
-          )}
-        </div>
-      </form>
-
-      {scope === "project" && <SettingsCustomTypes />}
-
-      <details
-        className="rounded border border-border bg-muted/10"
-        open={advancedOpen}
-        onToggle={(e) => setAdvancedOpen((e.target as HTMLDetailsElement).open)}
-      >
-        <summary className="cursor-pointer px-3 py-2 text-sm font-medium select-none">
-          Advanced (raw JSON)
-        </summary>
-        <div className="p-3 space-y-2">
-          <textarea
-            className="w-full h-72 font-mono text-xs p-3 border border-border rounded bg-background"
-            value={rawText}
-            onChange={(e) => setRawText(e.target.value)}
-          />
-          <button
-            type="button"
-            onClick={onSaveRaw}
-            disabled={update.isPending}
-            className="px-3 py-2 rounded bg-primary text-primary-foreground text-sm disabled:opacity-50"
-          >
-            Save raw JSON
-          </button>
-        </div>
-      </details>
-      </>
+            <summary className="cursor-pointer px-3 py-2 text-sm font-medium select-none">
+              Advanced (raw JSON)
+            </summary>
+            <div className="p-3 space-y-2">
+              <textarea
+                className="w-full h-72 font-mono text-xs p-3 border border-border rounded bg-background"
+                value={rawText}
+                onChange={(e) => setRawText(e.target.value)}
+              />
+              <button
+                type="button"
+                onClick={onSaveRaw}
+                disabled={update.isPending}
+                className="px-3 py-2 rounded bg-primary text-primary-foreground text-sm disabled:opacity-50"
+              >
+                Save raw JSON
+              </button>
+            </div>
+          </details>
+        </>
       )}
     </div>
   );

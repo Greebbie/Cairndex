@@ -49,17 +49,16 @@ export default function Timeline() {
           // (they're audit data, not narrative — humanizing them would be
           // misleading). Narrative events get the headline-vs-ID lift.
           const isReceipt = isSessionReceipt(e.summary);
-          const h = isReceipt ? { text: e.summary, tooltip: e.summary } : humanizeChangelogSummary(e.summary);
+          const h = isReceipt
+            ? { text: e.summary, tooltip: e.summary }
+            : humanizeChangelogSummary(e.summary);
           return (
             <li
               // biome-ignore lint/suspicious/noArrayIndexKey: server-stable order
               key={i}
               className="flex gap-3 text-sm border-b border-border pb-2"
             >
-              <span
-                className="text-xs text-muted-foreground min-w-24 font-mono"
-                title={e.date}
-              >
+              <span className="text-xs text-muted-foreground min-w-24 font-mono" title={e.date}>
                 {humanizeDateString(e.date)}
               </span>
               <span

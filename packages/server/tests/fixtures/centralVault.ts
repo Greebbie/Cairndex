@@ -25,11 +25,7 @@ export function makeCentralVaultFixture(
   options: CentralVaultFixtureOptions = {},
 ): CentralVaultFixture {
   const vaultRoot = mkdtempSync(join(tmpdir(), "cairn-server-"));
-  writeFileSync(
-    join(vaultRoot, "vault.yaml"),
-    `schemaVersion: 1\ntitle: Test Vault\n`,
-    "utf8",
-  );
+  writeFileSync(join(vaultRoot, "vault.yaml"), "schemaVersion: 1\ntitle: Test Vault\n", "utf8");
   const projectRoot = join(vaultRoot, "projects", projectId);
   mkdirSync(projectRoot, { recursive: true });
   let repoPathsBlock: string;
@@ -65,7 +61,7 @@ export function makeCentralVaultFixture(
   }
   writeFileSync(
     join(projectRoot, "index.md"),
-    `---\nphase: implementing\nphase_since: 2026-05-02\nnext_action: ship\n---\n# Demo project\n`,
+    "---\nphase: implementing\nphase_since: 2026-05-02\nnext_action: ship\n---\n# Demo project\n",
     "utf8",
   );
   writeFileSync(

@@ -88,10 +88,7 @@ export async function acceptProposal(
 
   if (proposal.proposalType === "update" && isImmutableType(cfg, proposal.targetType)) {
     throw new Error(
-      `acceptProposal: cannot accept update of immutable type '${proposal.targetType}' ` +
-        `(${proposalId}). Immutable types are append-only by convention — ` +
-        `create a new ${proposal.targetType} entry that supersedes the old one instead. ` +
-        `(Configurable via .cairndex/config.yaml → immutable_types.)`,
+      `acceptProposal: cannot accept update of immutable type '${proposal.targetType}' (${proposalId}). Immutable types are append-only by convention — create a new ${proposal.targetType} entry that supersedes the old one instead. (Configurable via .cairndex/config.yaml → immutable_types.)`,
     );
   }
 

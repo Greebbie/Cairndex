@@ -6,11 +6,7 @@ import { buildMemoryHealth } from "../indexes/memoryHealth.js";
 import { indexPath, nodeFolderPath } from "../paths.js";
 import { NODE_TYPES, type NodeType } from "../types.js";
 import { listNodeFiles, readNode } from "../vault.js";
-import type {
-  ListResourcesResult,
-  McpResource,
-  ReadResourceResult,
-} from "./types.js";
+import type { ListResourcesResult, McpResource, ReadResourceResult } from "./types.js";
 
 const SCHEME = "cairndex://vault/";
 const NODE_TYPE_TO_FOLDER_NAME: Record<NodeType, string> = {
@@ -98,18 +94,14 @@ export async function readMcpResource(
   if (tail === "active-context") {
     const ctx = await buildActiveContext(repoRoot, cfg);
     return {
-      contents: [
-        { uri, mimeType: "application/json", text: JSON.stringify(ctx, null, 2) },
-      ],
+      contents: [{ uri, mimeType: "application/json", text: JSON.stringify(ctx, null, 2) }],
     };
   }
 
   if (tail === "memory-health") {
     const health = await buildMemoryHealth(repoRoot, cfg);
     return {
-      contents: [
-        { uri, mimeType: "application/json", text: JSON.stringify(health, null, 2) },
-      ],
+      contents: [{ uri, mimeType: "application/json", text: JSON.stringify(health, null, 2) }],
     };
   }
 

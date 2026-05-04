@@ -16,7 +16,10 @@ export function useWatcherEvents(alias: string | undefined) {
     const onFileChanged = (e: MessageEvent<string>) => {
       try {
         const payload = JSON.parse(e.data) as { path?: string };
-        if (typeof payload.path === "string" && /state[\\/]last-turn-summary\.json$/.test(payload.path)) {
+        if (
+          typeof payload.path === "string" &&
+          /state[\\/]last-turn-summary\.json$/.test(payload.path)
+        ) {
           qc.invalidateQueries({ queryKey: ["last-turn-summary", alias] });
         }
       } catch {

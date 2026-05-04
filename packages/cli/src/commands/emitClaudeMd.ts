@@ -42,7 +42,9 @@ export async function runEmitClaudeMd(opts: EmitClaudeMdOptions): Promise<EmitCl
     };
   }
 
-  const cfg = existsSync(`${vaultPath(root)}/config.yaml`) ? loadProjectConfig(root) : defaultConfig();
+  const cfg = existsSync(`${vaultPath(root)}/config.yaml`)
+    ? loadProjectConfig(root)
+    : defaultConfig();
 
   const ctx = await buildActiveContext(root, cfg);
   const health = await buildMemoryHealth(root, cfg);
@@ -58,9 +60,10 @@ export async function runEmitClaudeMd(opts: EmitClaudeMdOptions): Promise<EmitCl
       : null
     : resolveProjectRef({ cwd: opts.cwd });
   const defaultTargetRoot =
-    opts.repoRoot ??
-    (ref && ref.projectId !== "legacy" && ref.repoRoot ? ref.repoRoot : root);
-  const target = opts.claudeMdPath ? resolve(opts.claudeMdPath) : join(defaultTargetRoot, "CLAUDE.md");
+    opts.repoRoot ?? (ref && ref.projectId !== "legacy" && ref.repoRoot ? ref.repoRoot : root);
+  const target = opts.claudeMdPath
+    ? resolve(opts.claudeMdPath)
+    : join(defaultTargetRoot, "CLAUDE.md");
   const existing = existsSync(target) ? await readFile(target, "utf8") : undefined;
   const result = applyCairndexBlock(existing, body);
   await writeFile(target, result.updated, "utf8");

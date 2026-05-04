@@ -1,7 +1,7 @@
 import type { Config } from "../config.js";
 import { createProposal, findDuplicate } from "../inbox/create.js";
 import type { NodeType } from "../types.js";
-import { listNodeFiles, type NodeFile } from "../vault.js";
+import { type NodeFile, listNodeFiles } from "../vault.js";
 
 const WIKILINK_RE = /\[\[([A-Z]+-\d+|\d{4}-\d{2}-\d{2}-\d{4})\]\]/g;
 const ID_RE = /\b([A-Z]+-\d+)\b/g;
@@ -101,13 +101,11 @@ function buildInsightDraft(
   lines.push("");
   lines.push("## Sessions");
   for (const m of sortedMentions) {
-    lines.push(
-      `- ${m.date} — ${m.sessionId}${m.summary ? `: ${m.summary}` : ""}`,
-    );
+    lines.push(`- ${m.date} — ${m.sessionId}${m.summary ? `: ${m.summary}` : ""}`);
   }
   lines.push("");
   lines.push(
-    `_If this pattern is real, edit and accept the proposal. Otherwise reject — the consolidator will not re-suggest the same body._`,
+    "_If this pattern is real, edit and accept the proposal. Otherwise reject — the consolidator will not re-suggest the same body._",
   );
   const summary = `Pattern around ${target} (${mentions.length} sessions, ${oldest?.date ?? "?"} → ${newest?.date ?? "?"})`;
   const frontmatter: Record<string, unknown> = {

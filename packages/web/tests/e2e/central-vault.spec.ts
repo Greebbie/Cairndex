@@ -4,15 +4,17 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
+import { getFreePort } from "./ports";
 
 let proc: ChildProcess;
 let vaultRoot: string;
 let home: string;
-const PORT = 7890;
+let PORT: number;
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO = join(__dirname, "..", "..", "..", "..");
 
 test.beforeAll(async () => {
+  PORT = await getFreePort();
   vaultRoot = mkdtempSync(join(tmpdir(), "cairn-cv-vault-"));
   home = mkdtempSync(join(tmpdir(), "cairn-cv-home-"));
   // vault.yaml + projects/<id>/project.yaml + minimal node folders

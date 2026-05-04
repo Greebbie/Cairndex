@@ -13,14 +13,14 @@ export function ContextPackList({ alias, pack }: Props) {
     <ol className="space-y-3">
       {items.map((it, idx) => {
         return (
-          <li
-            key={`${idx}-${it.id}`}
-            className="rounded border bg-card text-card-foreground p-3"
-          >
+          <li key={`${idx}-${it.id}`} className="rounded border bg-card text-card-foreground p-3">
             <div className="flex items-center gap-3 text-sm">
               <span className="text-muted-foreground font-mono w-6 text-right">{idx + 1}.</span>
               {it.type ? (
-                <Link to={nodeLink(alias, it.type, it.id)} className="font-mono text-primary hover:underline">
+                <Link
+                  to={nodeLink(alias, it.type, it.id)}
+                  className="font-mono text-primary hover:underline"
+                >
                   {it.id}
                 </Link>
               ) : (

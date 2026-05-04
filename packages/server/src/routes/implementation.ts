@@ -1,9 +1,6 @@
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import {
-  buildImplementationLine,
-  implementationLinePath,
-} from "@cairndex/core";
+import { buildImplementationLine, implementationLinePath } from "@cairndex/core";
 import type { FastifyInstance } from "fastify";
 import { resolveProject } from "../lib/resolveProject.js";
 import { safeLoadConfig } from "../lib/safeLoadConfig.js";

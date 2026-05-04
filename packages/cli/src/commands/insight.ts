@@ -48,10 +48,16 @@ function todayUtc(): string {
 
 export async function runInsightPromote(input: InsightCmdInput): Promise<InsightCmdResult> {
   const root = resolveMemoryRoot(input);
-  const ref = input.vaultRoot && input.projectId
-    ? resolveProjectRef({ cwd: input.cwd, vaultRoot: input.vaultRoot, projectId: input.projectId })
-    : resolveProjectRef({ cwd: input.cwd });
-  const sharedRoot = ref && ref.projectId !== "legacy" ? centralSharedPath(ref.vaultRoot) : sharedDir();
+  const ref =
+    input.vaultRoot && input.projectId
+      ? resolveProjectRef({
+          cwd: input.cwd,
+          vaultRoot: input.vaultRoot,
+          projectId: input.projectId,
+        })
+      : resolveProjectRef({ cwd: input.cwd });
+  const sharedRoot =
+    ref && ref.projectId !== "legacy" ? centralSharedPath(ref.vaultRoot) : sharedDir();
   const projectInsightsDir = join(vaultPath(root), defaultConfig().folders.insights);
   const src = await findInsightFile(projectInsightsDir, input.id);
   if (!src) return { exitCode: 1, message: `insight ${input.id} not found in project` };
@@ -172,7 +178,12 @@ function linkTargetSignature(links: unknown): string {
   if (!Array.isArray(links)) return "";
   const targets: string[] = [];
   for (const l of links) {
-    if (l && typeof l === "object" && "target" in l && typeof (l as { target: unknown }).target === "string") {
+    if (
+      l &&
+      typeof l === "object" &&
+      "target" in l &&
+      typeof (l as { target: unknown }).target === "string"
+    ) {
       targets.push((l as { target: string }).target);
     }
   }
@@ -350,10 +361,16 @@ export async function runInsightProposeFromSession(
 
 export async function runInsightPull(input: InsightCmdInput): Promise<InsightCmdResult> {
   const root = resolveMemoryRoot(input);
-  const ref = input.vaultRoot && input.projectId
-    ? resolveProjectRef({ cwd: input.cwd, vaultRoot: input.vaultRoot, projectId: input.projectId })
-    : resolveProjectRef({ cwd: input.cwd });
-  const sharedRoot = ref && ref.projectId !== "legacy" ? centralSharedPath(ref.vaultRoot) : sharedDir();
+  const ref =
+    input.vaultRoot && input.projectId
+      ? resolveProjectRef({
+          cwd: input.cwd,
+          vaultRoot: input.vaultRoot,
+          projectId: input.projectId,
+        })
+      : resolveProjectRef({ cwd: input.cwd });
+  const sharedRoot =
+    ref && ref.projectId !== "legacy" ? centralSharedPath(ref.vaultRoot) : sharedDir();
   const globalInsightsDir = join(sharedRoot, "insights");
   const src = await findInsightFile(globalInsightsDir, input.id);
   if (!src) return { exitCode: 1, message: `insight ${input.id} not found in global` };

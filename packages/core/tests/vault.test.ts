@@ -94,9 +94,11 @@ describe("vault", () => {
     });
 
     await expect(listNodeIds(projectRoot, defaultConfig(), "spec")).resolves.toEqual(["SPEC-001"]);
-    await expect(readNode(projectRoot, defaultConfig(), "spec", "SPEC-001")).resolves.toMatchObject({
-      id: "SPEC-001",
-    });
+    await expect(readNode(projectRoot, defaultConfig(), "spec", "SPEC-001")).resolves.toMatchObject(
+      {
+        id: "SPEC-001",
+      },
+    );
   });
 
   it("listNodeFiles returns paths and frontmatter for each", async () => {

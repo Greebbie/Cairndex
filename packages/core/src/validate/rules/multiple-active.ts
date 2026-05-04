@@ -11,7 +11,7 @@ export const multipleActive: ValidationRule = {
   name: "multiple-active",
   run(ctx) {
     const issues: ValidationIssue[] = [];
-    const byType = new Map<NodeType, typeof ctx.allNodes[number][]>();
+    const byType = new Map<NodeType, (typeof ctx.allNodes)[number][]>();
     for (const n of ctx.allNodes) {
       if (!SINGLETON_TYPES.has(n.type)) continue;
       const status = String(n.frontmatter.status ?? "");

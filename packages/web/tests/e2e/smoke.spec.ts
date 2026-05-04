@@ -4,15 +4,17 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
+import { getFreePort } from "./ports";
 
 let proc: ChildProcess;
 let tmp: string;
 let home: string;
-const PORT = 7889;
+let PORT: number;
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO = join(__dirname, "..", "..", "..", "..");
 
 test.beforeAll(async () => {
+  PORT = await getFreePort();
   tmp = mkdtempSync(join(tmpdir(), "cairn-e2e-"));
   home = mkdtempSync(join(tmpdir(), "cairn-home-"));
   const v = join(tmp, ".cairndex");
@@ -79,6 +81,25 @@ test("loads dashboard for the registered project", async ({ page }) => {
   await expect(page.getByText("ship it").first()).toBeVisible();
 });
 
+test("mobile dashboard keeps the cockpit full-width below navigation", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`http://localhost:${PORT}/p/e2e`);
+  await expect(page.getByRole("heading", { name: "Project State" })).toBeVisible({
+    timeout: 10_000,
+  });
+  const mainBox = await page.locator("main").boundingBox();
+  const projectStateBox = await page
+    .locator("section", { has: page.getByRole("heading", { name: "Project State" }) })
+    .boundingBox();
+  expect(mainBox?.x ?? 999).toBeLessThan(2);
+  expect(mainBox?.width ?? 0).toBeGreaterThan(360);
+  expect(projectStateBox?.width ?? 0).toBeGreaterThan(340);
+  const horizontalOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(horizontalOverflow).toBeLessThanOrEqual(1);
+});
+
 test("navigates to browse", async ({ page }) => {
   await page.goto(`http://localhost:${PORT}/p/e2e/browse`);
   await expect(page.getByRole("heading", { name: "Browse" })).toBeVisible();
@@ -132,10 +153,12 @@ test("dashboard active-spec link opens the file view (no broken plural route)", 
 }) => {
   await page.goto(`http://localhost:${PORT}/p/e2e`);
   await expect(page.getByText("implementing").first()).toBeVisible({ timeout: 10_000 });
-  // ProjectStatePanel renders SPEC-001 as a Link; clicking it must land on
-  // /browse/spec/SPEC-001 (singular type), not /browse/specs/... which the
-  // server does not accept.
-  await page.getByRole("link", { name: "SPEC-001" }).first().click();
+  // ProjectStatePanel renders node titles as the visible link text; the ID is
+  // kept in the tooltip. Clicking must still land on the singular node route.
+  const projectState = page.locator("section", {
+    has: page.getByRole("heading", { name: "Project State" }),
+  });
+  await projectState.getByRole("link", { name: "X" }).click();
   await expect(page).toHaveURL(/\/p\/e2e\/browse\/spec\/SPEC-001$/);
   await expect(page.getByText("body", { exact: true })).toBeVisible({ timeout: 10_000 });
 });

@@ -24,9 +24,7 @@ export interface ArchiveCommandResult {
   message?: string;
 }
 
-export async function runArchive(
-  opts: ArchiveCommandOptions,
-): Promise<ArchiveCommandResult> {
+export async function runArchive(opts: ArchiveCommandOptions): Promise<ArchiveCommandResult> {
   const root = resolveMemoryRoot(opts);
   if (!vaultExists(root)) {
     return {

@@ -57,8 +57,8 @@ export default function PackPreview() {
           </button>
         </form>
         <p className="text-xs text-muted-foreground">
-          Task is a <em>label only</em> — selection is rules-based (active spec/plan/task, recent
-          sessions, backlinked decisions, open questions). Agent should{" "}
+          Use a task ID or short focus phrase. Direct IDs and strong title matches pull in the
+          matching task plus linked plans, specs, decisions, insights, and open questions. Agent can{" "}
           <code className="font-mono">grep</code> the project memory directly for anything more.
         </p>
         {compose.isError ? (

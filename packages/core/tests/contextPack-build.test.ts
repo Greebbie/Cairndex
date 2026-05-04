@@ -122,7 +122,7 @@ describe("buildContextPack", () => {
     expect(ruleItem!.body).toContain("(truncated");
   });
 
-  it("uses task as a label only — selection is identical regardless of task string", async () => {
+  it("leaves selection unchanged when the task hint does not match any node", async () => {
     setup({
       "index.md": baseIndex,
       "specs/SPEC-001.md":
@@ -131,5 +131,58 @@ describe("buildContextPack", () => {
     const a = await buildContextPack(tmp, defaultConfig(), { task: "fix e2e" });
     const b = await buildContextPack(tmp, defaultConfig(), { task: "totally unrelated" });
     expect(a.items.map((i) => i.id)).toEqual(b.items.map((i) => i.id));
+  });
+
+  it("uses a direct task id as a focus hint and pulls linked plan/spec plus memory", async () => {
+    setup({
+      "index.md": baseIndex,
+      "tasks/TASK-001.md":
+        "---\nid: TASK-001\ntitle: Current task\nstatus: in_progress\ncreated: 2026-05-01\nupdated: 2026-05-01\n---\ncurrent\n",
+      "tasks/TASK-002.md":
+        "---\nid: TASK-002\ntitle: Requested task\nstatus: pending\ncreated: 2026-05-01\nupdated: 2026-05-01\nlinks:\n  - PLAN-009\n  - { type: implements, target: SPEC-009 }\n---\nrequested\n",
+      "plans/PLAN-009.md":
+        "---\nid: PLAN-009\ntitle: Requested plan\nstatus: draft\ncreated: 2026-05-01\nupdated: 2026-05-01\n---\nplan\n",
+      "specs/SPEC-009.md":
+        "---\nid: SPEC-009\ntitle: Requested spec\nstatus: planned\ncreated: 2026-05-01\nupdated: 2026-05-01\n---\nspec\n",
+      "decisions/ADR-009.md":
+        "---\nid: ADR-009\ntitle: Requested decision\nstatus: accepted\ncreated: 2026-05-01\nverification:\n  commit: abc1234\nlinks:\n  - { type: implements, target: SPEC-009 }\n---\ndecision\n",
+      "insights/INS-009.md":
+        "---\nid: INS-009\ntitle: Requested insight\nstatus: stable\ncreated: 2026-05-01\nlinks:\n  - { type: implements, target: SPEC-009 }\n---\ninsight\n",
+    });
+    const pack = await buildContextPack(tmp, defaultConfig(), { task: "TASK-002" });
+    const reasons = new Map(pack.items.map((i) => [i.id, i.reason]));
+    expect(reasons.get("TASK-001")).toMatch(/current task/);
+    expect(reasons.get("TASK-002")).toMatch(/requested by context hint/);
+    expect(reasons.get("PLAN-009")).toMatch(/linked from requested TASK-002/);
+    expect(reasons.get("SPEC-009")).toMatch(/linked from requested TASK-002/);
+    expect(reasons.get("ADR-009")).toMatch(/linked from SPEC-009/);
+    expect(reasons.get("INS-009")).toMatch(/linked insight for SPEC-009/);
+  });
+
+  it("matches a strong task-title hint when no direct id is provided", async () => {
+    setup({
+      "index.md": baseIndex,
+      "tasks/TASK-001.md":
+        "---\nid: TASK-001\ntitle: Current task\nstatus: in_progress\ncreated: 2026-05-01\nupdated: 2026-05-01\n---\ncurrent\n",
+      "tasks/TASK-050.md":
+        "---\nid: TASK-050\ntitle: Fix browser auth flow\nstatus: pending\ncreated: 2026-05-01\nupdated: 2026-05-01\n---\nrequested\n",
+    });
+    const pack = await buildContextPack(tmp, defaultConfig(), { task: "browser auth flow" });
+    const requested = pack.items.find((i) => i.id === "TASK-050");
+    expect(requested?.reason).toMatch(/requested by context hint/);
+  });
+
+  it("includes insights backlinked to the active spec", async () => {
+    setup({
+      "index.md": baseIndex,
+      "specs/SPEC-001.md":
+        "---\nid: SPEC-001\ntitle: Cockpit\nstatus: active\ncreated: 2026-05-01\nupdated: 2026-05-01\n---\nspec\n",
+      "insights/INS-001.md":
+        "---\nid: INS-001\ntitle: Useful pattern\nstatus: stable\ncreated: 2026-05-01\nlinks:\n  - { type: implements, target: SPEC-001 }\n---\ninsight\n",
+    });
+    const pack = await buildContextPack(tmp, defaultConfig(), { task: "x" });
+    expect(pack.items.some((i) => i.id === "INS-001" && /linked insight/.test(i.reason))).toBe(
+      true,
+    );
   });
 });

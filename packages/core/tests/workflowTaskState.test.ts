@@ -116,9 +116,7 @@ describe("workflow/taskState", () => {
     it("rejects re-completing a done task", async () => {
       const { repo } = seed();
       writeTask(repo, "TASK-001", "done");
-      await expect(completeTask(repo, defaultConfig(), "TASK-001")).rejects.toThrow(
-        /already done/,
-      );
+      await expect(completeTask(repo, defaultConfig(), "TASK-001")).rejects.toThrow(/already done/);
     });
   });
 

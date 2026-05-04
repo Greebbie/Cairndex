@@ -9,6 +9,7 @@
   "scripts": {
     "build": "pnpm -r build",
     "test": "vitest run && pnpm --filter @cairndex/web test",
+    "test:e2e": "pnpm --filter @cairndex/web test:e2e",
     "test:watch": "vitest",
     "lint": "biome check .",
     "format": "biome format --write .",

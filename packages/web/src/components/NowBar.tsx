@@ -37,7 +37,7 @@ export function NowBar({ alias, state }: Props) {
   return (
     <div
       data-testid="now-bar"
-      className="sticky top-0 z-30 -mx-8 px-8 py-2 mb-2 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/70 flex flex-wrap gap-x-3 gap-y-1 items-center text-sm"
+      className="sticky top-0 z-30 -mx-4 px-4 py-2 mb-2 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/70 flex flex-wrap gap-x-3 gap-y-1 items-center text-sm md:-mx-8 md:px-8"
     >
       <span className="text-muted-foreground uppercase text-xs tracking-wide">Now</span>
       <span className="font-medium">{state.phase}</span>

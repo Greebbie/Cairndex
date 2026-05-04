@@ -1,8 +1,12 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { applyClaudeHooks, renderClaudeSettings, renderMcpServerEntry } from "../src/utils/hooks.js";
+import {
+  applyClaudeHooks,
+  renderClaudeSettings,
+  renderMcpServerEntry,
+} from "../src/utils/hooks.js";
 
 describe("renderClaudeSettings", () => {
   it("legacy repo emits --filter-path .cairndex/", () => {
@@ -31,7 +35,7 @@ describe("renderClaudeSettings", () => {
       );
       const s = JSON.stringify(json);
       expect(s).toContain("--vault");
-      expect(s).toContain("\\\"C:/Users/me/Vault\\\"");
+      expect(s).toContain('\\"C:/Users/me/Vault\\"');
       expect(s).toContain("--project demo");
       expect(s).toContain("--filter-path projects/demo/");
       expect(s).not.toContain("--filter-path .cairndex/");
@@ -139,9 +143,9 @@ describe("applyClaudeHooks", () => {
     const repo = mkdtempSync(join(tmpdir(), "cairn-hooks-mcp-"));
     dirs.push(repo);
     await applyClaudeHooks(repo);
-    const settings = JSON.parse(
-      readFileSync(join(repo, ".claude", "settings.json"), "utf8"),
-    ) as { mcpServers?: Record<string, { command: string; args?: string[] }> };
+    const settings = JSON.parse(readFileSync(join(repo, ".claude", "settings.json"), "utf8")) as {
+      mcpServers?: Record<string, { command: string; args?: string[] }>;
+    };
     expect(settings.mcpServers).toBeDefined();
     expect(settings.mcpServers?.cairndex).toBeDefined();
     expect(settings.mcpServers?.cairndex?.args).toContain("mcp");
@@ -157,9 +161,9 @@ describe("applyClaudeHooks", () => {
       "utf8",
     );
     await applyClaudeHooks(repo);
-    const settings = JSON.parse(
-      readFileSync(join(repo, ".claude", "settings.json"), "utf8"),
-    ) as { mcpServers?: Record<string, { command: string; args?: string[] }> };
+    const settings = JSON.parse(readFileSync(join(repo, ".claude", "settings.json"), "utf8")) as {
+      mcpServers?: Record<string, { command: string; args?: string[] }>;
+    };
     const args = settings.mcpServers?.cairndex?.args ?? [];
     expect(args).toContain("--vault");
     expect(args).toContain("--project");
@@ -181,9 +185,9 @@ describe("applyClaudeHooks", () => {
       "utf8",
     );
     await applyClaudeHooks(repo);
-    const settings = JSON.parse(
-      readFileSync(join(repo, ".claude", "settings.json"), "utf8"),
-    ) as { mcpServers?: Record<string, { command: string; args?: string[] }> };
+    const settings = JSON.parse(readFileSync(join(repo, ".claude", "settings.json"), "utf8")) as {
+      mcpServers?: Record<string, { command: string; args?: string[] }>;
+    };
     expect(settings.mcpServers?.other?.command).toBe("node");
     expect(settings.mcpServers?.cairndex?.command).not.toBe("stale");
     expect(settings.mcpServers?.cairndex?.args).toContain("mcp");

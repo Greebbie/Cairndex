@@ -6,11 +6,7 @@
   "bin": {
     "cairndex": "./bin/cairndex"
   },
-  "files": [
-    "bin",
-    "dist",
-    "templates"
-  ],
+  "files": ["bin", "dist", "templates"],
   "scripts": {
     "build": "tsup",
     "build:sea-entry": "tsup --config tsup.sea.config.ts",

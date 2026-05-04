@@ -96,9 +96,9 @@ export interface CollapsedEvent {
 const ROUTING_RE =
   /^(Accepted|Rejected)\s+(PROP-\d+)(?:\s+→\s+(?:created|updated)\s+([a-z]+)\/([A-Z]+-\d+|\d{4}-\d{2}-\d{2}-\d{4}))?/;
 
-function parseRoutingEvent(summary: string):
-  | { verb: RoutingVerb; proposalId: string; target: EventTargetRef | null }
-  | null {
+function parseRoutingEvent(
+  summary: string,
+): { verb: RoutingVerb; proposalId: string; target: EventTargetRef | null } | null {
   const m = summary.match(ROUTING_RE);
   if (!m) return null;
   const verb = m[1] as RoutingVerb;

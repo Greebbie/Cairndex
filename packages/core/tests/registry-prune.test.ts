@@ -106,7 +106,7 @@ describe("registry: dead-path filtering + persistent prune", () => {
     await pruneDeadProjects();
 
     // Recreate the dir at the same path.
-    writeFileSync(dirA + "-marker", "x", "utf8");
+    writeFileSync(`${dirA}-marker`, "x", "utf8");
     const dirB = mkdtempSync(join(tmpdir(), "cairn-reuse-b-"));
     dirs.push(dirB);
     await registerProject({ path: dirB, alias: "reuse-b" });

@@ -4,7 +4,7 @@ import { dirname } from "node:path";
 import type { Config } from "../config.js";
 import { nodeSummaryPath } from "../paths.js";
 import { NODE_TYPES, type NodeType } from "../types.js";
-import { listNodeFiles, type NodeFile } from "../vault.js";
+import { type NodeFile, listNodeFiles } from "../vault.js";
 
 export interface NodeSummaryEntry {
   id: string;

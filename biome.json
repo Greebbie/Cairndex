@@ -21,7 +21,11 @@
       "**/*.md",
       "**/coverage",
       "**/.vitest",
-      "**/test-results"
+      "**/test-results",
+      ".cairndex",
+      ".claude/settings.json",
+      "packages/cli/dist-sea",
+      "packages/cli/dist-sea-entry"
     ]
   }
 }

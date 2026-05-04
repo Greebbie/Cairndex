@@ -1,12 +1,12 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
 import yaml from "js-yaml";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   DEFAULT_USER_PREFERENCES,
-  readUserPreferences,
   UserPreferencesSchema,
+  readUserPreferences,
   writeUserPreferences,
 } from "../src/userPrefs.js";
 

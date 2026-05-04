@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 import { estimateTokens, trimToBudget } from "../src/contextPack/budget.js";
 import type { ContextPackItem } from "../src/contextPack/types.js";
 
-const item = (id: string, prio: number, body: string, type: ContextPackItem["type"] = "session"): ContextPackItem => ({
+const item = (
+  id: string,
+  prio: number,
+  body: string,
+  type: ContextPackItem["type"] = "session",
+): ContextPackItem => ({
   id,
   type,
   title: id,
@@ -29,11 +34,7 @@ describe("trimToBudget", () => {
 
   it("drops lowest-priority candidates first when over budget", () => {
     const big = "x".repeat(4000); // ~1000 tokens body
-    const items = [
-      item("KEEP", 1, big),
-      item("Q", 3, big),
-      item("S", 4, big),
-    ];
+    const items = [item("KEEP", 1, big), item("Q", 3, big), item("S", 4, big)];
     const r = trimToBudget(items, 1500); // ~enough for KEEP only
     expect(r.items.map((i) => i.id)).toContain("KEEP");
     expect(r.items.map((i) => i.id)).not.toContain("S");

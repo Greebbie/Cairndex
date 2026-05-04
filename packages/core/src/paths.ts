@@ -39,9 +39,7 @@ export function centralVaultRootForProject(projectRoot: string): string | null {
  * circular dependency would result. The format is intentionally tiny so a local
  * parser is appropriate; full validation lives in `projectRef.ts::ProjectPointerSchema`.
  */
-function readPointerVaultAndProject(
-  repoRoot: string,
-): { vault: string; project: string } | null {
+function readPointerVaultAndProject(repoRoot: string): { vault: string; project: string } | null {
   const pointerPath = join(repoRoot, REPO_POINTER_FILE);
   if (!existsSync(pointerPath)) return null;
   try {

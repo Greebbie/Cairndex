@@ -2,19 +2,19 @@ import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  type ProjectEntry,
   createWatcher,
   defaultConfig,
   handleVaultChange,
   listProjects,
   listVaultProjects,
   loadProjectConfig,
-  type ProjectEntry,
   pruneDeadProjects,
   readUserPreferences,
   vaultPath,
   writeUserPreferences,
 } from "@cairndex/core";
-import { createServer, type CreateServerResult, type OnboardingHooks } from "@cairndex/server";
+import { type CreateServerResult, type OnboardingHooks, createServer } from "@cairndex/server";
 import open from "open";
 import { findExeRelative } from "../utils/exePath.js";
 import { logger } from "../utils/logger.js";

@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { Config } from "../config.js";
 import { indexesPath } from "../paths.js";
-import { listNodeFiles, type NodeFile } from "../vault.js";
+import { type NodeFile, listNodeFiles } from "../vault.js";
 
 /**
  * Implementation line: a chronological view of project work — completed first

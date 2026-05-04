@@ -4,7 +4,7 @@ import { dirname } from "node:path";
 import type { Config } from "../config.js";
 import { parseFrontmatter } from "../frontmatter.js";
 import { activeContextPath, indexPath } from "../paths.js";
-import { listNodeFiles, type NodeFile } from "../vault.js";
+import { type NodeFile, listNodeFiles } from "../vault.js";
 
 export interface NodeRef {
   id: string;

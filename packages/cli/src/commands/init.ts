@@ -204,7 +204,10 @@ export async function runInit(opts: InitOptions): Promise<void> {
           const full = join(cur, e.name);
           if (e.isDirectory()) stack.push(full);
           else if (e.isFile() && e.name.endsWith(".md")) {
-            baseline[full.slice(vault.length + 1).replace(/\\/g, "/")] = await readFile(full, "utf8");
+            baseline[full.slice(vault.length + 1).replace(/\\/g, "/")] = await readFile(
+              full,
+              "utf8",
+            );
           }
         }
       }
@@ -228,14 +231,14 @@ export async function runInit(opts: InitOptions): Promise<void> {
     console.log(
       `Refreshed Claude Code hooks + MCP wiring against the central vault referenced by ${pointerPath}.`,
     );
-    console.log("(Legacy `.cairndex/` skeleton skipped — this repo is already on the central layout.)");
+    console.log(
+      "(Legacy `.cairndex/` skeleton skipped — this repo is already on the central layout.)",
+    );
   } else {
     console.log(
       "Tip: this created a legacy repo-local vault. The canonical layout is a central vault:",
     );
     console.log("  cairndex vault init <path>");
-    console.log(
-      "  cairndex project import-repo-vault --vault <path> --project <id> --repo <repo>",
-    );
+    console.log("  cairndex project import-repo-vault --vault <path> --project <id> --repo <repo>");
   }
 }

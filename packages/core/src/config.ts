@@ -75,9 +75,7 @@ export const ConfigSchema = z.object({
   verification_required_for_status: z.array(z.string()).default(["done", "accepted"]),
   freshness_warn_days: z.number().int().min(0).default(30),
   node_types: z.record(z.string(), CustomTypeDefSchema).default({}),
-  immutable_types: z
-    .array(z.string())
-    .default(["decision", "session", "change", "insight"]),
+  immutable_types: z.array(z.string()).default(["decision", "session", "change", "insight"]),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

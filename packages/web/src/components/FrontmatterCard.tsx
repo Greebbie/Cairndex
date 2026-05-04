@@ -8,7 +8,7 @@ function renderValue(v: unknown): React.ReactNode {
     return (
       <ul className="space-y-0.5">
         {v.map((item, i) => (
-          <li key={i} className="text-xs">
+          <li key={`${i}-${JSON.stringify(item)}`} className="text-xs">
             {renderValue(item)}
           </li>
         ))}

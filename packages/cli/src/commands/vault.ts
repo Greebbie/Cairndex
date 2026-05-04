@@ -1,11 +1,7 @@
 import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import {
-  centralSharedPath,
-  centralVaultManifestPath,
-  writeVaultManifest,
-} from "@cairndex/core";
+import { centralSharedPath, centralVaultManifestPath, writeVaultManifest } from "@cairndex/core";
 import { findBundledTemplatesDir } from "../utils/bundledTemplates.js";
 import { copyDirRecursive } from "../utils/scaffoldMemory.js";
 

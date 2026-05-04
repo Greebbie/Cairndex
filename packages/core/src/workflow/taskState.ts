@@ -1,11 +1,11 @@
 import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
-import type { Config } from "../config.js";
 import { appendChangelog } from "../changelog.js";
+import type { Config } from "../config.js";
 import { parseFrontmatter, serializeFrontmatter } from "../frontmatter.js";
 import { buildActiveContext } from "../indexes/activeContext.js";
 import { indexPath } from "../paths.js";
-import { listNodeFiles, type NodeFile } from "../vault.js";
+import { type NodeFile, listNodeFiles } from "../vault.js";
 
 /**
  * Workflow-state mutations that intentionally bypass the inbox.

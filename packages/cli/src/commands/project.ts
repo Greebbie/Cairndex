@@ -35,13 +35,7 @@ function todayUtc(): string {
 }
 
 function normalizeList(values: readonly (string | undefined)[]): string[] {
-  return Array.from(
-    new Set(
-      values
-        .map((v) => v?.trim())
-        .filter((v): v is string => Boolean(v)),
-    ),
-  );
+  return Array.from(new Set(values.map((v) => v?.trim()).filter((v): v is string => Boolean(v))));
 }
 
 async function writePointer(repoRoot: string, vaultRoot: string, projectId: string): Promise<void> {
@@ -188,5 +182,8 @@ export async function runProjectImportRepoVault(
 }
 
 export function defaultProjectIdFromRepo(repoRoot: string): string {
-  return basename(resolve(repoRoot)).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  return basename(resolve(repoRoot))
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 }

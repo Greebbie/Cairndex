@@ -3,8 +3,5 @@
   "identifier": "default",
   "description": "Capability for the main window — minimal surface for v0.1.",
   "windows": ["main"],
-  "permissions": [
-    "core:default",
-    "shell:default"
-  ]
+  "permissions": ["core:default", "shell:default"]
 }

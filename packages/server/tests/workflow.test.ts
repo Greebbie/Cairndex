@@ -45,7 +45,10 @@ describe("POST /api/vault/:alias/task/switch", () => {
       payload: { taskId: "TASK-002" },
     });
     expect(r.statusCode).toBe(200);
-    const body = r.json() as { changed: Array<{ id: string; from: string; to: string }>; summary: string };
+    const body = r.json() as {
+      changed: Array<{ id: string; from: string; to: string }>;
+      summary: string;
+    };
     expect(body.summary).toMatch(/TASK-002/);
     // Two changed entries: TASK-001 demoted, TASK-002 promoted.
     const ids = body.changed.map((c) => c.id).sort();

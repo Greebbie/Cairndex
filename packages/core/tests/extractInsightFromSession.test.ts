@@ -65,7 +65,8 @@ describe("extractInsightFromSessionBody", () => {
   });
 
   it("ACCEPTS decisions with apostrophes — `don't`, `we'll` are normal English", () => {
-    const body = "We decided to make vaultPath follow the pointer so routes don't need to pre-resolve.";
+    const body =
+      "We decided to make vaultPath follow the pointer so routes don't need to pre-resolve.";
     const draft = extractInsightFromSessionBody(body, "session");
     expect(draft).not.toBeNull();
     expect(draft?.title).toMatch(/vaultPath/);
@@ -98,7 +99,8 @@ describe("extractInsightFromSessionBody", () => {
     // A session that's mostly *about* the inbox would otherwise auto-propose a
     // useless insight (this is what produced PROP-011 in dogfood). Filtering
     // those prefixes reduces it to no-signal.
-    const body = "Reviewed PROP-001. PROP-001 next. Then PROP-002 and PROP-002 again. PROP-003 PROP-003.";
+    const body =
+      "Reviewed PROP-001. PROP-001 next. Then PROP-002 and PROP-002 again. PROP-003 PROP-003.";
     expect(extractInsightFromSessionBody(body, "session")).toBeNull();
   });
 

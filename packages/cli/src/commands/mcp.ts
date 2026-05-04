@@ -60,7 +60,9 @@ function buildMcpServer(repoRoot: string): McpServer {
     return await listMcpResources(repoRoot, cfg);
   }) as unknown as AnyResult);
 
-  mcp.server.setRequestHandler(ReadResourceRequestSchema, (async (req: { params: { uri: string } }) => {
+  mcp.server.setRequestHandler(ReadResourceRequestSchema, (async (req: {
+    params: { uri: string };
+  }) => {
     return await readMcpResource(repoRoot, cfg, req.params.uri);
   }) as unknown as AnyResult);
 
@@ -114,7 +116,9 @@ export async function runMcp(opts: McpOptions): Promise<McpResult> {
   try {
     await watcher.start();
   } catch (e) {
-    process.stderr.write(`watcher failed to start: ${e instanceof Error ? e.message : String(e)}\n`);
+    process.stderr.write(
+      `watcher failed to start: ${e instanceof Error ? e.message : String(e)}\n`,
+    );
   }
 
   // Block until the transport closes (client disconnects or stdin EOF). Without this,

@@ -17,7 +17,8 @@ interface ResolvedTitleProps {
 function ResolvedTitle({ alias, target, italic = true }: ResolvedTitleProps) {
   const node = useNode(alias, target.type, target.id);
   const title =
-    node.data?.frontmatter && typeof (node.data.frontmatter as { title?: unknown }).title === "string"
+    node.data?.frontmatter &&
+    typeof (node.data.frontmatter as { title?: unknown }).title === "string"
       ? (node.data.frontmatter as { title: string }).title
       : null;
   const text = title ?? target.id;
@@ -58,11 +59,7 @@ export function EventLine({ alias, event }: EventLineProps) {
         </span>
       );
     }
-    return (
-      <span title={event.tooltip}>
-        {verb} a proposal (no resulting node recorded)
-      </span>
-    );
+    return <span title={event.tooltip}>{verb} a proposal (no resulting node recorded)</span>;
   }
   if (event.batch) {
     const { accepts, rejects, sampleTargets } = event.batch;

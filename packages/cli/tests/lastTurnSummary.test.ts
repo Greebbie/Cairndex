@@ -73,6 +73,15 @@ describe("runLastTurnSummary", () => {
     expect(r.summary?.filesTouched).toBe(2); // a.ts + b.ts deduped
   });
 
+  it("can refuse to overwrite the summary when a required transcript is missing", async () => {
+    const repo = seedRepo();
+    const r = await runLastTurnSummary({ cwd: repo, requireTranscript: true });
+    expect(r.exitCode).toBe(1);
+    expect(r.path).toBeUndefined();
+    expect(existsSync(join(repo, ".cairndex", "state", "last-turn-summary.json"))).toBe(false);
+    expect(r.message).toContain("requires a Claude Code Stop-hook transcript payload");
+  });
+
   it("missing vault returns exit 1", async () => {
     const repo = mkdtempSync(join(tmpdir(), "cairn-lts-empty-"));
     dirs.push(repo);

@@ -137,14 +137,20 @@ export async function runBootstrap(opts: BootstrapOptions): Promise<BootstrapRes
   if (inbox.pending.length === 0) {
     lines.push("Inbox: no pending proposals.");
   } else {
-    lines.push(`Pending proposals (${inbox.pending.length} total, showing top ${Math.min(limit, inbox.pending.length)}):`);
+    lines.push(
+      `Pending proposals (${inbox.pending.length} total, showing top ${Math.min(limit, inbox.pending.length)}):`,
+    );
     for (const p of inbox.pending.slice(0, limit)) {
       const target = p.target ?? "(new)";
-      lines.push(`  - ${p.proposalId}  ${p.proposalType}  ${p.targetType}/${target}  — ${p.summary}`);
+      lines.push(
+        `  - ${p.proposalId}  ${p.proposalType}  ${p.targetType}/${target}  — ${p.summary}`,
+      );
     }
   }
   lines.push("");
-  lines.push("Reminder: propose durable memory changes via the inbox — never edit canonical files directly.");
+  lines.push(
+    "Reminder: propose durable memory changes via the inbox — never edit canonical files directly.",
+  );
   lines.push("  new memory:    cairndex inbox propose --type insight --target <id>");
   lines.push("  update memory: cairndex inbox propose-update <targetId>");
   lines.push("Workflow state can be advanced directly (no inbox round-trip):");

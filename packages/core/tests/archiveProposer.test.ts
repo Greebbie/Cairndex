@@ -1,4 +1,12 @@
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -22,7 +30,12 @@ afterEach(() => {
   rmSync(tmp, { recursive: true, force: true });
 });
 
-function writeNodeFile(folder: string, id: string, fm: Record<string, unknown>, body: string): void {
+function writeNodeFile(
+  folder: string,
+  id: string,
+  fm: Record<string, unknown>,
+  body: string,
+): void {
   const lines: string[] = ["---"];
   for (const [k, v] of Object.entries(fm)) {
     if (typeof v === "object" && v !== null && !Array.isArray(v)) {
@@ -40,14 +53,19 @@ function writeNodeFile(folder: string, id: string, fm: Record<string, unknown>, 
 
 describe("proposeStaleNodeArchives", () => {
   it("drafts an archive proposal for an old, low-confidence, unverified node", async () => {
-    writeNodeFile(".cairndex/specs", "SPEC-005", {
-      id: "SPEC-005",
-      title: "Old draft spec",
-      status: "draft",
-      created: "2025-01-01",
-      updated: "2025-01-01",
-      provenance: { created_by: "claude", session: "old", confidence: 0.3 },
-    }, "old experimental thinking\n");
+    writeNodeFile(
+      ".cairndex/specs",
+      "SPEC-005",
+      {
+        id: "SPEC-005",
+        title: "Old draft spec",
+        status: "draft",
+        created: "2025-01-01",
+        updated: "2025-01-01",
+        provenance: { created_by: "claude", session: "old", confidence: 0.3 },
+      },
+      "old experimental thinking\n",
+    );
 
     const result = await proposeStaleNodeArchives(tmp, defaultConfig(), {
       ageDays: 180,
@@ -66,22 +84,32 @@ describe("proposeStaleNodeArchives", () => {
   });
 
   it("skips verified nodes (status=stable / done / etc.)", async () => {
-    writeNodeFile(".cairndex/specs", "SPEC-006", {
-      id: "SPEC-006",
-      title: "Old stable spec",
-      status: "stable",
-      created: "2024-01-01",
-      updated: "2024-01-01",
-      provenance: { created_by: "claude", session: "old", confidence: 0.3 },
-    }, "shipped, stable\n");
-    writeNodeFile(".cairndex/tasks", "TASK-007", {
-      id: "TASK-007",
-      title: "Old finished task",
-      status: "done",
-      created: "2024-01-01",
-      updated: "2024-01-01",
-      provenance: { created_by: "claude", session: "old", confidence: 0.3, verified: true },
-    }, "done\n");
+    writeNodeFile(
+      ".cairndex/specs",
+      "SPEC-006",
+      {
+        id: "SPEC-006",
+        title: "Old stable spec",
+        status: "stable",
+        created: "2024-01-01",
+        updated: "2024-01-01",
+        provenance: { created_by: "claude", session: "old", confidence: 0.3 },
+      },
+      "shipped, stable\n",
+    );
+    writeNodeFile(
+      ".cairndex/tasks",
+      "TASK-007",
+      {
+        id: "TASK-007",
+        title: "Old finished task",
+        status: "done",
+        created: "2024-01-01",
+        updated: "2024-01-01",
+        provenance: { created_by: "claude", session: "old", confidence: 0.3, verified: true },
+      },
+      "done\n",
+    );
     const result = await proposeStaleNodeArchives(tmp, defaultConfig(), {
       ageDays: 180,
       now: new Date("2026-05-02T12:00:00Z"),
@@ -90,14 +118,19 @@ describe("proposeStaleNodeArchives", () => {
   });
 
   it("skips high-confidence nodes regardless of age", async () => {
-    writeNodeFile(".cairndex/insights", "INS-008", {
-      id: "INS-008",
-      title: "Old high-confidence insight",
-      status: "draft",
-      created: "2024-01-01",
-      updated: "2024-01-01",
-      provenance: { created_by: "claude", session: "old", confidence: 0.9 },
-    }, "high confidence\n");
+    writeNodeFile(
+      ".cairndex/insights",
+      "INS-008",
+      {
+        id: "INS-008",
+        title: "Old high-confidence insight",
+        status: "draft",
+        created: "2024-01-01",
+        updated: "2024-01-01",
+        provenance: { created_by: "claude", session: "old", confidence: 0.9 },
+      },
+      "high confidence\n",
+    );
     const result = await proposeStaleNodeArchives(tmp, defaultConfig(), {
       ageDays: 180,
       now: new Date("2026-05-02T12:00:00Z"),
@@ -106,14 +139,19 @@ describe("proposeStaleNodeArchives", () => {
   });
 
   it("skips fresh nodes (younger than ageDays)", async () => {
-    writeNodeFile(".cairndex/specs", "SPEC-009", {
-      id: "SPEC-009",
-      title: "Recent draft spec",
-      status: "draft",
-      created: "2026-04-01",
-      updated: "2026-04-01",
-      provenance: { created_by: "claude", session: "recent", confidence: 0.3 },
-    }, "recent draft\n");
+    writeNodeFile(
+      ".cairndex/specs",
+      "SPEC-009",
+      {
+        id: "SPEC-009",
+        title: "Recent draft spec",
+        status: "draft",
+        created: "2026-04-01",
+        updated: "2026-04-01",
+        provenance: { created_by: "claude", session: "recent", confidence: 0.3 },
+      },
+      "recent draft\n",
+    );
     const result = await proposeStaleNodeArchives(tmp, defaultConfig(), {
       ageDays: 180,
       now: new Date("2026-05-02T12:00:00Z"),
@@ -122,14 +160,19 @@ describe("proposeStaleNodeArchives", () => {
   });
 
   it("skips already-archived nodes", async () => {
-    writeNodeFile(".cairndex/specs", "SPEC-010", {
-      id: "SPEC-010",
-      title: "Already archived",
-      status: "archived",
-      created: "2024-01-01",
-      updated: "2024-01-01",
-      provenance: { created_by: "claude", session: "old", confidence: 0.3 },
-    }, "archived\n");
+    writeNodeFile(
+      ".cairndex/specs",
+      "SPEC-010",
+      {
+        id: "SPEC-010",
+        title: "Already archived",
+        status: "archived",
+        created: "2024-01-01",
+        updated: "2024-01-01",
+        provenance: { created_by: "claude", session: "old", confidence: 0.3 },
+      },
+      "archived\n",
+    );
     const result = await proposeStaleNodeArchives(tmp, defaultConfig(), {
       ageDays: 180,
       now: new Date("2026-05-02T12:00:00Z"),
@@ -143,14 +186,19 @@ describe("proposeStaleNodeArchives", () => {
       "---\nphase: implementing\nactive_spec: SPEC-011\n---\n# index\n",
       "utf8",
     );
-    writeNodeFile(".cairndex/specs", "SPEC-011", {
-      id: "SPEC-011",
-      title: "Active but old draft",
-      status: "draft",
-      created: "2024-01-01",
-      updated: "2024-01-01",
-      provenance: { created_by: "claude", session: "old", confidence: 0.3 },
-    }, "in flight\n");
+    writeNodeFile(
+      ".cairndex/specs",
+      "SPEC-011",
+      {
+        id: "SPEC-011",
+        title: "Active but old draft",
+        status: "draft",
+        created: "2024-01-01",
+        updated: "2024-01-01",
+        provenance: { created_by: "claude", session: "old", confidence: 0.3 },
+      },
+      "in flight\n",
+    );
     const result = await proposeStaleNodeArchives(tmp, defaultConfig(), {
       ageDays: 180,
       now: new Date("2026-05-02T12:00:00Z"),
@@ -159,20 +207,30 @@ describe("proposeStaleNodeArchives", () => {
   });
 
   it("excludes session and change types (different lifecycle)", async () => {
-    writeNodeFile(".cairndex/sessions", "2024-01-01-1000", {
-      id: "2024-01-01-1000",
-      date: "2024-01-01",
-      summary: "old session",
-      provenance: { created_by: "claude", session: "old", confidence: 0.3 },
-    }, "old session body\n");
-    writeNodeFile(".cairndex/changes", "CHG-012", {
-      id: "CHG-012",
-      title: "Old change",
-      status: "draft",
-      created: "2024-01-01",
-      updated: "2024-01-01",
-      provenance: { created_by: "claude", session: "old", confidence: 0.3 },
-    }, "old change\n");
+    writeNodeFile(
+      ".cairndex/sessions",
+      "2024-01-01-1000",
+      {
+        id: "2024-01-01-1000",
+        date: "2024-01-01",
+        summary: "old session",
+        provenance: { created_by: "claude", session: "old", confidence: 0.3 },
+      },
+      "old session body\n",
+    );
+    writeNodeFile(
+      ".cairndex/changes",
+      "CHG-012",
+      {
+        id: "CHG-012",
+        title: "Old change",
+        status: "draft",
+        created: "2024-01-01",
+        updated: "2024-01-01",
+        provenance: { created_by: "claude", session: "old", confidence: 0.3 },
+      },
+      "old change\n",
+    );
     const result = await proposeStaleNodeArchives(tmp, defaultConfig(), {
       ageDays: 180,
       now: new Date("2026-05-02T12:00:00Z"),
@@ -181,14 +239,19 @@ describe("proposeStaleNodeArchives", () => {
   });
 
   it("re-running is idempotent (no duplicate proposals)", async () => {
-    writeNodeFile(".cairndex/specs", "SPEC-013", {
-      id: "SPEC-013",
-      title: "Stale draft",
-      status: "draft",
-      created: "2024-01-01",
-      updated: "2024-01-01",
-      provenance: { created_by: "claude", session: "old", confidence: 0.3 },
-    }, "stale\n");
+    writeNodeFile(
+      ".cairndex/specs",
+      "SPEC-013",
+      {
+        id: "SPEC-013",
+        title: "Stale draft",
+        status: "draft",
+        created: "2024-01-01",
+        updated: "2024-01-01",
+        provenance: { created_by: "claude", session: "old", confidence: 0.3 },
+      },
+      "stale\n",
+    );
     const first = await proposeStaleNodeArchives(tmp, defaultConfig(), {
       ageDays: 180,
       now: new Date("2026-05-02T12:00:00Z"),
@@ -205,14 +268,19 @@ describe("proposeStaleNodeArchives", () => {
   });
 
   it("emits archive proposal whose body explains the three triggers", async () => {
-    writeNodeFile(".cairndex/specs", "SPEC-014", {
-      id: "SPEC-014",
-      title: "Stale",
-      status: "draft",
-      created: "2024-01-01",
-      updated: "2024-01-01",
-      provenance: { created_by: "claude", session: "old", confidence: 0.3 },
-    }, "needs archive\n");
+    writeNodeFile(
+      ".cairndex/specs",
+      "SPEC-014",
+      {
+        id: "SPEC-014",
+        title: "Stale",
+        status: "draft",
+        created: "2024-01-01",
+        updated: "2024-01-01",
+        provenance: { created_by: "claude", session: "old", confidence: 0.3 },
+      },
+      "needs archive\n",
+    );
     await proposeStaleNodeArchives(tmp, defaultConfig(), {
       ageDays: 180,
       now: new Date("2026-05-02T12:00:00Z"),
@@ -225,14 +293,19 @@ describe("proposeStaleNodeArchives", () => {
   });
 
   it("the proposal lives at inbox/proposed-memory-updates/PROP-NNN.md", async () => {
-    writeNodeFile(".cairndex/specs", "SPEC-015", {
-      id: "SPEC-015",
-      title: "Stale",
-      status: "draft",
-      created: "2024-01-01",
-      updated: "2024-01-01",
-      provenance: { created_by: "claude", session: "old", confidence: 0.3 },
-    }, "x\n");
+    writeNodeFile(
+      ".cairndex/specs",
+      "SPEC-015",
+      {
+        id: "SPEC-015",
+        title: "Stale",
+        status: "draft",
+        created: "2024-01-01",
+        updated: "2024-01-01",
+        provenance: { created_by: "claude", session: "old", confidence: 0.3 },
+      },
+      "x\n",
+    );
     await proposeStaleNodeArchives(tmp, defaultConfig(), {
       ageDays: 180,
       now: new Date("2026-05-02T12:00:00Z"),
@@ -246,14 +319,19 @@ describe("proposeStaleNodeArchives", () => {
   });
 
   it("respects custom confidenceThreshold (e.g., 0.7 archives 0.6 nodes)", async () => {
-    writeNodeFile(".cairndex/specs", "SPEC-016", {
-      id: "SPEC-016",
-      title: "Mid-confidence stale",
-      status: "draft",
-      created: "2024-01-01",
-      updated: "2024-01-01",
-      provenance: { created_by: "claude", session: "old", confidence: 0.6 },
-    }, "x\n");
+    writeNodeFile(
+      ".cairndex/specs",
+      "SPEC-016",
+      {
+        id: "SPEC-016",
+        title: "Mid-confidence stale",
+        status: "draft",
+        created: "2024-01-01",
+        updated: "2024-01-01",
+        provenance: { created_by: "claude", session: "old", confidence: 0.6 },
+      },
+      "x\n",
+    );
     const lenient = await proposeStaleNodeArchives(tmp, defaultConfig(), {
       ageDays: 180,
       confidenceThreshold: 0.5,

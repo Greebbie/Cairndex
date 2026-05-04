@@ -1,11 +1,12 @@
-import { ActivePlanPanel } from "@/components/cockpit/ActivePlanPanel";
-import { InboxPanel } from "@/components/cockpit/InboxPanel";
-import { MemoryHealthPanel } from "@/components/cockpit/MemoryHealthPanel";
-import { ProjectStatePanel } from "@/components/cockpit/ProjectStatePanel";
 import { DoctorBadge } from "@/components/DoctorBadge";
 import { EventLine } from "@/components/EventLine";
 import { LastTurnCard } from "@/components/LastTurnCard";
 import { NowBar } from "@/components/NowBar";
+import { ActivePlanPanel } from "@/components/cockpit/ActivePlanPanel";
+import { AgentContextPanel } from "@/components/cockpit/AgentContextPanel";
+import { InboxPanel } from "@/components/cockpit/InboxPanel";
+import { MemoryHealthPanel } from "@/components/cockpit/MemoryHealthPanel";
+import { ProjectStatePanel } from "@/components/cockpit/ProjectStatePanel";
 import { useDashboard, useProjects } from "@/lib/api";
 import { foldChangelogForDisplay, isHeuristicProposalEvent } from "@/lib/changelogFormat";
 import { useWatcherEvents } from "@/lib/sse";
@@ -50,7 +51,7 @@ export default function Dashboard() {
   const data = dashboard.data;
 
   return (
-    <div className="p-8 space-y-4 max-w-3xl">
+    <div className="p-4 md:p-8 space-y-4 max-w-7xl">
       {data ? <NowBar alias={alias} state={data.projectState} /> : null}
       <LastTurnCard alias={alias} />
 
@@ -66,8 +67,12 @@ export default function Dashboard() {
             const dataPath = proj.projectRoot ?? proj.path;
             return (
               <div
-                className="text-xs text-muted-foreground font-mono mt-0.5"
-                title={proj.vaultRoot ? `Vault: ${proj.vaultRoot}` : `Legacy layout — memory in <repo>/${".cairndex"}/`}
+                className="text-[11px] sm:text-xs text-muted-foreground font-mono mt-0.5 break-all"
+                title={
+                  proj.vaultRoot
+                    ? `Vault: ${proj.vaultRoot}`
+                    : `Legacy layout — memory in <repo>/${".cairndex"}/`
+                }
               >
                 {dataPath}
               </div>
@@ -85,11 +90,17 @@ export default function Dashboard() {
         </div>
       ) : data ? (
         <>
-          <ProjectStatePanel alias={alias} state={data.projectState} />
-          <ActivePlanPanel alias={alias} state={data.projectState} />
-          <MemoryHealthPanel alias={alias} health={data.memoryHealth} />
-          <InboxPanel alias={alias} />
-
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start">
+            <div className="min-w-0 space-y-4">
+              <ProjectStatePanel alias={alias} state={data.projectState} />
+              <ActivePlanPanel alias={alias} state={data.projectState} />
+            </div>
+            <div className="min-w-0 space-y-4 xl:sticky xl:top-14">
+              <AgentContextPanel alias={alias} agentContext={data.agentContext} />
+              <MemoryHealthPanel alias={alias} health={data.memoryHealth} />
+              <InboxPanel alias={alias} />
+            </div>
+          </div>
           <RecentActivity alias={alias} events={data.recentActivity} />
         </>
       ) : null}

@@ -160,26 +160,15 @@ function contextIfStaleCommand(layout: HookLayoutMode, bin: string): string {
  * For central-vault layouts we explicitly pass --vault and --project so the MCP server
  * binds to the correct project regardless of which cwd Claude Code spawns the process in.
  */
-export function renderMcpServerEntry(
-  layout: HookLayoutMode,
-  repoRoot: string,
-): McpServerEntry {
+export function renderMcpServerEntry(layout: HookLayoutMode, repoRoot: string): McpServerEntry {
   const localBin = join(repoRoot, "packages", "cli", "bin", "cairndex");
   const useLocal = existsSync(localBin);
   const command = useLocal ? "node" : "cairndex";
-  const baseArgs = useLocal
-    ? ["packages/cli/bin/cairndex", "mcp"]
-    : ["mcp"];
+  const baseArgs = useLocal ? ["packages/cli/bin/cairndex", "mcp"] : ["mcp"];
   if (layout.mode === "central") {
     return {
       command,
-      args: [
-        ...baseArgs,
-        "--vault",
-        layout.vaultRoot,
-        "--project",
-        layout.projectId,
-      ],
+      args: [...baseArgs, "--vault", layout.vaultRoot, "--project", layout.projectId],
     };
   }
   return { command, args: baseArgs };
@@ -252,9 +241,10 @@ function detectLayout(repoRoot: string): HookLayoutMode {
   try {
     const pointer = readProjectPointer(repoRoot);
     if (pointer) {
-      const vaultRoot = pointer.vault.startsWith(".") || !pointer.vault.match(/^[A-Za-z]:|^\//)
-        ? join(repoRoot, pointer.vault)
-        : pointer.vault;
+      const vaultRoot =
+        pointer.vault.startsWith(".") || !pointer.vault.match(/^[A-Za-z]:|^\//)
+          ? join(repoRoot, pointer.vault)
+          : pointer.vault;
       return { mode: "central", vaultRoot, projectId: pointer.project };
     }
   } catch {

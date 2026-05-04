@@ -173,9 +173,7 @@ export async function resolveVaultProject(
   return (
     projects.find(
       (p) =>
-        p.projectId === idOrAlias ||
-        p.alias === idOrAlias ||
-        (p.aliases ?? []).includes(idOrAlias),
+        p.projectId === idOrAlias || p.alias === idOrAlias || (p.aliases ?? []).includes(idOrAlias),
     ) ?? null
   );
 }

@@ -29,13 +29,21 @@ export async function computeBacklinks(repoRoot: string, cfg: Config): Promise<B
   }
   for (const n of all) {
     // typed edges
-    const links = (n.frontmatter.links ?? []) as LinkLike[];
+    const links = (n.frontmatter.links ?? []) as unknown[];
     if (Array.isArray(links)) {
       for (const link of links) {
-        if (!link?.target) continue;
-        const list = idx.get(link.target) ?? [];
-        list.push({ from: n.id, fromType: n.type, type: link.type });
-        idx.set(link.target, list);
+        if (typeof link === "string") {
+          const list = idx.get(link) ?? [];
+          list.push({ from: n.id, fromType: n.type, type: "links" });
+          idx.set(link, list);
+          continue;
+        }
+        if (!link || typeof link !== "object") continue;
+        const typed = link as Partial<LinkLike>;
+        if (!typed.target) continue;
+        const list = idx.get(typed.target) ?? [];
+        list.push({ from: n.id, fromType: n.type, type: typed.type ?? "links" });
+        idx.set(typed.target, list);
       }
     }
     // wikilinks in body

@@ -64,11 +64,15 @@ describe("runSweep", () => {
       "utf8",
     );
     const first = await runSweep({ cwd: tmp, ageDays: 180, now: new Date("2026-05-02T00:00:00Z") });
-    const second = await runSweep({ cwd: tmp, ageDays: 180, now: new Date("2026-05-02T00:00:00Z") });
+    const second = await runSweep({
+      cwd: tmp,
+      ageDays: 180,
+      now: new Date("2026-05-02T00:00:00Z"),
+    });
     expect(first.archive?.proposalsCreated).toBe(1);
     expect(second.archive?.proposalsCreated).toBe(0);
-    const files = readdirSync(join(tmp, ".cairndex/inbox/proposed-memory-updates")).filter(
-      (f) => f.endsWith(".md"),
+    const files = readdirSync(join(tmp, ".cairndex/inbox/proposed-memory-updates")).filter((f) =>
+      f.endsWith(".md"),
     );
     expect(files.length).toBe(1);
   });

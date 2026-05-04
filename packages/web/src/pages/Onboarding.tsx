@@ -11,12 +11,9 @@ interface RegisteredProject {
   vaultRoot: string;
 }
 
-const isWindows =
-  typeof navigator !== "undefined" && /Win(dows|32|64)/i.test(navigator.userAgent);
+const isWindows = typeof navigator !== "undefined" && /Win(dows|32|64)/i.test(navigator.userAgent);
 const exampleVaultPath = isWindows ? "C:\\Users\\you\\CairndexVault" : "~/CairndexVault";
-const exampleRepoPath = isWindows
-  ? "C:\\Users\\you\\Documents\\GitHub\\my-app"
-  : "~/code/my-app";
+const exampleRepoPath = isWindows ? "C:\\Users\\you\\Documents\\GitHub\\my-app" : "~/code/my-app";
 
 export default function Onboarding() {
   const [step, setStep] = useState<Step>("vault");
@@ -28,9 +25,8 @@ export default function Onboarding() {
       <div className="mb-6 space-y-1">
         <h1 className="text-2xl font-semibold">Welcome to Cairndex</h1>
         <p className="text-sm text-muted-foreground">
-          Persistent project memory for your AI coding work. Specs, decisions, and session
-          notes live in one central vault — agents read them before work and propose updates
-          you review.
+          Persistent project memory for your AI coding work. Specs, decisions, and session notes
+          live in one central vault — agents read them before work and propose updates you review.
         </p>
       </div>
 
@@ -130,15 +126,14 @@ function VaultStep({ onDone }: { onDone: (vaultRoot: string) => void }) {
         <span className="text-xs text-muted-foreground">Vault folder path</span>
         <input
           type="text"
-          autoFocus
           value={path}
           onChange={(e) => setPath(e.target.value)}
           placeholder={`e.g. ${exampleVaultPath}`}
           className="mt-1 w-full px-3 py-2 text-sm font-mono border border-border rounded bg-background"
         />
         <span className="block text-xs text-muted-foreground mt-1">
-          Tip: paste from your file explorer's address bar. The folder will be created if it
-          doesn't exist.{!isWindows ? " Tilde (~) expands to your home folder." : ""}
+          Tip: paste from your file explorer's address bar. The folder will be created if it doesn't
+          exist.{!isWindows ? " Tilde (~) expands to your home folder." : ""}
         </span>
       </label>
 
@@ -228,7 +223,6 @@ function ProjectStep({
         <span className="text-xs text-muted-foreground">Path to your code repo</span>
         <input
           type="text"
-          autoFocus
           value={repo}
           onChange={(e) => setRepo(e.target.value)}
           placeholder={`e.g. ${exampleRepoPath}`}
@@ -353,7 +347,7 @@ function DoctorStep({ registered }: { registered: RegisteredProject }) {
                     className="text-primary hover:underline"
                   >
                     {showAll
-                      ? `Show fewer (collapse to first 8)`
+                      ? "Show fewer (collapse to first 8)"
                       : `Show all ${issues.length} issues`}
                   </button>
                 </li>
@@ -371,8 +365,8 @@ function DoctorStep({ registered }: { registered: RegisteredProject }) {
               <code>cairndex init</code>
             </pre>
             <p className="text-muted-foreground">
-              After that, any Claude Code session inside that repo automatically reads/writes
-              this vault. You can skip this for now and do it later — the GUI works either way.
+              After that, any Claude Code session inside that repo automatically reads/writes this
+              vault. You can skip this for now and do it later — the GUI works either way.
             </p>
           </div>
 

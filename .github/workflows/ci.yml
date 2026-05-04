@@ -48,6 +48,17 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Install Playwright browsers
+        if: runner.os != 'Linux'
+        run: pnpm --filter @cairndex/web exec playwright install chromium
+
+      - name: Install Playwright browsers + Linux deps
+        if: runner.os == 'Linux'
+        run: pnpm --filter @cairndex/web exec playwright install --with-deps chromium
+
+      - name: E2E
+        run: pnpm test:e2e
+
   coverage:
     name: coverage
     runs-on: ubuntu-latest

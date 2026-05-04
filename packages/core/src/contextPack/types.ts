@@ -20,7 +20,7 @@ export interface ContextPackItem {
 }
 
 export interface ContextPackOutput {
-  /** User-supplied task label (pure label — does not affect selection in v1). */
+  /** User-supplied task label or focus hint. */
   task: string;
   /** Slugified task + short hash; suffix-only stable across re-runs. */
   packId: string;
@@ -54,7 +54,11 @@ export const PRIORITY = {
   ACTIVE_PLAN: 1,
   CURRENT_TASK: 1,
   ACTIVE_GOAL: 1,
+  REQUESTED_NODE: 1,
+  LINKED_FOCUS_NODE: 2,
   BACKLINKED_DECISION: 2,
+  BACKLINKED_INSIGHT: 2,
+  RELATED_OPEN_QUESTION: 2,
   OPEN_QUESTION: 3,
   RECENT_SESSION: 4,
 } as const;

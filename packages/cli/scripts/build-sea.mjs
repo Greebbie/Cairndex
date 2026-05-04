@@ -111,10 +111,9 @@ if (isWin) {
 
       // Replace the icon group used by Explorer (resource id 1, language neutral).
       const iconBuf = readFileSync(icoPath);
-      const iconFile = Data.IconFile.from(iconBuf.buffer.slice(
-        iconBuf.byteOffset,
-        iconBuf.byteOffset + iconBuf.byteLength,
-      ));
+      const iconFile = Data.IconFile.from(
+        iconBuf.buffer.slice(iconBuf.byteOffset, iconBuf.byteOffset + iconBuf.byteLength),
+      );
       Resource.IconGroupEntry.replaceIconsForResource(
         res.entries,
         1, // group id
@@ -179,7 +178,7 @@ if (isMac) postjectArgs.push("--macho-segment-name", "NODE_SEA");
 execFileSync(process.execPath, postjectArgs, { stdio: "inherit" });
 
 // 6. Stage portable folder layout: copy web/ and templates/ next to the exe
-console.log(`[sea] staging web/ and templates/ alongside exe`);
+console.log("[sea] staging web/ and templates/ alongside exe");
 cpSync(webDist, join(out, "web"), { recursive: true });
 cpSync(templatesSrc, join(out, "templates"), { recursive: true });
 
@@ -195,7 +194,7 @@ const repoExe = join(repoRoot, exeName);
 copyFileSync(finalExe, repoExe);
 console.log(`[sea] copied to repo root -> ${repoExe}`);
 
-console.log(`[sea] ✓ done.`);
+console.log("[sea] ✓ done.");
 console.log(`[sea]   Repo root:   ${repoExe}  ← visible after clone, double-click to launch`);
 console.log(`[sea]   Portable:    ${out}/  (move this folder to redistribute)`);
-console.log(`[sea]   Both forms launch the GUI on http://localhost:7777.`);
+console.log("[sea]   Both forms launch the GUI on http://localhost:7777.");

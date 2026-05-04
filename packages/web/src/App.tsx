@@ -3,9 +3,9 @@ import { AppRoutes } from "./router";
 
 export default function App() {
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen flex-col overflow-hidden md:flex-row">
       <Sidebar />
-      <main className="flex-1 overflow-auto">
+      <main className="min-w-0 flex-1 overflow-auto">
         <AppRoutes />
       </main>
     </div>

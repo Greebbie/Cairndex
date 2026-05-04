@@ -35,6 +35,21 @@ describe("backlinks", () => {
     ]);
   });
 
+  it("collects string-style frontmatter links", async () => {
+    setup({
+      "plans/PLAN-001-a.md":
+        "---\nid: PLAN-001\ntitle: A\nstatus: active\ncreated: 2026-04-30\nupdated: 2026-04-30\n---\n",
+      "tasks/TASK-001-a.md":
+        "---\nid: TASK-001\ntitle: A\nstatus: pending\ncreated: 2026-04-30\nupdated: 2026-04-30\nlinks:\n  - PLAN-001\n---\n",
+    });
+    const idx = await computeBacklinks(tmp, defaultConfig());
+    expect(idx.get("PLAN-001")).toContainEqual({
+      from: "TASK-001",
+      fromType: "task",
+      type: "links",
+    });
+  });
+
   it("collects [[wikilinks]] from body as 'mentions' edges", async () => {
     setup({
       "specs/SPEC-001-a.md":

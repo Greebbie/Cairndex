@@ -8,6 +8,7 @@ function isSeaRuntime(): boolean {
   // so use eval to defer resolution to the actual Node runtime where the
   // bundle executes. Falls back to false (regular CJS bundle).
   try {
+    // biome-ignore lint/security/noGlobalEval: Node SEA detection needs runtime require after bundling.
     const dynamicRequire = eval("require") as typeof require;
     const sea = dynamicRequire("node:sea") as { isSea?: () => boolean };
     return sea.isSea?.() ?? false;

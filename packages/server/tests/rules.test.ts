@@ -129,11 +129,7 @@ describe("rules CRUD routes", () => {
       cleanup: () => rmSync(repoDir, { recursive: true, force: true }),
     });
     mkdirSync(join(repoDir, ".cairndex"), { recursive: true });
-    writeFileSync(
-      join(repoDir, ".cairndex", "config.yaml"),
-      "schemaVersion: 1\n",
-      "utf8",
-    );
+    writeFileSync(join(repoDir, ".cairndex", "config.yaml"), "schemaVersion: 1\n", "utf8");
 
     const app = await createServer({
       projects: [
@@ -154,10 +150,7 @@ describe("rules CRUD routes", () => {
     });
     expect(put.statusCode).toBe(200);
 
-    const onDisk = readFileSync(
-      join(repoDir, ".cairndex", "rules", "local.md"),
-      "utf8",
-    );
+    const onDisk = readFileSync(join(repoDir, ".cairndex", "rules", "local.md"), "utf8");
     expect(onDisk).toContain("# local rule");
 
     await app.close();

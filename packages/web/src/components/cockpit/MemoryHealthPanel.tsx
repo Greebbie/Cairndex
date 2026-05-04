@@ -51,10 +51,7 @@ export function MemoryHealthPanel({ alias, health }: Props) {
         className="rounded border border-emerald-500/30 bg-emerald-50/40 dark:bg-emerald-950/20 px-3 py-1.5 text-sm flex items-center gap-2"
         data-testid="memory-health-badge"
       >
-        <span
-          className="inline-block w-2 h-2 rounded-full bg-emerald-500"
-          aria-hidden="true"
-        />
+        <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" aria-hidden="true" />
         <span className="text-emerald-800 dark:text-emerald-300">
           Vault healthy — {green} note{green === 1 ? "" : "s"}, no issues.
         </span>

@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -17,9 +17,7 @@ describe("layoutHints", () => {
   });
 
   it("uses .cairndex-relative paths for legacy project ids", () => {
-    expect(inboxProposalsHint(LEGACY_PROJECT_ID)).toBe(
-      ".cairndex/inbox/proposed-memory-updates/",
-    );
+    expect(inboxProposalsHint(LEGACY_PROJECT_ID)).toBe(".cairndex/inbox/proposed-memory-updates/");
     expect(archiveDestinationHint(LEGACY_PROJECT_ID)).toBe(".cairndex/archive/<type>/");
     expect(searchVaultHint(LEGACY_PROJECT_ID)).toBe("grep .cairndex/");
   });

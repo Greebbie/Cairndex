@@ -1,4 +1,8 @@
-import { LEGACY_PROJECT_ID, inboxProposalsHint, searchVaultHint } from "../agentSurface/layoutHints.js";
+import {
+  LEGACY_PROJECT_ID,
+  inboxProposalsHint,
+  searchVaultHint,
+} from "../agentSurface/layoutHints.js";
 import { serializeFrontmatter } from "../frontmatter.js";
 import type { ContextPackItem, ContextPackOutput } from "./types.js";
 

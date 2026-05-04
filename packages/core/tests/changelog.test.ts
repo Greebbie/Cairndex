@@ -51,9 +51,7 @@ describe("appendChangelog", () => {
   it("swallows errors silently — never throws even if the path is invalid", async () => {
     // Pass a path that resolves to a non-writable / nonsense parent. The function
     // should still resolve without rejecting (observability is non-load-bearing).
-    await expect(
-      appendChangelog("\0not-a-real-path\0", "x"),
-    ).resolves.toBeUndefined();
+    await expect(appendChangelog("\0not-a-real-path\0", "x")).resolves.toBeUndefined();
   });
 
   it("changelogPath is layout-aware (works for both legacy and central via vaultPath)", () => {

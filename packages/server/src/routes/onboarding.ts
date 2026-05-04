@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { listVaultProjects, type ProjectEntry } from "@cairndex/core";
+import { type ProjectEntry, listVaultProjects } from "@cairndex/core";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 
@@ -41,9 +41,7 @@ function expandHome(p: string): string {
 }
 
 function flattenZodError(err: z.ZodError): string {
-  return err.issues
-    .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
-    .join("; ");
+  return err.issues.map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; ");
 }
 
 // Errors that come from "you typed a bad path" rather than "the server broke"
@@ -98,9 +96,7 @@ export async function registerOnboardingRoutes(
         fresh.find((p) => p.projectRoot === result.projectRoot) ??
         fresh.find((p) => p.path === result.projectRoot);
       if (!newEntry) {
-        return reply
-          .code(500)
-          .send({ error: "project registered but not found in vault scan" });
+        return reply.code(500).send({ error: "project registered but not found in vault scan" });
       }
       if (hooks.onProjectRegistered) {
         try {

@@ -12,7 +12,14 @@ beforeEach(() => {
   home = mkdtempSync(join(tmpdir(), "cairn-autoaccept-home-"));
   process.env.CAIRNDEX_HOME = home;
   // Minimal vault layout the helper needs.
-  for (const sub of ["specs", "decisions", "insights", "tasks", "changes", "inbox/proposed-memory-updates"]) {
+  for (const sub of [
+    "specs",
+    "decisions",
+    "insights",
+    "tasks",
+    "changes",
+    "inbox/proposed-memory-updates",
+  ]) {
     mkdirSync(join(repo, ".cairndex", sub), { recursive: true });
   }
   writeFileSync(join(repo, ".cairndex/config.yaml"), "schemaVersion: 1\n");
@@ -20,7 +27,7 @@ beforeEach(() => {
 afterEach(() => {
   rmSync(repo, { recursive: true, force: true });
   rmSync(home, { recursive: true, force: true });
-  delete process.env.CAIRNDEX_HOME;
+  process.env.CAIRNDEX_HOME = undefined;
 });
 
 function setThreshold(value: number | null) {

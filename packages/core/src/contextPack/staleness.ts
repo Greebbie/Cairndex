@@ -1,3 +1,4 @@
+import type { Dirent } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { vaultPath } from "../paths.js";
@@ -58,7 +59,7 @@ export async function lastMemoryChangeAt(projectRoot: string): Promise<string | 
 }
 
 async function maxMtimeMs(dir: string, depth: number): Promise<number | null> {
-  let entries;
+  let entries: Dirent[];
   try {
     entries = await readdir(dir, { withFileTypes: true });
   } catch {

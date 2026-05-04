@@ -28,7 +28,7 @@ describe("runBootstrap", () => {
     );
     writeFileSync(
       join(vault, "inbox", "proposed-memory-updates", "PROP-001.md"),
-      `---\nid: PROP-001\nproposalType: create\ntargetType: insight\nstatus: pending\nsummary: ship bootstrap\nreason: hook D wiring\ncontentHash: abc\ncreated: 2026-05-03T00:00:00Z\nprovenance:\n  created_by: test\n  session: t\n---\nbody\n`,
+      "---\nid: PROP-001\nproposalType: create\ntargetType: insight\nstatus: pending\nsummary: ship bootstrap\nreason: hook D wiring\ncontentHash: abc\ncreated: 2026-05-03T00:00:00Z\nprovenance:\n  created_by: test\n  session: t\n---\nbody\n",
       "utf8",
     );
     return repo;

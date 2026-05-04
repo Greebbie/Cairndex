@@ -1,7 +1,7 @@
 import {
   DEFAULT_USER_PREFERENCES,
-  readUserPreferences,
   UserPreferencesSchema,
+  readUserPreferences,
   writeUserPreferences,
 } from "@cairndex/core";
 import type { FastifyInstance } from "fastify";

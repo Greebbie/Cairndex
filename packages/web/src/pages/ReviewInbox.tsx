@@ -1,6 +1,6 @@
+import { TextWithResolvedIds } from "@/components/InlineNodeRef";
 import { ProposalDiff } from "@/components/inbox/ProposalDiff";
 import { ProposalPatchView } from "@/components/inbox/ProposalPatchView";
-import { TextWithResolvedIds } from "@/components/InlineNodeRef";
 import {
   useAcceptProposal,
   useInbox,
@@ -61,8 +61,9 @@ function TargetTitle({
   const node = useNode(alias, type, id);
   if (!id) return <span className="italic text-muted-foreground">(new)</span>;
   const title =
-    node.data?.frontmatter && typeof (node.data.frontmatter as { title?: unknown }).title === "string"
-      ? ((node.data.frontmatter as { title: string }).title)
+    node.data?.frontmatter &&
+    typeof (node.data.frontmatter as { title?: unknown }).title === "string"
+      ? (node.data.frontmatter as { title: string }).title
       : null;
   return (
     <span className="italic" title={id}>
@@ -135,10 +136,8 @@ function ProposalCard({
   // proposals without an explicit agent decision behind them — the human reviewer
   // needs to know that at a glance to calibrate trust.
   const isAutoDistill =
-    p.provenance.createdBy === "auto-distill" ||
-    p.provenance.createdBy === "cairndex-consolidate";
-  const isLowConf =
-    typeof p.provenance.confidence === "number" && p.provenance.confidence < 0.5;
+    p.provenance.createdBy === "auto-distill" || p.provenance.createdBy === "cairndex-consolidate";
+  const isLowConf = typeof p.provenance.confidence === "number" && p.provenance.confidence < 0.5;
   const headline = summaryHeadline(p.summary);
 
   return (

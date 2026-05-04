@@ -100,8 +100,18 @@ describe("consolidateRecentSessions", () => {
     // mention PROP-028 / PROP-020 a few times each. consolidateRecentSessions
     // would then auto-draft "Pattern around PROP-028" meta-proposals — noise
     // about the noise. Same workflow-prefix filter as extractFromSession.ts.
-    writeSession("2026-04-25-1000", "2026-04-25", "triage", "Reviewed [[PROP-028]] and PROP-028 again");
-    writeSession("2026-04-26-1000", "2026-04-26", "triage", "[[PROP-028]] still pending — PROP-028");
+    writeSession(
+      "2026-04-25-1000",
+      "2026-04-25",
+      "triage",
+      "Reviewed [[PROP-028]] and PROP-028 again",
+    );
+    writeSession(
+      "2026-04-26-1000",
+      "2026-04-26",
+      "triage",
+      "[[PROP-028]] still pending — PROP-028",
+    );
     writeSession(
       "2026-04-27-1000",
       "2026-04-27",

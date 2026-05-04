@@ -14,8 +14,10 @@ function summarize(s: Metrics): string {
   const parts: string[] = [];
   const totalToolCalls =
     s.toolCounts.Edit + s.toolCounts.Write + s.toolCounts.Bash + s.toolCounts.Read;
-  if (s.filesTouched > 0) parts.push(`${s.filesTouched} file${s.filesTouched === 1 ? "" : "s"} touched`);
-  if (totalToolCalls > 0) parts.push(`${totalToolCalls} tool call${totalToolCalls === 1 ? "" : "s"}`);
+  if (s.filesTouched > 0)
+    parts.push(`${s.filesTouched} file${s.filesTouched === 1 ? "" : "s"} touched`);
+  if (totalToolCalls > 0)
+    parts.push(`${totalToolCalls} tool call${totalToolCalls === 1 ? "" : "s"}`);
   if (s.newProposals.length > 0) {
     parts.push(`${s.newProposals.length} proposal${s.newProposals.length === 1 ? "" : "s"}`);
   }
@@ -58,10 +60,7 @@ export function LastTurnCard({ alias }: Props) {
         </span>
       </div>
       {narrative.length > 0 ? (
-        <ul
-          data-testid="last-turn-events"
-          className="text-xs text-foreground/90 pl-1 space-y-0.5"
-        >
+        <ul data-testid="last-turn-events" className="text-xs text-foreground/90 pl-1 space-y-0.5">
           {narrative.map((e, idx) => (
             <li key={`${e.date}-${idx}`} className="flex gap-2">
               <span className="text-emerald-700/70 dark:text-emerald-300/70 select-none">·</span>

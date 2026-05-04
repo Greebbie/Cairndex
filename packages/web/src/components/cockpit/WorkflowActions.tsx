@@ -1,9 +1,4 @@
-import {
-  useNodesByType,
-  usePhaseSet,
-  useTaskComplete,
-  useTaskSwitch,
-} from "@/lib/api";
+import { useNodesByType, usePhaseSet, useTaskComplete, useTaskSwitch } from "@/lib/api";
 import type { ProjectState } from "@/lib/types";
 import { useState } from "react";
 
@@ -38,10 +33,7 @@ export function WorkflowActions({ alias, state }: Props) {
   const [phaseInput, setPhaseInput] = useState("");
 
   const lastError =
-    switchTask.error?.message ??
-    completeTask.error?.message ??
-    setPhase.error?.message ??
-    null;
+    switchTask.error?.message ?? completeTask.error?.message ?? setPhase.error?.message ?? null;
 
   const onCompleteCurrent = async () => {
     if (!state.currentTask) return;
@@ -63,42 +55,40 @@ export function WorkflowActions({ alias, state }: Props) {
     setPhaseInput("");
   };
 
-  const anyPending =
-    switchTask.isPending || completeTask.isPending || setPhase.isPending;
+  const anyPending = switchTask.isPending || completeTask.isPending || setPhase.isPending;
 
   return (
     <div className="mt-3 pt-3 border-t border-border/50 space-y-2 text-sm">
       <div className="text-xs uppercase tracking-wide text-muted-foreground">Actions</div>
 
-      <div className="flex flex-wrap gap-2 items-center">
+      <div className="grid gap-2 sm:flex sm:flex-wrap sm:items-center">
         <button
           type="button"
           onClick={onCompleteCurrent}
           disabled={!state.currentTask || anyPending}
-          className="rounded bg-emerald-600 text-white px-2.5 py-1 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+          className="rounded bg-emerald-600 text-white px-2.5 py-1 text-xs disabled:opacity-50 disabled:cursor-not-allowed sm:w-auto"
           title={
-            state.currentTask
-              ? `Mark ${state.currentTask.id} done`
-              : "No current task to complete"
+            state.currentTask ? `Mark ${state.currentTask.id} done` : "No current task to complete"
           }
         >
           {completeTask.isPending ? "Completing…" : "Mark current task done"}
         </button>
 
-        <div className="flex items-center gap-1">
+        <div className="flex min-w-0 items-center gap-1">
           <select
             aria-label="Switch to task"
             value={selectedTaskId}
             onChange={(e) => setSelectedTaskId(e.target.value)}
             disabled={anyPending || eligibleTasks.length === 0}
-            className="rounded border bg-background px-2 py-1 text-xs disabled:opacity-50"
+            className="min-w-0 flex-1 rounded border bg-background px-2 py-1 text-xs disabled:opacity-50 sm:w-44 sm:flex-none"
           >
             <option value="">
               {eligibleTasks.length === 0 ? "No switchable tasks" : "Switch to task…"}
             </option>
             {eligibleTasks.map((t) => (
               <option key={t.id} value={t.id}>
-                {t.id} — {t.title ?? "(untitled)"}{t.status ? ` (${t.status})` : ""}
+                {t.id} — {t.title ?? "(untitled)"}
+                {t.status ? ` (${t.status})` : ""}
               </option>
             ))}
           </select>
@@ -112,7 +102,7 @@ export function WorkflowActions({ alias, state }: Props) {
           </button>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex min-w-0 items-center gap-1">
           <select
             aria-label="Advance phase"
             value=""
@@ -120,7 +110,7 @@ export function WorkflowActions({ alias, state }: Props) {
               if (e.target.value) onSetPhase(e.target.value);
             }}
             disabled={anyPending}
-            className="rounded border bg-background px-2 py-1 text-xs disabled:opacity-50"
+            className="min-w-0 flex-1 rounded border bg-background px-2 py-1 text-xs disabled:opacity-50 sm:w-32 sm:flex-none"
           >
             <option value="">Set phase…</option>
             {COMMON_PHASES.filter((p) => p !== state.phase).map((p) => (
@@ -138,7 +128,7 @@ export function WorkflowActions({ alias, state }: Props) {
               if (e.key === "Enter") onSetPhase(phaseInput);
             }}
             disabled={anyPending}
-            className="rounded border bg-background px-2 py-1 text-xs w-24 disabled:opacity-50"
+            className="w-24 rounded border bg-background px-2 py-1 text-xs disabled:opacity-50"
           />
         </div>
       </div>

@@ -1,4 +1,12 @@
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -83,9 +91,7 @@ describe("runInsightProposeFromSession", () => {
     expect(r.proposalId).toBeUndefined();
     // No proposal file should have been created.
     const inbox = join(repo, ".cairndex", "inbox", "proposed-memory-updates");
-    const entries = existsSync(inbox)
-      ? readdirSync(inbox).filter((f) => f.endsWith(".md"))
-      : [];
+    const entries = existsSync(inbox) ? readdirSync(inbox).filter((f) => f.endsWith(".md")) : [];
     expect(entries).toEqual([]);
   });
 
@@ -131,7 +137,7 @@ describe("runInsightProposeFromSession", () => {
       // Proposal frontmatter shows accepted.
       expect(readFileSync(r.path ?? "", "utf8")).toMatch(/status:\s*accepted/);
     } finally {
-      delete process.env.CAIRNDEX_HOME;
+      process.env.CAIRNDEX_HOME = undefined;
     }
   });
 
@@ -158,9 +164,7 @@ describe("runInsightProposeFromSession", () => {
     expect(r.skipReason).toBe("active-focus-only");
     expect(r.proposalId).toBeUndefined();
     const inbox = join(repo, ".cairndex", "inbox", "proposed-memory-updates");
-    const entries = existsSync(inbox)
-      ? readdirSync(inbox).filter((f) => f.endsWith(".md"))
-      : [];
+    const entries = existsSync(inbox) ? readdirSync(inbox).filter((f) => f.endsWith(".md")) : [];
     expect(entries).toEqual([]);
   });
 

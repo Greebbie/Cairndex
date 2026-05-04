@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import {
-  consolidateRecentSessions,
   type ConsolidateResult,
+  consolidateRecentSessions,
   defaultConfig,
   loadProjectConfig,
   vaultExists,
@@ -24,9 +24,7 @@ export interface ConsolidateCommandResult {
   message?: string;
 }
 
-export async function runConsolidate(
-  opts: ConsolidateOptions,
-): Promise<ConsolidateCommandResult> {
+export async function runConsolidate(opts: ConsolidateOptions): Promise<ConsolidateCommandResult> {
   const root = resolveMemoryRoot(opts);
   if (!vaultExists(root)) {
     return {

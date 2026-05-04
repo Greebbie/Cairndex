@@ -2,12 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import {
-  ConfigSchema,
-  configPath,
-  listAllTypes,
-  vaultPath,
-} from "@cairndex/core";
+import { ConfigSchema, configPath, listAllTypes, vaultPath } from "@cairndex/core";
 import type { FastifyInstance } from "fastify";
 import yaml from "js-yaml";
 import { z } from "zod";
