@@ -12,6 +12,8 @@ export interface SessionSeed {
   date?: string;
   summary?: string;
   narrative_status?: "empty" | "auto" | "confirmed";
+  /** Optional markdown body appended after the frontmatter closing `---`. */
+  body?: string;
 }
 
 export interface TaskSeed {
@@ -89,9 +91,10 @@ export function seedFixture(seed: FixtureSeed): string {
     const date = s.date ?? s.id.slice(0, 10);
     const narrativeStatus = s.narrative_status ?? "empty";
     const summary = s.summary ?? "";
+    const body = s.body ?? "";
     writeFileSync(
       join(vault, "sessions", `${s.id}.md`),
-      `---\nid: ${s.id}\ndate: ${date}\nsummary: '${summary.replace(/'/g, "\\'")}'\nnarrative_status: ${narrativeStatus}\n---\n`,
+      `---\nid: ${s.id}\ndate: ${date}\nsummary: '${summary.replace(/'/g, "\\'")}'\nnarrative_status: ${narrativeStatus}\n---\n${body}`,
     );
   }
 

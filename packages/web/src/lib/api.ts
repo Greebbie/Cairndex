@@ -3,6 +3,8 @@ import { z } from "zod";
 import {
   ChangesSchema,
   ClaudeCodeStatusSchema,
+  type CloseOutAnswers,
+  CloseOutDraftResponseSchema,
   ComposePackResponseSchema,
   DashboardSchema,
   ImplementationLineSchema,
@@ -16,6 +18,8 @@ import {
   PackResponseSchema,
   type Project,
   ProjectSchema,
+  ResumeResponseSchema,
+  SubmitCloseOutResultSchema,
   UserPreferencesSchema,
   VaultOverviewSchema,
 } from "./types.js";
@@ -178,6 +182,80 @@ export function useIntent(alias: string | undefined) {
     enabled: !!alias,
     // Intent is short-lived (per-turn); keep responses fresh but rely on SSE for true liveness.
     staleTime: 5_000,
+  });
+}
+
+export function useResume(alias: string | undefined) {
+  return useQuery({
+    queryKey: ["resume", alias],
+    queryFn: () => jsonFetch(`/api/vault/${alias}/resume`, ResumeResponseSchema),
+    enabled: !!alias,
+    // Resume is built from disk reads; 30s cache is safe — SSE invalidation
+    // handles the truly-live updates if the server pushes them.
+    staleTime: 30_000,
+  });
+}
+
+/**
+ * Fetch the close-out draft for a specific session — prefilled heuristics from
+ * the server (last-turn summary + any existing session narrative). Always
+ * re-fetches when shown (staleTime: 0) so the user sees fresh data even if the
+ * card was previously mounted and the session changed.
+ */
+export function useCloseOutDraft(alias: string, sessionId: string | null) {
+  return useQuery({
+    queryKey: ["vault", alias, "closeout", "draft", sessionId],
+    queryFn: async () => {
+      if (!sessionId) throw new Error("sessionId required");
+      const r = await fetch(
+        `/api/vault/${alias}/closeout/draft?sessionId=${encodeURIComponent(sessionId)}`,
+      );
+      if (!r.ok) {
+        if (r.status === 404) throw new Error(`unknown vault: ${alias}`);
+        if (r.status === 400) throw new Error("bad request");
+        throw new Error(`draft fetch failed: ${r.statusText}`);
+      }
+      const json = await r.json();
+      return CloseOutDraftResponseSchema.parse(json);
+    },
+    enabled: !!sessionId,
+    staleTime: 0, // always re-fetch when shown
+  });
+}
+
+/**
+ * Submit the confirmed close-out answers for a session. On success, invalidates
+ * the resume query (dashboard reflects the new confirmed state) and the closeout
+ * draft query (re-opening the card sees fresh data).
+ */
+export function useSubmitCloseOut(alias: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: {
+      sessionId: string;
+      answers: CloseOutAnswers;
+    }) => {
+      const r = await fetch(`/api/vault/${alias}/closeout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!r.ok) {
+        const text = await r.text().catch(() => "");
+        throw new Error(
+          `submit failed: ${r.statusText}${text ? ` — ${text}` : ""}`,
+        );
+      }
+      const json = await r.json();
+      return SubmitCloseOutResultSchema.parse(json);
+    },
+    onSuccess: () => {
+      // Invalidate resume so the dashboard refetches with the new confirmed state.
+      // Key MUST match useResume's queryKey shape: ["resume", alias].
+      qc.invalidateQueries({ queryKey: ["resume", alias] });
+      // Also invalidate the draft query so re-opening the card sees fresh data.
+      qc.invalidateQueries({ queryKey: ["vault", alias, "closeout"] });
+    },
   });
 }
 

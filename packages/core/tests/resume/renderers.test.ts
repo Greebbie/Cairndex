@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { renderAgentFlavor, renderCliFlavor } from "../../src/resume/renderers.js";
+import type { RenderAgentFlavorOptions } from "../../src/resume/renderers.js";
 import type { ResumeView } from "../../src/resume/types.js";
 
 const baseView: ResumeView = {
@@ -151,6 +152,17 @@ describe("renderAgentFlavor", () => {
     });
     expect(out).toMatch(/Coverage flags:/);
     expect(out).toMatch(/recent-narrative: yellow/);
+  });
+
+  it("includes 'Memory health: green N  yellow M  red K' line when health is provided", () => {
+    const opts: RenderAgentFlavorOptions = { health: { counts: { green: 50, yellow: 2, red: 0 } } };
+    const out = renderAgentFlavor(baseView, opts);
+    expect(out).toMatch(/Memory health: green 50 +yellow 2 +red 0/);
+  });
+
+  it("omits Memory health line when health arg is not provided", () => {
+    const out = renderAgentFlavor(baseView);
+    expect(out).not.toMatch(/Memory health:/);
   });
 
   it("renders empty-vault gracefully (all-null fields)", () => {

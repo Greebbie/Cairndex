@@ -4,15 +4,17 @@ import { LastTurnCard } from "@/components/LastTurnCard";
 import { NowBar } from "@/components/NowBar";
 import { ActivePlanPanel } from "@/components/cockpit/ActivePlanPanel";
 import { AgentContextPanel } from "@/components/cockpit/AgentContextPanel";
+import { CloseOutCard } from "@/components/cockpit/CloseOutCard";
 import { InboxPanel } from "@/components/cockpit/InboxPanel";
 import { IntentBar } from "@/components/cockpit/IntentBar";
 import { MemoryHealthPanel } from "@/components/cockpit/MemoryHealthPanel";
 import { ProjectStatePanel } from "@/components/cockpit/ProjectStatePanel";
-import { useDashboard, useIntent, useProjects } from "@/lib/api";
+import { ResumeCard } from "@/components/cockpit/ResumeCard";
+import { useCloseOutDraft, useDashboard, useIntent, useProjects, useResume, useSubmitCloseOut } from "@/lib/api";
 import { foldChangelogForDisplay, isHeuristicProposalEvent } from "@/lib/changelogFormat";
 import { useWatcherEvents } from "@/lib/sse";
 import { humanizeDateString } from "@/lib/time";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 
 export default function Dashboard() {
@@ -21,7 +23,19 @@ export default function Dashboard() {
   const projects = useProjects();
   const dashboard = useDashboard(alias);
   const intent = useIntent(alias);
+  const resume = useResume(alias);
   useWatcherEvents(alias);
+
+  // Close-out card: show when the most recent session has narrativeStatus === "empty".
+  // Local skip state is keyed by session ID so a later session with a different ID
+  // would still trigger the card. P1 follow-up: record skipped_at on the server so
+  // the card doesn't re-appear on page reload for a skipped session.
+  const [skippedSessionId, setSkippedSessionId] = useState<string | null>(null);
+  const lastSession = resume.data?.view?.lastSession ?? null;
+  const needsCloseOut = lastSession?.narrativeStatus === "empty";
+  const showCloseOut = !!(needsCloseOut && lastSession && lastSession.id !== skippedSessionId);
+  const draft = useCloseOutDraft(alias ?? "", showCloseOut ? (lastSession?.id ?? null) : null);
+  const submitCloseOut = useSubmitCloseOut(alias ?? "");
 
   useEffect(() => {
     if (!alias && projects.data && projects.data.length > 0) {
@@ -54,6 +68,18 @@ export default function Dashboard() {
 
   return (
     <div className="p-4 md:p-8 space-y-4 max-w-7xl">
+      {showCloseOut && draft.data && lastSession ? (
+        <CloseOutCard
+          sessionId={lastSession.id}
+          draft={draft.data.draft}
+          onSubmit={(answers) =>
+            submitCloseOut.mutate({ sessionId: lastSession.id, answers })
+          }
+          onSkip={() => setSkippedSessionId(lastSession.id)}
+          submitting={submitCloseOut.isPending}
+        />
+      ) : null}
+      {resume.data?.view ? <ResumeCard view={resume.data.view} /> : null}
       {data ? <NowBar alias={alias} state={data.projectState} /> : null}
       <IntentBar alias={alias} intent={intent.data?.intent ?? null} />
       <LastTurnCard alias={alias} />

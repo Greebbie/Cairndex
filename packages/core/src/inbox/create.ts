@@ -130,6 +130,7 @@ export async function createProposal(
   if (input.target !== undefined) fm.target = input.target;
   if (input.newFrontmatter !== undefined) fm.newFrontmatter = input.newFrontmatter;
   if (patchToPersist !== undefined) fm.patch = patchToPersist;
+  if (input.closeoutKey !== undefined) fm.closeoutKey = input.closeoutKey;
 
   const filePath = join(dir, `${proposalId}.md`);
   await writeFile(filePath, serializeFrontmatter(fm, resolvedNewBody), "utf8");
@@ -157,6 +158,49 @@ export async function findDuplicate(
   const candidates: ProposalFile[] = [...all.pending, ...all.accepted, ...all.rejected];
   for (const p of candidates) {
     if (p.contentHash === target) return p.proposalId;
+  }
+  return null;
+}
+
+/**
+ * Scan the proposals directory for a file whose frontmatter contains the given
+ * `closeoutKey`. Returns the proposal id (e.g. "PROP-001") if found, or null.
+ *
+ * This is the canonical idempotency lookup for close-out proposals keyed on
+ * `closeout:<sessionId>`. Callers should check this before calling `createProposal`
+ * to avoid writing a duplicate PROP file.
+ */
+export async function findProposalByCloseoutKey(
+  repoRoot: string,
+  key: string,
+): Promise<string | null> {
+  const dir = inboxProposalsPath(repoRoot);
+  if (!existsSync(dir)) return null;
+  let entries: string[];
+  try {
+    entries = await readdir(dir);
+  } catch {
+    return null;
+  }
+  for (const e of entries) {
+    if (!e.endsWith(".md")) continue;
+    const filePath = join(dir, e);
+    let raw: string;
+    try {
+      raw = await readFile(filePath, "utf8");
+    } catch {
+      continue;
+    }
+    let data: Record<string, unknown>;
+    try {
+      ({ data } = parseFrontmatter<Record<string, unknown>>(raw));
+    } catch {
+      continue;
+    }
+    if (data.closeoutKey === key) {
+      const id = typeof data.id === "string" ? data.id : e.replace(/\.md$/, "");
+      return id;
+    }
   }
   return null;
 }

@@ -1,16 +1,18 @@
 import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
-import { projectIdFromRoot } from "./agentSurface/layoutHints.js";
-import { renderAgentSurface } from "./agentSurface/template.js";
 import { archiveIfNeeded } from "./archive.js";
 import { applyCairndexBlock } from "./claudeMd.js";
 import type { Config } from "./config.js";
+import { loadProjectConfig } from "./config.js";
 import { parseFrontmatter, serializeFrontmatter } from "./frontmatter.js";
 import { buildMemoryHealth } from "./indexes/memoryHealth.js";
 import { regenerateAllIndexes } from "./indexes/regenerate.js";
 import { normalizeFrontmatter } from "./normalize.js";
 import { INDEXES_DIR, vaultPath } from "./paths.js";
+import { buildResumeView } from "./resume/buildResumeView.js";
+import { renderAgentFlavor } from "./resume/renderers.js";
+import { writeResumeCache } from "./resume/cache.js";
 import { applyAutoFixes } from "./validate/fix.js";
 import { runValidation } from "./validate/index.js";
 
@@ -150,14 +152,16 @@ export async function handleVaultChange(
   //    write here doesn't itself fire the watcher — but skipping no-op writes keeps mtime stable).
   if (activeContextChanged || memoryHealthChanged) {
     try {
-      const ctx = (await import("./indexes/activeContext.js")).buildActiveContext;
-      const ac = await ctx(repoRoot, cfg);
-      const health = await buildMemoryHealth(repoRoot, cfg);
-      const body = renderAgentSurface(ac, health, projectIdFromRoot(repoRoot));
+      const view = await buildResumeView({ cwd: repoRoot });
+      const watcherCfg = loadProjectConfig(repoRoot);
+      const health = await buildMemoryHealth(repoRoot, watcherCfg);
+      const body = renderAgentFlavor(view, { health });
       const claudeMdPath = join(repoRoot, "CLAUDE.md");
       const existing = existsSync(claudeMdPath) ? await readFile(claudeMdPath, "utf8") : undefined;
       const applied = applyCairndexBlock(existing, body);
       await writeFile(claudeMdPath, applied.updated, "utf8");
+      // Keep state/resume.* in sync with the CLAUDE.md region (mirrors emitClaudeMd.ts).
+      await writeResumeCache({ cwd: repoRoot, view });
       result.claudeMdUpdated = true;
     } catch {
       // best-effort; never block on CLAUDE.md regen.

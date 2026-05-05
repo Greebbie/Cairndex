@@ -97,6 +97,33 @@ beforeEach(() => {
     else if (u.endsWith("/implementation"))
       body = { generatedAt: "2026-05-02T00:00:00Z", entries: [], byPlan: {} };
     else if (u.endsWith("/last-turn-summary")) body = { summary: null };
+    else if (u.endsWith("/resume"))
+      body = {
+        generated: true,
+        builtAt: "2026-05-05T12:00:00Z",
+        sources: [],
+        view: {
+          lastSession: {
+            id: "2026-05-05-1000",
+            date: "2026-05-05",
+            narrativeStatus: "confirmed",
+            summary: "wired ResumeCard into Dashboard",
+          },
+          activeTask: {
+            id: "TASK-014",
+            title: "Wire ResumeCard into Dashboard",
+            status: "in_progress",
+            nextAction: "run tests",
+            ageDays: 0,
+          },
+          whyContext: null,
+          suggestedNext: null,
+          pendingMemory: { count: 1, titles: ["review inbox"] },
+          coverageFlags: [],
+          builtAt: "2026-05-05T12:00:00Z",
+          sources: [],
+        },
+      };
     else if (u.endsWith("/api/vault/demo/task")) body = [];
     else body = {};
     return new Response(JSON.stringify(body), {
@@ -208,5 +235,117 @@ describe("Dashboard (smoke)", () => {
     expect(nowBar.textContent).toContain("Now");
     expect(nowBar.textContent).toContain("implementing");
     expect(nowBar.textContent).toContain("TASK-007");
+  });
+
+  it("renders ResumeCard at the top of the page when resume data is available", async () => {
+    const Wrapper = withRouting();
+    render(
+      <Wrapper>
+        <Dashboard />
+      </Wrapper>,
+    );
+    // The ResumeCard section heading should appear
+    expect(await screen.findByText("Resume")).toBeDefined();
+    // The active task title from the mocked resume payload should be visible
+    expect(await screen.findByText("Wire ResumeCard into Dashboard")).toBeDefined();
+    // Confirms the card uses title-as-headline convention (task ID is secondary)
+    expect(await screen.findByText(/TASK-014/)).toBeDefined();
+    // Pending memory count should be visible
+    expect(await screen.findByText(/1 pending/i)).toBeDefined();
+  });
+
+  it("renders CloseOutCard above ResumeCard when last session narrativeStatus is empty", async () => {
+    const closeOutDraftPayload = {
+      sessionId: "2026-05-05-0228",
+      draft: {
+        didFinish: "Wired CloseOutCard into Dashboard.",
+        decisionOrLearning: "",
+        nextStep: "Run integration tests.",
+      },
+    };
+    const resumeWithEmptySession = {
+      generated: true,
+      builtAt: "2026-05-05T12:00:00Z",
+      sources: [],
+      view: {
+        lastSession: {
+          id: "2026-05-05-0228",
+          date: "2026-05-05",
+          narrativeStatus: "empty",
+          summary: "",
+        },
+        activeTask: {
+          id: "TASK-019",
+          title: "Wire CloseOutCard into Dashboard",
+          status: "in_progress",
+          nextAction: "run tests",
+          ageDays: 0,
+        },
+        whyContext: null,
+        suggestedNext: null,
+        pendingMemory: { count: 0, titles: [] },
+        coverageFlags: [],
+        builtAt: "2026-05-05T12:00:00Z",
+        sources: [],
+      },
+    };
+
+    const prevFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async (url: string | URL | Request) => {
+      const u = typeof url === "string" ? url : url.toString();
+      let body: unknown;
+      if (u.endsWith("/api/projects")) body = projectsPayload;
+      else if (u.endsWith("/dashboard")) body = dashboardPayload;
+      else if (u.endsWith("/inbox")) body = inboxPayload;
+      else if (u.endsWith("/doctor/demo")) body = { issues: [] };
+      else if (u.endsWith("/implementation"))
+        body = { generatedAt: "2026-05-02T00:00:00Z", entries: [], byPlan: {} };
+      else if (u.endsWith("/last-turn-summary")) body = { summary: null };
+      else if (u.endsWith("/resume")) body = resumeWithEmptySession;
+      else if (u.includes("/closeout/draft")) body = closeOutDraftPayload;
+      else if (u.endsWith("/api/vault/demo/task")) body = [];
+      else body = {};
+      return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as unknown as typeof fetch;
+
+    try {
+      const Wrapper = withRouting();
+      render(
+        <Wrapper>
+          <Dashboard />
+        </Wrapper>,
+      );
+
+      // CloseOutCard heading should appear
+      expect(await screen.findByText(/close out last session/i)).toBeDefined();
+      // ResumeCard should also appear (below the CloseOutCard)
+      expect(await screen.findByText("Resume")).toBeDefined();
+
+      // Verify CloseOutCard appears BEFORE ResumeCard in DOM order
+      const closeOutHeading = screen.getByText(/close out last session/i);
+      const resumeHeading = screen.getByText("Resume");
+      // compareDocumentPosition: DOCUMENT_POSITION_FOLLOWING (4) means closeOut comes before resume
+      const position = closeOutHeading.compareDocumentPosition(resumeHeading);
+      expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    } finally {
+      globalThis.fetch = prevFetch;
+    }
+  });
+
+  it("does NOT render CloseOutCard when last session narrativeStatus is confirmed", async () => {
+    // The default beforeEach mock returns narrativeStatus: "confirmed" for /resume
+    const Wrapper = withRouting();
+    render(
+      <Wrapper>
+        <Dashboard />
+      </Wrapper>,
+    );
+    // Wait for resume data to load (ResumeCard appears)
+    expect(await screen.findByText("Resume")).toBeDefined();
+    // CloseOutCard heading should NOT be present
+    expect(screen.queryByText(/close out last session/i)).toBeNull();
   });
 });

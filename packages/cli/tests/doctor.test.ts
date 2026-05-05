@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { runDoctor } from "../src/commands/doctor.js";
 
 let tmp: string;
@@ -11,6 +11,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   rmSync(tmp, { recursive: true, force: true });
+  vi.restoreAllMocks();
 });
 
 describe("doctor", () => {
@@ -103,5 +104,57 @@ describe("doctor", () => {
     expect(body).toContain("SPEC-200.md");
     // ID parsed from path arg should appear in Nodes referenced
     expect(body).toContain("[[SPEC-200]]");
+  });
+
+  it("--story prints story-coverage indicators in addition to structural health", async () => {
+    writeFileSync(
+      join(tmp, ".cairndex/specs/SPEC-001-x.md"),
+      "---\nid: SPEC-001\ntitle: X\nstatus: active\ncreated: 2026-04-30\nupdated: 2026-04-30\nprovenance:\n  created_by: c\n  session: s\n---\n",
+    );
+    const logged: string[] = [];
+    const spy = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logged.push(args.map((a) => String(a)).join(" "));
+    });
+    await runDoctor({ cwd: tmp, story: true });
+    spy.mockRestore();
+    const out = logged.join("\n");
+    expect(out).toContain("Story coverage");
+    // All 5 indicator labels should appear
+    expect(out).toContain("Recent narrative");
+    expect(out).toContain("Active task progress");
+    expect(out).toContain("Next action defined");
+    expect(out).toContain("Inbox hygiene");
+    expect(out).toContain("Resume consumption");
+  });
+
+  it("doctor without --story does NOT print story coverage", async () => {
+    writeFileSync(
+      join(tmp, ".cairndex/specs/SPEC-001-x.md"),
+      "---\nid: SPEC-001\ntitle: X\nstatus: active\ncreated: 2026-04-30\nupdated: 2026-04-30\nprovenance:\n  created_by: c\n  session: s\n---\n",
+    );
+    const logged: string[] = [];
+    const spy = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logged.push(args.map((a) => String(a)).join(" "));
+    });
+    await runDoctor({ cwd: tmp });
+    spy.mockRestore();
+    const out = logged.join("\n");
+    expect(out).not.toContain("Story coverage");
+  });
+
+  it("--story --silent suppresses ALL output including story coverage", async () => {
+    writeFileSync(
+      join(tmp, ".cairndex/specs/SPEC-001-x.md"),
+      "---\nid: SPEC-001\ntitle: X\nstatus: active\ncreated: 2026-04-30\nupdated: 2026-04-30\nprovenance:\n  created_by: c\n  session: s\n---\n",
+    );
+    const logged: string[] = [];
+    const spy = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logged.push(args.map((a) => String(a)).join(" "));
+    });
+    await runDoctor({ cwd: tmp, story: true, silent: true });
+    spy.mockRestore();
+    const out = logged.join("\n");
+    expect(out).not.toContain("Story coverage");
+    expect(out).not.toContain("vault is clean");
   });
 });

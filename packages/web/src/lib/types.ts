@@ -321,3 +321,84 @@ export const InboxListSchema = z.object({
   duplicate: z.array(ProposalSchema),
 });
 export type InboxList = z.infer<typeof InboxListSchema>;
+
+// ---------------------------------------------------------------------------
+// Resume view — mirrors packages/core/src/resume/types.ts; web stays decoupled
+// from core internals so these are re-declared as part of the API contract.
+// ---------------------------------------------------------------------------
+
+export const LastSessionInfoSchema = z.object({
+  id: z.string(),
+  date: z.string(),
+  narrativeStatus: z.enum(["empty", "auto", "confirmed"]),
+  summary: z.string(),
+});
+export type LastSessionInfo = z.infer<typeof LastSessionInfoSchema>;
+
+export const ActiveTaskInfoSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  status: z.string(),
+  nextAction: z.string().nullable(),
+  ageDays: z.number(),
+});
+export type ActiveTaskInfo = z.infer<typeof ActiveTaskInfoSchema>;
+
+export const WhyContextInfoSchema = z.object({
+  kind: z.enum(["decision", "insight"]),
+  id: z.string(),
+  title: z.string(),
+});
+export type WhyContextInfo = z.infer<typeof WhyContextInfoSchema>;
+
+export const PendingMemoryInfoSchema = z.object({
+  count: z.number(),
+  titles: z.array(z.string()),
+});
+export type PendingMemoryInfo = z.infer<typeof PendingMemoryInfoSchema>;
+
+export const ResumeViewSchema = z.object({
+  lastSession: LastSessionInfoSchema.nullable(),
+  activeTask: ActiveTaskInfoSchema.nullable(),
+  whyContext: WhyContextInfoSchema.nullable(),
+  suggestedNext: z.string().nullable(),
+  pendingMemory: PendingMemoryInfoSchema,
+  coverageFlags: z.array(z.string()),
+  builtAt: z.string(),
+  sources: z.array(z.string()),
+});
+export type ResumeView = z.infer<typeof ResumeViewSchema>;
+
+export const ResumeResponseSchema = z.object({
+  generated: z.literal(true),
+  sources: z.array(z.string()),
+  builtAt: z.string(),
+  view: ResumeViewSchema,
+});
+export type ResumeResponse = z.infer<typeof ResumeResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// Close-out — mirrors packages/core/src/closeout/submit.ts CloseOutAnswers.
+// Web stays decoupled from core internals; these are re-declared as part of
+// the API contract.
+// ---------------------------------------------------------------------------
+
+export const CloseOutAnswersSchema = z.object({
+  didFinish: z.string(),
+  decisionOrLearning: z.string(),
+  nextStep: z.string(),
+});
+export type CloseOutAnswers = z.infer<typeof CloseOutAnswersSchema>;
+
+export const CloseOutDraftResponseSchema = z.object({
+  sessionId: z.string(),
+  draft: CloseOutAnswersSchema,
+});
+export type CloseOutDraftResponse = z.infer<typeof CloseOutDraftResponseSchema>;
+
+export const SubmitCloseOutResultSchema = z.object({
+  sessionPath: z.string(),
+  taskPath: z.string().nullable(),
+  proposalId: z.string().nullable(),
+});
+export type SubmitCloseOutResult = z.infer<typeof SubmitCloseOutResultSchema>;

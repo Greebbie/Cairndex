@@ -3,7 +3,9 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import {
   applyCairndexBlock,
+  buildMemoryHealth,
   buildResumeView,
+  loadProjectConfig,
   renderAgentFlavor,
   resolveProjectRef,
   vaultExists,
@@ -43,7 +45,9 @@ export async function runEmitClaudeMd(opts: EmitClaudeMdOptions): Promise<EmitCl
     ...(opts.vaultRoot !== undefined && { vaultRoot: opts.vaultRoot }),
     ...(opts.projectId !== undefined && { projectId: opts.projectId }),
   });
-  const body = renderAgentFlavor(view);
+  const cfg = loadProjectConfig(root);
+  const health = await buildMemoryHealth(root, cfg);
+  const body = renderAgentFlavor(view, { health });
 
   // If the caller passed --vault explicitly, don't fall back to cwd-based pointer
   // discovery for the target — explicit args always win, otherwise a stray

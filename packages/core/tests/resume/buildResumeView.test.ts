@@ -31,7 +31,7 @@ describe("buildResumeView", () => {
     expect(view.suggestedNext).toBe("write tests"); // falls back from intent → task next_action
     expect(view.pendingMemory.count).toBe(1);
     expect(view.pendingMemory.titles).toEqual(["rethink Y"]);
-    expect(view.coverageFlags).toEqual([]); // Phase 5 fills this
+    expect(Array.isArray(view.coverageFlags)).toBe(true); // Phase 5 populates this
     expect(view.builtAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect(view.sources.length).toBeGreaterThan(0);
   });
@@ -45,7 +45,8 @@ describe("buildResumeView", () => {
     expect(view.suggestedNext).toBeNull();
     expect(view.pendingMemory.count).toBe(0);
     expect(view.pendingMemory.titles).toEqual([]);
-    expect(view.coverageFlags).toEqual([]);
+    // No active task → next-action-defined=red, so coverageFlags is non-empty
+    expect(Array.isArray(view.coverageFlags)).toBe(true);
     expect(view.sources).toEqual([]);
   });
 
@@ -89,6 +90,55 @@ describe("buildResumeView", () => {
     });
     const view = await buildResumeView({ cwd: root, today: new Date("2026-05-04T00:00:00Z") });
     expect(view.activeTask?.ageDays).toBe(3);
+  });
+
+  it("populates coverageFlags with names of yellow/red story-coverage indicators", async () => {
+    root = seedFixture({
+      sessions: [
+        // 4 unconfirmed + 1 confirmed in last 7 days → recent-narrative=red (20% < 50%)
+        { id: "2026-05-01-1000", narrative_status: "empty" },
+        { id: "2026-05-02-1000", narrative_status: "empty" },
+        { id: "2026-05-03-1000", narrative_status: "empty" },
+        { id: "2026-05-04-1000", narrative_status: "empty" },
+        { id: "2026-05-05-1000", narrative_status: "confirmed" },
+      ],
+      // No currentTask → next-action-defined=red
+    });
+    const view = await buildResumeView({ cwd: root, today: new Date("2026-05-05T12:00:00Z") });
+    // recent-narrative should be red (1/5 = 20% < 50%)
+    expect(view.coverageFlags).toContain("recent-narrative");
+    // next-action-defined should be red (no active task)
+    expect(view.coverageFlags).toContain("next-action-defined");
+    // inbox-hygiene: 0 pending → green, should NOT appear
+    expect(view.coverageFlags).not.toContain("inbox-hygiene");
+  });
+
+  it("coverageFlags contains only non-green indicator names", async () => {
+    root = seedFixture({
+      sessions: [{ id: "2026-05-05-1000", narrative_status: "confirmed" }],
+      tasks: [
+        {
+          id: "TASK-OK",
+          title: "active task",
+          status: "in_progress",
+          next_action: "do something",
+          updated: "2026-05-05",
+        },
+      ],
+      currentTask: "TASK-OK",
+    });
+    const view = await buildResumeView({ cwd: root, today: new Date("2026-05-05T12:00:00Z") });
+    // With 1 session confirmed (100%) and an active task with next_action, most indicators are green.
+    // recent-narrative: green (1/1 = 100%)
+    expect(view.coverageFlags).not.toContain("recent-narrative");
+    // next-action-defined: green (task has next_action)
+    expect(view.coverageFlags).not.toContain("next-action-defined");
+    // inbox-hygiene: green (0 pending)
+    expect(view.coverageFlags).not.toContain("inbox-hygiene");
+    // All flags should be names only (no level suffix)
+    for (const flag of view.coverageFlags) {
+      expect(flag).not.toMatch(/: (green|yellow|red)$/);
+    }
   });
 
   it("collects sources from every reader that read a file", async () => {

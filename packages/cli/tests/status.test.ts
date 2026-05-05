@@ -93,4 +93,29 @@ describe("runStatus", () => {
     expect(r.exitCode).toBe(1);
     expect(r.message).toBeDefined();
   });
+
+  it("prints a story coverage line in human-readable output", async () => {
+    const repo = seedLegacyRepo();
+    const r = await runStatus({ cwd: repo });
+    expect(r.exitCode).toBe(0);
+    const text = r.body ?? "";
+    // The story coverage line should always be present (either "all green" or flag names)
+    expect(text).toMatch(/Story:/);
+  });
+
+  it("--json output includes storyCoverage array with name and level", async () => {
+    const repo = seedLegacyRepo();
+    const r = await runStatus({ cwd: repo, json: true });
+    expect(r.exitCode).toBe(0);
+    const parsed = JSON.parse(r.body ?? "{}") as {
+      storyCoverage?: Array<{ name: string; level: string }>;
+    };
+    expect(Array.isArray(parsed.storyCoverage)).toBe(true);
+    const sc = parsed.storyCoverage ?? [];
+    expect(sc.length).toBe(5); // always 5 indicators
+    for (const entry of sc) {
+      expect(typeof entry.name).toBe("string");
+      expect(["green", "yellow", "red"]).toContain(entry.level);
+    }
+  });
 });

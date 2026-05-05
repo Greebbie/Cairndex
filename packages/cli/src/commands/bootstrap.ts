@@ -1,14 +1,13 @@
 import { existsSync } from "node:fs";
 import {
-  buildActiveContext,
   buildMemoryHealth,
+  buildResumeView,
   defaultConfig,
   findLatestPackWithStaleness,
   inboxProposalsPath,
   listProposals,
   loadProjectConfig,
-  projectIdFromRoot,
-  renderAgentSurface,
+  renderAgentFlavor,
   resolveProjectRef,
   vaultExists,
   vaultPath,
@@ -52,8 +51,9 @@ const DEFAULT_PROPOSAL_LIMIT = 5;
  * pending proposals injected — no need for the agent to discover and read CLAUDE.md
  * before useful work can begin.
  *
- * Output format intentionally mirrors `renderAgentSurface` (used in CLAUDE.md region)
- * so the agent sees the same shape whether it loads context via the file or the hook.
+ * Output format uses `renderAgentFlavor` (same as the CLAUDE.md region written by
+ * `cairndex emit claude-md`) so the agent sees the same shape whether it loads context
+ * via the file or the hook.
  */
 export async function runBootstrap(opts: BootstrapOptions): Promise<BootstrapResult> {
   const root = resolveMemoryRoot(opts);
@@ -64,9 +64,12 @@ export async function runBootstrap(opts: BootstrapOptions): Promise<BootstrapRes
     ? loadProjectConfig(root)
     : defaultConfig();
 
-  const ctx = await buildActiveContext(root, cfg);
+  const view = await buildResumeView({
+    cwd: opts.cwd,
+    ...(opts.vaultRoot !== undefined && { vaultRoot: opts.vaultRoot }),
+    ...(opts.projectId !== undefined && { projectId: opts.projectId }),
+  });
   const health = await buildMemoryHealth(root, cfg);
-  const projectId = opts.projectId ?? projectIdFromRoot(root);
   const limit = opts.proposalLimit ?? DEFAULT_PROPOSAL_LIMIT;
   const inbox = await listProposals(root, cfg);
 
@@ -96,7 +99,7 @@ export async function runBootstrap(opts: BootstrapOptions): Promise<BootstrapRes
     lines.push(`  Inbox:        ${inboxProposalsPath(root)}`);
     lines.push("");
   }
-  lines.push(renderAgentSurface(ctx, health, projectId));
+  lines.push(renderAgentFlavor(view, { health }));
   // When something's red or yellow, show up to three issue summaries inline so
   // the agent doesn't have to shell out to `cairndex doctor` to learn what's
   // wrong. Red issues are listed before yellow — they're the ones an agent

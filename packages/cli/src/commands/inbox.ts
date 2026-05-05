@@ -256,3 +256,59 @@ export async function runInboxReject(
     return { exitCode: 1, message: e instanceof Error ? e.message : String(e) };
   }
 }
+
+export interface InboxCleanupOptions extends BaseOptions {
+  /** Match proposals whose `provenance.created_by` equals this string. */
+  autoSource: string;
+  reason?: string;
+  dryRun?: boolean;
+}
+
+export interface InboxCleanupResult {
+  exitCode: 0 | 1;
+  message?: string;
+  matched: Array<{ proposalId: string; summary: string }>;
+  rejected: string[];
+  skipped: Array<{ proposalId: string; reason: string }>;
+}
+
+export async function runInboxCleanup(opts: InboxCleanupOptions): Promise<InboxCleanupResult> {
+  const root = resolveMemoryRoot(opts);
+  if (!vaultExists(root)) {
+    return {
+      exitCode: 1,
+      message: missingVaultMessage(root),
+      matched: [],
+      rejected: [],
+      skipped: [],
+    };
+  }
+  const cfg = loadCfg(root);
+  const list = await listProposals(root, cfg);
+  // Only pending proposals are candidates — already-rejected ones have nothing
+  // to do, accepted/duplicate ones shouldn't be silently re-touched.
+  const matched: Array<{ proposalId: string; summary: string }> = [];
+  for (const p of list.pending) {
+    if (p.provenance.createdBy === opts.autoSource) {
+      matched.push({ proposalId: p.proposalId, summary: p.summary });
+    }
+  }
+  if (opts.dryRun) {
+    return { exitCode: 0, matched, rejected: [], skipped: [] };
+  }
+  const reason = opts.reason ?? `bulk cleanup: created_by=${opts.autoSource}`;
+  const rejected: string[] = [];
+  const skipped: Array<{ proposalId: string; reason: string }> = [];
+  for (const m of matched) {
+    try {
+      await rejectProposal(root, cfg, m.proposalId, reason);
+      rejected.push(m.proposalId);
+    } catch (e) {
+      skipped.push({
+        proposalId: m.proposalId,
+        reason: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+  return { exitCode: 0, matched, rejected, skipped };
+}

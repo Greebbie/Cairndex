@@ -33,6 +33,12 @@ export interface CreateProposalInput {
   summary: string;
   reason: string;
   provenance: ProposalProvenance;
+  /**
+   * Optional idempotency key. When set, the value is stored in the PROP frontmatter
+   * as `closeoutKey`. Callers can use `findProposalByCloseoutKey` to check whether
+   * a proposal with this key already exists before creating a new one.
+   */
+  closeoutKey?: string;
 }
 
 export interface FindDuplicateInput {

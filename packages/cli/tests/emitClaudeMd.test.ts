@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { buildResumeView, renderAgentFlavor } from "@cairndex/core";
+import { buildMemoryHealth, buildResumeView, defaultConfig, renderAgentFlavor } from "@cairndex/core";
 import { runEmitClaudeMd } from "../src/commands/emitClaudeMd.js";
 
 let tmp: string;
@@ -35,6 +35,12 @@ describe("runEmitClaudeMd (post-resume swap)", () => {
         "---\nid: TASK-007\ntitle: 'ship'\nstatus: in_progress\ncreated: 2026-05-05\nupdated: 2026-05-05\nnext_action: 'test'\n---\n",
     });
 
+    // Compute expected BEFORE running emitClaudeMd so the vault state is identical
+    // (resume-consumption scorer checks for state/resume.json which emitClaudeMd writes).
+    const view = await buildResumeView({ cwd: tmp });
+    const health = await buildMemoryHealth(tmp, defaultConfig());
+    const expected = renderAgentFlavor(view, { health }).trim();
+
     await runEmitClaudeMd({ cwd: tmp });
 
     const claudeMd = await readFile(join(tmp, "CLAUDE.md"), "utf8");
@@ -46,8 +52,6 @@ describe("runEmitClaudeMd (post-resume swap)", () => {
       .slice(start + "<!-- cairndex:start v1 -->".length, end)
       .trim();
 
-    const view = await buildResumeView({ cwd: tmp });
-    const expected = renderAgentFlavor(view).trim();
     expect(region).toBe(expected);
   });
 

@@ -1,4 +1,9 @@
 import type { ResumeView } from "./types.js";
+import type { MemoryHealthCounts } from "../indexes/memoryHealth.js";
+
+export interface RenderAgentFlavorOptions {
+  health?: { counts: MemoryHealthCounts };
+}
 
 export function renderCliFlavor(view: ResumeView): string {
   const out: string[] = [];
@@ -65,7 +70,7 @@ const MINIMAL_CONTRACT = [
  * the minimal operating contract that teaches the agent how to behave around the
  * resume architecture.
  */
-export function renderAgentFlavor(view: ResumeView): string {
+export function renderAgentFlavor(view: ResumeView, opts: RenderAgentFlavorOptions = {}): string {
   const lines: string[] = [];
 
   if (view.lastSession) {
@@ -104,6 +109,11 @@ export function renderAgentFlavor(view: ResumeView): string {
     lines.push("Pending memory: 0 pending");
   }
 
+  if (opts.health) {
+    const { green, yellow, red } = opts.health.counts;
+    lines.push(`Memory health: green ${green}  yellow ${yellow}  red ${red}`);
+  }
+
   if (view.coverageFlags.length > 0) {
     lines.push(`Coverage flags: ${view.coverageFlags.join(", ")}`);
   }
@@ -119,9 +129,10 @@ export function renderAgentFlavor(view: ResumeView): string {
   lines.push("if you're heading the wrong way. The Stop hook clears it at end-of-turn.");
   lines.push("");
   lines.push("Session wrap-up: when the user signals close-out (`/wrap`, 'wrap up',");
-  lines.push("'close out'), run `cairndex wrap` to get a read-only report. For each ⚠ warning,");
-  lines.push("propose the matching mutation (task complete / session log / doctor --fix /");
-  lines.push("inbox triage) and ask before executing. Wrap is read-then-suggest, not auto-fix.");
+  lines.push("'close out'), run `cairndex wrap`. If the most recent session is unconfirmed,");
+  lines.push("this opens the close-out flow (3 questions: what finished, any decision/learning,");
+  lines.push("where next). The dashboard's close-out card is the primary surface; the CLI");
+  lines.push("falls back interactively in a TTY or via `--json` for scripts.");
 
   return lines.join("\n") + "\n" + MINIMAL_CONTRACT;
 }

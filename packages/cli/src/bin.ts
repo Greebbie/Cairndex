@@ -7,6 +7,7 @@ import { runDoctor } from "./commands/doctor.js";
 import { runEmitClaudeMd } from "./commands/emitClaudeMd.js";
 import {
   runInboxAccept,
+  runInboxCleanup,
   runInboxList,
   runInboxPropose,
   runInboxProposeUpdate,
@@ -20,6 +21,7 @@ import {
 } from "./commands/insight.js";
 import { runIntentClear, runIntentSet, runIntentShow } from "./commands/intent.js";
 import { runResume } from "./commands/resume.js";
+import { runCloseOut } from "./commands/closeout.js";
 import { runLastTurnSummary } from "./commands/lastTurnSummary.js";
 import { runMcp } from "./commands/mcp.js";
 import {
@@ -168,6 +170,11 @@ program
   .option("--scope <mode>", "Validation scope: changed | all", "all")
   .option("--auto-session", "Generate a session note from the recent transcript", false)
   .option("--filter-path <prefix>", "Only check files under this path prefix")
+  .option(
+    "--story",
+    "Also print story coverage indicators (narrative, task progress, inbox, resume)",
+    false,
+  )
   .action(async (opts) => {
     let transcriptPath: string | undefined;
     if (opts.autoSession) {
@@ -185,6 +192,7 @@ program
       scope: opts.scope,
       autoSession: opts.autoSession,
       filterPath: opts.filterPath,
+      story: opts.story,
       ...(transcriptPath ? { transcriptPath } : {}),
     });
     process.exit(r.exitCode);
@@ -521,7 +529,7 @@ program
 program
   .command("wrap")
   .description(
-    "Close-out report (read-only) — checks active task / next action / inbox / doctor / last session '## Next' and surfaces forward-pickup signals on one screen.",
+    "Open the close-out flow for the most recent unconfirmed session (3 questions: what finished, any decision/learning, where next). Prints a session-status summary if no unconfirmed session is pending.",
   )
   .option("--cwd <path>", "Working directory", process.cwd())
   .option("--vault <path>", "Vault root (overrides --cwd)")
@@ -532,10 +540,9 @@ program
     if (opts.vault) callOpts.vaultRoot = opts.vault;
     if (opts.project) callOpts.projectId = opts.project;
     if (opts.json) callOpts.json = true;
-    const r = await runWrap(callOpts);
-    if (r.message) console.error(r.message);
-    if (r.body) console.log(r.body);
-    process.exit(r.exitCode);
+    // runWrap (post-Task-4.7) writes its own output and sets process.exitCode
+    // when a non-zero exit is needed. No return value to consume.
+    await runWrap(callOpts);
   });
 
 program
@@ -643,6 +650,37 @@ program
     });
   });
 
+program
+  .command("closeout")
+  .description(
+    "Close out the most recent session (or --session <id>): edit narrative, optionally propose a memory update.",
+  )
+  .option("--cwd <path>", "Project root", process.cwd())
+  .option("--vault <path>", "Vault root override")
+  .option("--project <id>", "Project ID override")
+  .option("--session <id>", "Specific session ID (defaults to latest)")
+  .option("--json", "Print prefilled draft as JSON and exit (no submit)")
+  .option("--did <text>", "Q1 answer (non-interactive submit)")
+  .option("--learn <text>", "Q2 answer (non-interactive submit)")
+  .option("--next <text>", "Q3 answer (non-interactive submit)")
+  .option(
+    "--confirm",
+    "Submit non-interactively (requires --did/--next; --learn optional)",
+  )
+  .action(async (opts) => {
+    await runCloseOut({
+      cwd: opts.cwd,
+      vaultRoot: opts.vault,
+      projectId: opts.project,
+      session: opts.session,
+      json: opts.json,
+      did: opts.did,
+      learn: opts.learn,
+      next: opts.next,
+      confirm: opts.confirm,
+    });
+  });
+
 const inbox = program
   .command("inbox")
   .description("Review-and-accept queue for agent-proposed memory updates");
@@ -715,6 +753,42 @@ inbox
     if (opts.project) callOpts.projectId = opts.project;
     const r = await runInboxReject(callOpts);
     if (r.message) console.error(r.message);
+    process.exit(r.exitCode);
+  });
+
+inbox
+  .command("cleanup")
+  .description(
+    "Bulk-reject pending proposals matching a provenance source (e.g. cairndex-consolidate). Useful for one-time triage of historical auto-generated noise.",
+  )
+  .requiredOption("--auto-source <name>", "Match proposals where provenance.created_by equals this value")
+  .option("--cwd <path>", "Working directory", process.cwd())
+  .option("--vault <path>", "Vault root (overrides --cwd)")
+  .option("--project <id>", "Project id inside a central vault")
+  .option("--reason <text>", "Rejection reason recorded on each PROP")
+  .option("--dry-run", "Print matched proposals without rejecting", false)
+  .action(async (opts) => {
+    const callOpts: Parameters<typeof runInboxCleanup>[0] = {
+      cwd: opts.cwd,
+      autoSource: opts.autoSource,
+    };
+    if (opts.vault) callOpts.vaultRoot = opts.vault;
+    if (opts.project) callOpts.projectId = opts.project;
+    if (opts.reason) callOpts.reason = opts.reason;
+    if (opts.dryRun) callOpts.dryRun = true;
+    const r = await runInboxCleanup(callOpts);
+    if (r.message) console.error(r.message);
+    if (r.matched.length === 0) {
+      console.log(`No pending proposals match created_by="${opts.autoSource}".`);
+    } else if (opts.dryRun) {
+      console.log(`Would reject ${r.matched.length} proposal(s):`);
+      for (const m of r.matched) console.log(`  ${m.proposalId}  ${m.summary}`);
+      console.log(`\n(dry run — re-run without --dry-run to apply)`);
+    } else {
+      console.log(`Rejected ${r.rejected.length} of ${r.matched.length} proposal(s).`);
+      for (const id of r.rejected) console.log(`  ✓ ${id}`);
+      for (const s of r.skipped) console.log(`  ✗ ${s.proposalId} — ${s.reason}`);
+    }
     process.exit(r.exitCode);
   });
 

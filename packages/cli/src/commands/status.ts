@@ -9,6 +9,7 @@ import {
   loadProjectConfig,
   projectIdFromRoot,
   readIntent,
+  scoreAllStoryCoverage,
   vaultExists,
   vaultPath,
 } from "@cairndex/core";
@@ -102,11 +103,14 @@ export async function runStatus(opts: StatusOptions): Promise<StatusResult> {
   const cfg = existsSync(`${vaultPath(root)}/config.yaml`)
     ? loadProjectConfig(root)
     : defaultConfig();
-  const ctx = await buildActiveContext(root, cfg);
-  const health = await buildMemoryHealth(root, cfg);
-  const inbox = await listProposals(root, cfg);
-  const lastChange = await lastDurableMtime(root);
-  const intent = await readIntent(root);
+  const [ctx, health, inbox, lastChange, intent, storyCoverage] = await Promise.all([
+    buildActiveContext(root, cfg),
+    buildMemoryHealth(root, cfg),
+    listProposals(root, cfg),
+    lastDurableMtime(root),
+    readIntent(root),
+    scoreAllStoryCoverage({ cwd: root }),
+  ]);
   const projectId = opts.projectId ?? projectIdFromRoot(root);
 
   if (opts.json) {
@@ -123,6 +127,7 @@ export async function runStatus(opts: StatusOptions): Promise<StatusResult> {
           nextAction: ctx.nextAction,
           intent,
           memory: health.counts,
+          storyCoverage: storyCoverage.map((i) => ({ name: i.name, level: i.level })),
           inbox: {
             pending: inbox.pending.length,
             accepted: inbox.accepted.length,
@@ -168,6 +173,14 @@ export async function runStatus(opts: StatusOptions): Promise<StatusResult> {
   lines.push(
     `${pad("Memory:", 14)}${health.counts.green} green  ${health.counts.yellow} yellow  ${health.counts.red} red`,
   );
+  const storyFlags = storyCoverage.filter((i) => i.level !== "green");
+  if (storyFlags.length > 0) {
+    lines.push(
+      `${pad("Story:", 14)}${storyFlags.map((f) => `${f.name}: ${f.level}`).join(", ")}`,
+    );
+  } else {
+    lines.push(`${pad("Story:", 14)}all green`);
+  }
   lines.push(
     `${pad("Inbox:", 14)}${inbox.pending.length} pending  ${inbox.accepted.length} accepted  ${inbox.rejected.length} rejected`,
   );

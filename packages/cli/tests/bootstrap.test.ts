@@ -40,8 +40,9 @@ describe("runBootstrap", () => {
     expect(r.exitCode).toBe(0);
     const text = r.body ?? "";
     expect(text).toContain("Cairndex session bootstrap");
-    expect(text).toContain("Phase: implementing");
-    expect(text).toContain("Active spec: SPEC-001");
+    // New flavor: renderAgentFlavor output — task-centric, not phase/spec-centric.
+    expect(text).toContain("Operating contract:");
+    expect(text).toContain("cairndex context");
     expect(text).toContain("PROP-001");
     expect(text).toContain("Pending proposals");
   });

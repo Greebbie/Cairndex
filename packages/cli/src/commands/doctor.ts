@@ -2,6 +2,7 @@ import { existsSync, statSync } from "node:fs";
 import { mkdir, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import {
+  type CoverageLevel,
   type ValidationIssue,
   applyAutoFixes,
   defaultConfig,
@@ -11,6 +12,7 @@ import {
   parseTranscriptJsonl,
   regenerateRecentChanges,
   runValidation,
+  scoreAllStoryCoverage,
   signalsPath,
   vaultPath,
 } from "@cairndex/core";
@@ -34,6 +36,12 @@ export interface DoctorOptions {
    * instead of the fallback filesystem mtime walk.
    */
   transcriptPath?: string;
+  /**
+   * When true, prints story coverage indicators (recent narrative, active task progress,
+   * next action defined, inbox hygiene, resume consumption) after the structural health
+   * section. Story indicators are informational only — they do NOT affect the exit code.
+   */
+  story?: boolean;
 }
 
 export interface DoctorResult {
@@ -49,6 +57,17 @@ function severityColor(sev: ValidationIssue["severity"]): (s: string) => string 
       return kleur.yellow;
     case "info":
       return kleur.blue;
+  }
+}
+
+function coverageGlyph(level: CoverageLevel): string {
+  switch (level) {
+    case "green":
+      return kleur.green("●");
+    case "yellow":
+      return kleur.yellow("●");
+    case "red":
+      return kleur.red("●");
   }
 }
 
@@ -191,6 +210,22 @@ export async function runDoctor(opts: DoctorOptions): Promise<DoctorResult> {
       }
       console.log();
       console.log(`${errors.length} error(s), ${warns.length} warning(s), ${infos.length} info`);
+    }
+  }
+
+  // --story: print story coverage indicators after structural health.
+  // These are informational only — they do NOT affect the exit code.
+  if (opts.story && !opts.silent) {
+    const indicators = await scoreAllStoryCoverage({
+      cwd,
+      ...(opts.vaultRoot !== undefined && { vaultRoot: opts.vaultRoot }),
+      ...(opts.projectId !== undefined && { projectId: opts.projectId }),
+    });
+    console.log();
+    console.log("Story coverage:");
+    for (const ind of indicators) {
+      const glyph = coverageGlyph(ind.level);
+      console.log(`  ${glyph} ${ind.label}: ${ind.detail}`);
     }
   }
 

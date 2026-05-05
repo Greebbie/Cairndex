@@ -47,7 +47,8 @@ describe("handleVaultChange — indexes cascade", () => {
     expect(result.claudeMdUpdated).toBe(true);
     const claudeMd = readFileSync(join(tmp, "CLAUDE.md"), "utf8");
     expect(claudeMd).toContain("<!-- cairndex:start v1 -->");
-    expect(claudeMd).toContain("Active spec: SPEC-001");
+    // New flavor: renderAgentFlavor output — task-centric, not phase/spec-centric.
+    expect(claudeMd).toContain("Operating contract:");
   });
 
   it("ignores changes inside .cairndex/indexes/ to avoid loops", async () => {
