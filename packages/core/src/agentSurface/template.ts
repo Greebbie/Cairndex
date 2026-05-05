@@ -3,8 +3,14 @@ import type { MemoryHealth } from "../indexes/memoryHealth.js";
 import { LEGACY_PROJECT_ID, inboxProposalsHint } from "./layoutHints.js";
 
 /**
- * Render the Recommended-set agent-surface body. This is what goes inside the
- * `<!-- cairndex:start v1 --> ... <!-- cairndex:end -->` region of CLAUDE.md.
+ * @deprecated Use `renderAgentFlavor(buildResumeView({ cwd }))` from `@cairndex/core`
+ * instead. The `emitClaudeMd` command was migrated in Task 2.7 (2026-05).
+ *
+ * This function remains only because `bootstrap.ts` and `watcherActions.ts` still call
+ * it. Those callers will be migrated in a future task. Do not add new call sites.
+ *
+ * Original docs: Render the Recommended-set agent-surface body. This is what goes inside
+ * the `<!-- cairndex:start v1 --> ... <!-- cairndex:end -->` region of CLAUDE.md.
  *
  * Per design: phase + active goal/spec/plan/task + next action + a single
  * memory-health line + the `cairndex context` command hint + an inbox-proposal note.

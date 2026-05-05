@@ -10,6 +10,7 @@ beforeEach(() => {
   mkdirSync(join(tmp, ".cairndex/specs"), { recursive: true });
   mkdirSync(join(tmp, ".cairndex/sessions"), { recursive: true });
   mkdirSync(join(tmp, ".cairndex/inbox/proposed-memory-updates"), { recursive: true });
+  mkdirSync(join(tmp, ".cairndex/signals"), { recursive: true });
   writeFileSync(join(tmp, ".cairndex/config.yaml"), "schemaVersion: 1\n");
 });
 afterEach(() => {
@@ -32,7 +33,7 @@ describe("runSweep", () => {
     expect(r.archive?.proposalsCreated).toBe(0);
   });
 
-  it("creates a consolidate proposal when 3+ sessions reference the same node", async () => {
+  it("emits a consolidate signal to signals/ when 3+ sessions reference the same node", async () => {
     for (const date of ["2026-04-25", "2026-04-26", "2026-04-27"]) {
       const id = `${date}-1000`;
       writeFileSync(
@@ -43,8 +44,9 @@ describe("runSweep", () => {
     }
     const r = await runSweep({ cwd: tmp, lookbackDays: 365 });
     expect(r.consolidate?.proposalsCreated).toBeGreaterThanOrEqual(1);
-    const files = readdirSync(join(tmp, ".cairndex/inbox/proposed-memory-updates"));
-    expect(files.some((f) => /^PROP-\d+\.md$/.test(f))).toBe(true);
+    // Consolidate now writes to signals/, not inbox/.
+    const sigFiles = readdirSync(join(tmp, ".cairndex/signals"));
+    expect(sigFiles.some((f) => /^SIG-\d+\.md$/.test(f))).toBe(true);
   });
 
   it("creates an archive proposal for stale low-confidence unverified nodes", async () => {

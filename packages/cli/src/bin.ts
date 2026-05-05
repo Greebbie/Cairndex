@@ -19,6 +19,7 @@ import {
   runInsightPull,
 } from "./commands/insight.js";
 import { runIntentClear, runIntentSet, runIntentShow } from "./commands/intent.js";
+import { runResume } from "./commands/resume.js";
 import { runLastTurnSummary } from "./commands/lastTurnSummary.js";
 import { runMcp } from "./commands/mcp.js";
 import {
@@ -281,7 +282,7 @@ emit
 program
   .command("consolidate")
   .description(
-    "Scan recent sessions for repeated node references and draft insight proposals into the inbox",
+    "Scan recent sessions for repeated node references and emit insight signals to signals/",
   )
   .option("--cwd <path>", "Working directory", process.cwd())
   .option("--vault <path>", "Vault root (overrides --cwd)")
@@ -306,15 +307,15 @@ program
     if (r.message) console.error(r.message);
     if (r.result) {
       console.log(
-        `consolidate: ${r.result.proposalsCreated} proposal(s) created, ${r.result.candidates.length} candidate target(s) examined.`,
+        `consolidate: ${r.result.proposalsCreated} signal(s) emitted, ${r.result.candidates.length} candidate target(s) examined.`,
       );
       for (const c of r.result.candidates) {
-        const status = c.proposalId
-          ? `proposed as ${c.proposalId}`
+        const status = c.signalId
+          ? `emitted as signal ${c.signalId}`
           : c.skipped === "covered"
             ? "skipped (covered by existing insight)"
             : c.skipped === "duplicate"
-              ? "skipped (duplicate proposal)"
+              ? "skipped (duplicate signal)"
               : "skipped";
         console.log(`  ${c.target}: ${c.mentions} mention(s) — ${status}`);
       }
@@ -373,7 +374,7 @@ program
 program
   .command("sweep")
   .description(
-    "Run consolidate + archive together — drafts insight and archive proposals into the inbox. Safe to run on every session end (idempotent via dedupe).",
+    "Run consolidate + archive together — emits insight signals to signals/ and drafts archive proposals into the inbox. Safe to run on every session end (idempotent via dedupe).",
   )
   .option("--cwd <path>", "Working directory", process.cwd())
   .option("--vault <path>", "Vault root (overrides --cwd)")
@@ -422,8 +423,8 @@ program
         if (r.consolidate && r.consolidate.candidates.length > 0) {
           console.log("  consolidate:");
           for (const c of r.consolidate.candidates) {
-            const status = c.proposalId
-              ? `proposed as ${c.proposalId}`
+            const status = c.signalId
+              ? `emitted as signal ${c.signalId}`
               : c.skipped
                 ? `skipped (${c.skipped})`
                 : "skipped";
@@ -624,6 +625,22 @@ intent
     if (r.message) console.error(r.message);
     if (r.body) console.log(r.body);
     process.exit(r.exitCode);
+  });
+
+program
+  .command("resume")
+  .description("Print the current resume view (and update state/resume.* cache).")
+  .option("--cwd <path>", "Working directory", process.cwd())
+  .option("--vault <path>", "Vault root (overrides --cwd)")
+  .option("--project <id>", "Project id inside a central vault")
+  .option("--json", "Emit JSON wrapper instead of Markdown", false)
+  .action(async (opts) => {
+    await runResume({
+      cwd: opts.cwd,
+      ...(opts.vault ? { vaultRoot: opts.vault } : {}),
+      ...(opts.project ? { projectId: opts.project } : {}),
+      json: opts.json === true,
+    });
   });
 
 const inbox = program
@@ -850,8 +867,8 @@ insight
     }
     const r = await runInsightProposeFromSession(callOpts);
     if (r.message && !opts.silent) console.error(r.message);
-    if (r.proposalId && !opts.silent) {
-      console.log(`proposed ${r.proposalId} -> ${r.path}`);
+    if (r.signalId && !opts.silent) {
+      console.log(`signal ${r.signalId} -> ${r.path}`);
     }
     process.exit(r.exitCode);
   });

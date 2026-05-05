@@ -84,6 +84,7 @@ export const SessionFrontmatterSchema = z.object({
   id: SessionId,
   date: IsoDate,
   summary: z.string(),
+  narrative_status: z.enum(["empty", "auto", "confirmed"]).default("empty"),
   provenance: ProvenanceSchema.optional(),
   links: z.array(LinkSchema).optional(),
   tags: z.array(z.string()).optional(),

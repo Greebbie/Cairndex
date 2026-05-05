@@ -3,15 +3,11 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import {
   applyCairndexBlock,
-  buildActiveContext,
-  buildMemoryHealth,
-  defaultConfig,
-  loadProjectConfig,
-  projectIdFromRoot,
-  renderAgentSurface,
+  buildResumeView,
+  renderAgentFlavor,
   resolveProjectRef,
   vaultExists,
-  vaultPath,
+  writeResumeCache,
 } from "@cairndex/core";
 import { missingVaultMessage } from "../utils/missingVaultMessage.js";
 import { resolveMemoryRoot } from "../utils/resolveMemoryRoot.js";
@@ -42,14 +38,12 @@ export async function runEmitClaudeMd(opts: EmitClaudeMdOptions): Promise<EmitCl
     };
   }
 
-  const cfg = existsSync(`${vaultPath(root)}/config.yaml`)
-    ? loadProjectConfig(root)
-    : defaultConfig();
-
-  const ctx = await buildActiveContext(root, cfg);
-  const health = await buildMemoryHealth(root, cfg);
-  const projectId = opts.projectId ?? projectIdFromRoot(root);
-  const body = renderAgentSurface(ctx, health, projectId);
+  const view = await buildResumeView({
+    cwd: opts.cwd,
+    ...(opts.vaultRoot !== undefined && { vaultRoot: opts.vaultRoot }),
+    ...(opts.projectId !== undefined && { projectId: opts.projectId }),
+  });
+  const body = renderAgentFlavor(view);
 
   // If the caller passed --vault explicitly, don't fall back to cwd-based pointer
   // discovery for the target — explicit args always win, otherwise a stray
@@ -67,6 +61,14 @@ export async function runEmitClaudeMd(opts: EmitClaudeMdOptions): Promise<EmitCl
   const existing = existsSync(target) ? await readFile(target, "utf8") : undefined;
   const result = applyCairndexBlock(existing, body);
   await writeFile(target, result.updated, "utf8");
+
+  // Lockstep: keep state/resume.* in sync with the CLAUDE.md region.
+  await writeResumeCache({
+    cwd: opts.cwd,
+    ...(opts.vaultRoot !== undefined && { vaultRoot: opts.vaultRoot }),
+    ...(opts.projectId !== undefined && { projectId: opts.projectId }),
+    view,
+  });
 
   return { exitCode: 0, action: result.action };
 }

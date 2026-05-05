@@ -7,6 +7,7 @@ import {
   globalDir,
   registerProject,
   sharedDir,
+  signalsPath,
   vaultPath,
   writeSyncBaseline,
 } from "@cairndex/core";
@@ -35,6 +36,8 @@ const NODE_FOLDERS = [
   "indexes/context-packs",
   "inbox",
   "inbox/proposed-memory-updates",
+  // Phase 1.3: low-trust signals directory (auto-distill / consolidate writers).
+  "signals",
 ];
 
 const INDEX_BODY = `---
@@ -169,6 +172,9 @@ export async function runInit(opts: InitOptions): Promise<void> {
       await writeFile(configPathStr, yaml.dump({ schemaVersion: cfg.schemaVersion }), "utf8");
     }
   }
+
+  // 4b. signals/ directory — ensure it exists in both layouts (idempotent).
+  await mkdir(signalsPath(repoRoot), { recursive: true });
 
   // 5. CLAUDE.md (universal — both layouts get the agent-surface block)
   if (opts.claudeMd) {

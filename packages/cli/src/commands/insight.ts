@@ -4,7 +4,8 @@ import { basename, join } from "node:path";
 import {
   buildActiveContext,
   centralSharedPath,
-  createWithAutoAccept,
+  computeProposalHash,
+  createSignal,
   defaultConfig,
   extractInsightFromSessionBody,
   extractTranscriptText,
@@ -15,6 +16,7 @@ import {
   resolveProjectRef,
   serializeFrontmatter,
   sharedDir,
+  signalsPath,
   vaultExists,
   vaultPath,
 } from "@cairndex/core";
@@ -124,28 +126,28 @@ async function findLatestSessionId(sessionsDir: string): Promise<string | null> 
 export interface InsightProposeFromSessionResult {
   exitCode: 0 | 1;
   message?: string;
-  /** Proposal id, if a draft was produced and proposed. */
-  proposalId?: string;
-  /** Path to the proposal file, if created. */
+  /**
+   * Signal id (SIG-NNN) if an auto-distill signal was emitted to `signals/`.
+   *
+   * Previously this was `proposalId` (PROP-NNN in inbox). Renamed because
+   * auto-distill now writes to `signals/`, not `inbox/proposed-memory-updates/`.
+   * A future `cairndex signal promote` command turns a signal into an inbox draft.
+   */
+  signalId?: string;
+  /** Path to the signal file in `signals/`, if created. */
   path?: string;
-  /** Set when an existing proposal already covers this content. */
+  /**
+   * Set when an existing inbox proposal or signal already covers this content.
+   * May reference a PROP-NNN (inbox duplicate) or SIG-NNN (signal duplicate).
+   */
   duplicateOf?: string;
-  /** Reason the heuristic chose to skip — present when no proposal was created. */
+  /** Reason the heuristic chose to skip — present when no signal was created. */
   skipReason?:
     | "no-signal"
     | "session-missing"
     | "duplicate"
     | "low-confidence"
     | "active-focus-only";
-  /**
-   * True when the user's `autoAcceptConfidenceThreshold` preference fired and
-   * the proposal was immediately accepted into canonical memory. The PROP file
-   * still exists in the inbox (now in `accepted` status); a durable insight
-   * was also created.
-   */
-  autoAccepted?: boolean;
-  /** Set when autoAccepted — the durable target id created (e.g. INS-007). */
-  appliedTargetId?: string;
 }
 
 /**
@@ -275,13 +277,12 @@ export async function runInsightProposeFromSession(
     };
   }
 
-  // Semantic dedupe — a coarse-match key on title (with IDs stripped) plus the
-  // sorted set of related-id link targets. Catches the dogfood pattern where each
-  // session's auto-distilled draft has a distinct body (different `## Source` line)
-  // but is conceptually the same proposal. The standard contentHash dedupe below
-  // would miss these because the body differs. Includes pending AND rejected — a
-  // user who already rejected "Recurring focus on SPEC-X" doesn't want the next
-  // session to re-propose it.
+  // Semantic dedupe against existing inbox proposals — a coarse-match key on title
+  // (with IDs stripped) plus the sorted set of related-id link targets. Catches the
+  // dogfood pattern where each session's auto-distilled draft has a distinct body
+  // (different `## Source` line) but is conceptually the same proposal. Includes
+  // pending AND rejected — a user who already rejected "Recurring focus on SPEC-X"
+  // in the inbox doesn't want the next session to emit a new SIG for it.
   const draftLinkSig = draft.relatedIds.slice().sort().join(",");
   const draftCoarse = coarseInsightKey(draft.title);
   if (draftCoarse.length > 0 || draftLinkSig.length > 0) {
@@ -298,7 +299,7 @@ export async function runInsightProposeFromSession(
       ) {
         return {
           exitCode: 0,
-          message: `insight draft semantically matches ${cand.proposalId}`,
+          message: `insight draft semantically matches inbox proposal ${cand.proposalId}`,
           duplicateOf: cand.proposalId,
           skipReason: "duplicate",
         };
@@ -306,9 +307,8 @@ export async function runInsightProposeFromSession(
     }
   }
 
-  // Dedupe against existing proposals via the standard content-hash check. The signal
-  // is intentionally weak (hash of body+target+type) so we mostly use it to avoid
-  // re-proposing the same draft if the Stop hook fires twice.
+  // Content-hash dedupe against existing inbox proposals. Avoids re-emitting the
+  // exact same signal if the Stop hook fires twice in the same session.
   const dup = await findDuplicate(root, cfg, {
     proposalType: "create",
     targetType: "insight",
@@ -317,18 +317,44 @@ export async function runInsightProposeFromSession(
   if (dup) {
     return {
       exitCode: 0,
-      message: `insight draft already proposed as ${dup}`,
+      message: `insight draft already proposed as inbox proposal ${dup}`,
       duplicateOf: dup,
       skipReason: "duplicate",
     };
   }
 
-  // Routed through createWithAutoAccept so `autoAcceptConfidenceThreshold` in
-  // user prefs gets honored — without this gate the auto-distilled insights
-  // would always require manual review even when the user has explicitly
-  // raised their trust dial.
-  const result = await createWithAutoAccept(root, cfg, {
+  // Content-hash dedupe against existing signal files. Prevents duplicate SIG files
+  // when the Stop hook fires more than once without a new session in between.
+  const signalsDir = signalsPath(root);
+  const existingSignalFiles = existsSync(signalsDir) ? await readdir(signalsDir) : [];
+  const draftHash = computeProposalHash({
     proposalType: "create",
+    targetType: "insight",
+    newBody: draft.body,
+  });
+  for (const sigFile of existingSignalFiles) {
+    if (!sigFile.endsWith(".md")) continue;
+    try {
+      const sigRaw = await readFile(join(signalsDir, sigFile), "utf8");
+      const { data: sigData } = parseFrontmatter<Record<string, unknown>>(sigRaw);
+      if (sigData.contentHash === draftHash) {
+        const sigId = String(sigData.id ?? sigFile.replace(/\.md$/, ""));
+        return {
+          exitCode: 0,
+          message: `insight draft already emitted as signal ${sigId}`,
+          duplicateOf: sigId,
+          skipReason: "duplicate",
+        };
+      }
+    } catch {
+      // ignore unreadable signal files
+    }
+  }
+
+  // Emit to signals/ — not inbox. Signals are low-trust automated outputs that
+  // require human promotion before they reach canonical memory. No auto-accept path.
+  const result = await createSignal(root, {
+    source: "auto-distill",
     targetType: "insight",
     newFrontmatter: {
       title: draft.title,
@@ -342,20 +368,15 @@ export async function runInsightProposeFromSession(
     summary: `Auto-distilled insight: ${draft.title}`,
     reason: draft.reason,
     provenance: {
-      createdBy: input.createdBy ?? "auto-distill",
       session: sessionId,
       // Conditioned on which signals fired — see extractInsightFromSessionBody.
-      // The inbox UI default-collapses proposals below 0.4 so ID-only matches
-      // (which were the noisiest dogfood failures) stay out of the way.
       confidence: draft.confidence,
     },
   });
   return {
     exitCode: 0,
-    proposalId: result.proposalId,
+    signalId: result.signalId,
     path: result.path,
-    autoAccepted: result.autoAccepted,
-    ...(result.applied ? { appliedTargetId: result.applied.targetId } : {}),
   };
 }
 

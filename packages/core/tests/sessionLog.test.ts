@@ -107,6 +107,21 @@ describe("appendToSession", () => {
     expect(decisionsIdx).toBeLessThan(d1Idx);
   });
 
+  it("sets narrative_status to 'empty' when first creating a session note", async () => {
+    const r = await appendToSession({
+      repoRoot: tmp,
+      cfg: defaultConfig(),
+      now: new Date(Date.UTC(2026, 4, 5, 12, 0)),
+      kind: "progress",
+      text: "initial entry",
+      agentName: "test-agent",
+    });
+    expect(r.created).toBe(true);
+    const raw = readFileSync(r.path, "utf8");
+    expect(raw).toMatch(/^narrative_status: empty$/m);
+    expect(raw).toMatch(/^summary:\s*['"]{0,2}\s*$/m);
+  });
+
   it("re-uses the newest session file when multiple exist (date-id sort)", async () => {
     // Pre-seed two session files with different ids.
     writeFileSync(

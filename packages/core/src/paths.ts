@@ -175,3 +175,23 @@ export function inboxPath(repoRoot: string): string {
 export function inboxProposalsPath(repoRoot: string): string {
   return join(inboxPath(repoRoot), INBOX_PROPOSALS_DIR);
 }
+
+export const SIGNALS_DIR = "signals";
+
+export function signalsPath(repoRoot: string): string {
+  return join(vaultPath(repoRoot), SIGNALS_DIR);
+}
+
+export const STATE_DIR = "state";
+
+export function statePath(repoRoot: string): string {
+  return join(vaultPath(repoRoot), STATE_DIR);
+}
+
+export function resumeJsonPath(repoRoot: string): string {
+  return join(statePath(repoRoot), "resume.json");
+}
+
+export function resumeMdPath(repoRoot: string): string {
+  return join(statePath(repoRoot), "resume.md");
+}

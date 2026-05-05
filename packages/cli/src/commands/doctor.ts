@@ -1,5 +1,5 @@
 import { existsSync, statSync } from "node:fs";
-import { readdir } from "node:fs/promises";
+import { mkdir, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import {
   type ValidationIssue,
@@ -7,9 +7,11 @@ import {
   defaultConfig,
   generateAutoSession,
   loadProjectConfig,
+  migrateNarrativeStatus,
   parseTranscriptJsonl,
   regenerateRecentChanges,
   runValidation,
+  signalsPath,
   vaultPath,
 } from "@cairndex/core";
 import kleur from "kleur";
@@ -107,6 +109,18 @@ export async function runDoctor(opts: DoctorOptions): Promise<DoctorResult> {
 
   // --fix
   if (opts.fix) {
+    const migResult = await migrateNarrativeStatus({
+      cwd,
+      vaultRoot: opts.vaultRoot,
+      projectId: opts.projectId,
+    });
+    if (migResult.updated > 0 && !opts.silent) {
+      console.log(`migrated ${migResult.updated} sessions: narrative_status backfilled`);
+    }
+
+    // Ensure signals/ directory exists (idempotent; silent).
+    await mkdir(signalsPath(cwd), { recursive: true });
+
     const r = await applyAutoFixes(cwd, cfg, issues);
     if (r.fixed.length > 0) {
       logger.info({ count: r.fixed.length }, "auto-fixed issues");

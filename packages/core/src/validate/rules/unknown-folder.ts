@@ -18,6 +18,9 @@ const ALLOWED_EXTRA = new Set([
   // Phase D: scratchpad for transient turn-state JSON (last-turn-summary.json,
   // future ephemeral status files). Not durable memory, intentionally non-node.
   "state",
+  // Resume-and-close-out P0: low-trust auto-distill / consolidate output.
+  // Never auto-accepted; promoted explicitly into inbox via signal promote.
+  "signals",
 ]);
 
 export const unknownFolder: ValidationRule = {

@@ -72,8 +72,10 @@ describe("central vault end-to-end", () => {
     expect(emit.exitCode).toBe(0);
     const claudeMd = readFileSync(join(repoRoot, "CLAUDE.md"), "utf8");
     expect(claudeMd).toMatch(/<!-- cairndex:start v1 -->/);
-    // Central layout: agent-surface body should reference projects/<id>/inbox, not .cairndex/
-    expect(claudeMd).toContain("projects/demo/inbox/proposed-memory-updates/");
+    // Post-Task-2.7: the region now contains the new agent flavor (resume-view based),
+    // not the old phase/goal/spec/plan/inbox text. Verify the new operating contract marker.
+    expect(claudeMd).toContain("Operating contract:");
+    expect(claudeMd).toContain("Pending memory:");
   });
 
   it("legacy repo-local init still works alongside the central flow", async () => {

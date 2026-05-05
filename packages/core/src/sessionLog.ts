@@ -3,6 +3,7 @@ import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { type Config, folderForNodeType } from "./config.js";
 import { parseFrontmatter, serializeFrontmatter } from "./frontmatter.js";
+import type { SessionFrontmatter } from "./schema.js";
 import { formatSessionId } from "./ids.js";
 import { applyPatch } from "./inbox/applyPatch.js";
 import { nodeFolderPath } from "./paths.js";
@@ -70,15 +71,16 @@ export async function appendToSession(input: AppendToSessionInput): Promise<Appe
   // Create a fresh session file with empty placeholder sections.
   const sessionId = formatSessionId(input.now, { utc: true });
   const date = sessionId.slice(0, 10);
-  const frontmatter = {
+  const frontmatter: SessionFrontmatter = {
     id: sessionId,
     date,
-    summary: "TODO: one-line summary",
+    summary: "",
+    narrative_status: "empty",
     provenance: {
       created_by: input.agentName ?? "cairndex-session-log",
       session: sessionId,
     },
-    links: [] as Array<{ type: string; target: string }>,
+    links: [],
   };
 
   const initialSections = [

@@ -1,5 +1,10 @@
+import { existsSync } from "node:fs";
+import { readFile, readdir } from "node:fs/promises";
 import type { Config } from "../config.js";
-import { createProposal, findDuplicate } from "../inbox/create.js";
+import { parseFrontmatter } from "../frontmatter.js";
+import { computeProposalHash } from "../inbox/hash.js";
+import { signalsPath } from "../paths.js";
+import { createSignal } from "../signals/create.js";
 import type { NodeType } from "../types.js";
 import { type NodeFile, listNodeFiles } from "../vault.js";
 
@@ -34,7 +39,7 @@ export interface ConsolidateResult {
     target: string;
     mentions: number;
     sessionIds: string[];
-    proposalId?: string;
+    signalId?: string;
     skipped?: "covered" | "duplicate";
   }>;
 }
@@ -185,12 +190,34 @@ export async function consolidateRecentSessions(
     const draft = buildInsightDraft(target, mentions);
     const targetType: NodeType = "insight";
 
-    const dup = await findDuplicate(repoRoot, cfg, {
+    // Content-hash dedupe against existing signal files. Prevents duplicate SIG
+    // files when consolidate runs more than once across the same session window.
+    // Decision: scan signals/ only (not inbox/) — inbox dedup is deferred per
+    // Task 1.5 reviewer note; signal dedup is sufficient for idempotency.
+    const sigDir = signalsPath(repoRoot);
+    const draftHash = computeProposalHash({
       proposalType: "create",
       targetType,
       newBody: draft.body,
     });
-    if (dup) {
+    let isDuplicate = false;
+    if (existsSync(sigDir)) {
+      const sigFiles = await readdir(sigDir);
+      for (const sigFile of sigFiles) {
+        if (!sigFile.endsWith(".md")) continue;
+        try {
+          const raw = await readFile(`${sigDir}/${sigFile}`, "utf8");
+          const { data } = parseFrontmatter<Record<string, unknown>>(raw);
+          if (data.contentHash === draftHash) {
+            isDuplicate = true;
+            break;
+          }
+        } catch {
+          // ignore unreadable signal files
+        }
+      }
+    }
+    if (isDuplicate) {
       result.candidates.push({
         target,
         mentions: mentions.length,
@@ -200,15 +227,14 @@ export async function consolidateRecentSessions(
       continue;
     }
 
-    const proposal = await createProposal(repoRoot, cfg, {
-      proposalType: "create",
+    const signal = await createSignal(repoRoot, {
+      source: "auto-consolidate",
       targetType,
       newBody: draft.body,
       newFrontmatter: draft.frontmatter,
       summary: draft.summary,
       reason: `Auto-consolidated from ${mentions.length} sessions referencing ${target} in the last ${lookbackDays} days.`,
       provenance: {
-        createdBy: "cairndex-consolidate",
         session: now.toISOString().slice(0, 10),
         confidence: 0.5,
       },
@@ -219,7 +245,7 @@ export async function consolidateRecentSessions(
       target,
       mentions: mentions.length,
       sessionIds: mentions.map((m) => m.sessionId),
-      proposalId: proposal.proposalId,
+      signalId: signal.signalId,
     });
   }
 

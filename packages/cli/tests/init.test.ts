@@ -4,6 +4,23 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runInit } from "../src/commands/init.js";
 
+// Standalone signal-dir test (not inside the main describe so it has its own temp dir lifecycle)
+it("creates signals/ folder on init", async () => {
+  const root = mkdtempSync(join(tmpdir(), "cairndex-init-signals-"));
+  const home = mkdtempSync(join(tmpdir(), "cairndex-init-signals-home-"));
+  process.env.CAIRNDEX_HOME = home;
+  try {
+    mkdirSync(join(root, ".git"), { recursive: true });
+    await runInit({ cwd: root, yes: true, claudeMd: false, hooks: false });
+    const sig = join(root, ".cairndex", "signals");
+    expect(existsSync(sig)).toBe(true);
+  } finally {
+    Reflect.deleteProperty(process.env, "CAIRNDEX_HOME");
+    rmSync(root, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
 let tmp: string;
 let home: string;
 

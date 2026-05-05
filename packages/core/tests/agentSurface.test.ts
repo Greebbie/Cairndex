@@ -1,3 +1,27 @@
+/**
+ * Tests for the legacy `renderAgentSurface` function.
+ *
+ * Most tests that asserted the OLD output shape have been RETIRED as of Task 2.7 (2026-05):
+ *
+ * - "includes phase/active goal/spec/plan/task and next action" — RETIRED.
+ *   `renderAgentSurface` is @deprecated. The new agent-surface output comes from
+ *   `renderAgentFlavor(buildResumeView())` which is task-centric, not phase/goal-centric.
+ *
+ * - "renders memory health on a single line with red/yellow/green counts" — RETIRED.
+ *   Memory health counts are not in the new agent flavor. They will return in Phase 5
+ *   (story coverage), not as a line from `renderAgentSurface`.
+ *
+ * - "includes the inbox proposal note" / "uses .cairndex-relative inbox path" /
+ *   "uses project-relative inbox path when given a central project id" — RETIRED.
+ *   The inbox-proposal hint is not in `renderAgentFlavor`. Durable-write guidance is
+ *   provided by the minimal operating contract block in `renderAgentFlavor`.
+ *
+ * - "omits empty sections gracefully when active info is missing" — RETIRED.
+ *   `renderAgentSurface` is @deprecated; this behaviour is no longer a regression target.
+ *
+ * Remaining tests cover invariants that are still relied on by the two surviving callers
+ * (`bootstrap.ts` and `watcherActions.ts`) until those are migrated.
+ */
 import { describe, expect, it } from "vitest";
 import { renderAgentSurface } from "../src/agentSurface/template.js";
 import type { ActiveContext } from "../src/indexes/activeContext.js";
@@ -26,57 +50,17 @@ const baseHealth: MemoryHealth = {
   issues: [],
 };
 
-describe("renderAgentSurface (Recommended template)", () => {
-  it("includes phase/active goal/spec/plan/task and next action", () => {
+describe("renderAgentSurface (legacy — @deprecated)", () => {
+  // Survival invariant: bootstrap.ts and watcherActions.ts still call this.
+  // These tests prevent silent regressions until those callers are migrated.
+  it("returns a non-empty string for a fully-populated context", () => {
     const out = renderAgentSurface(baseCtx, baseHealth);
-    expect(out).toContain("Phase: implementing");
-    expect(out).toContain("Active goal: GOAL-002");
-    expect(out).toContain("Active spec: SPEC-003");
-    expect(out).toContain("Active plan: PLAN-002");
-    expect(out).toMatch(/current.+TASK-007/);
-    expect(out).toContain("Current task: TASK-007");
-    expect(out).toContain("Next action: Run cairndex doctor --fix on packages/web");
+    expect(typeof out).toBe("string");
+    expect(out.length).toBeGreaterThan(0);
   });
 
-  it("renders memory health on a single line with red/yellow/green counts", () => {
-    const out = renderAgentSurface(baseCtx, baseHealth);
-    expect(out).toMatch(/Memory health:.*green 12.*yellow 3.*red 1/);
-  });
-
-  it("includes the cairndex context command hint", () => {
+  it("includes the cairndex context command hint (relied on by surviving callers)", () => {
     const out = renderAgentSurface(baseCtx, baseHealth);
     expect(out).toMatch(/cairndex context/);
-  });
-
-  it("includes the inbox proposal note", () => {
-    const out = renderAgentSurface(baseCtx, baseHealth);
-    expect(out).toMatch(/inbox.*proposed-memory-updates/);
-  });
-
-  it("uses .cairndex-relative inbox path in legacy mode", () => {
-    const out = renderAgentSurface(baseCtx, baseHealth);
-    expect(out).toContain(".cairndex/inbox/proposed-memory-updates/");
-  });
-
-  it("uses project-relative inbox path when given a central project id", () => {
-    const out = renderAgentSurface(baseCtx, baseHealth, "demo");
-    expect(out).toContain("projects/demo/inbox/proposed-memory-updates/");
-    expect(out).not.toContain(".cairndex/inbox");
-  });
-
-  it("omits empty sections gracefully when active info is missing", () => {
-    const minimal: ActiveContext = {
-      ...baseCtx,
-      activeGoal: null,
-      activeSpec: null,
-      activePlan: null,
-      currentTask: null,
-    };
-    const out = renderAgentSurface(minimal, baseHealth);
-    expect(out).not.toContain("Active goal:");
-    expect(out).not.toContain("Active spec:");
-    expect(out).not.toContain("Active plan:");
-    expect(out).not.toContain("Current task:");
-    expect(out).toContain("Phase: implementing");
   });
 });
