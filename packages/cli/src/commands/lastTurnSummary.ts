@@ -2,9 +2,11 @@ import { existsSync, statSync } from "node:fs";
 import { mkdir, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
+  type IntentRecord,
   defaultConfig,
   loadProjectConfig,
   parseTranscriptJsonl,
+  readIntent,
   vaultExists,
   vaultPath,
 } from "@cairndex/core";
@@ -41,6 +43,14 @@ export interface LastTurnSummary {
   newProposals: string[];
   /** Latest session id at the time the summary was written, or null. */
   latestSessionId: string | null;
+  /**
+   * The pre-flight intent that was active when this turn ended (i.e. captured before
+   * the Stop hook chain's `intent clear` step ran). Lets the dashboard's LastTurnCard
+   * render "agent said it would do X" alongside the metric line so the user can eyeball
+   * whether the actual outcome (filesTouched / toolCounts) matched the contract.
+   * Null when no intent was set for this turn.
+   */
+  intent: IntentRecord | null;
 }
 
 export interface LastTurnSummaryResult {
@@ -134,6 +144,11 @@ export async function runLastTurnSummary(
 
   const newProposals = await recentProposals(vault, windowMs, now);
   const latestSession = await latestSessionId(vault);
+  // Capture the intent BEFORE the Stop chain's `intent clear` step removes the file.
+  // Order is enforced in `claudeCodeHooks.ts`: last-turn-summary runs at index 2 of the
+  // Stop chain, intent clear at index 5. Read failures (missing or malformed) are
+  // non-fatal — null is the natural empty-state representation.
+  const intent = await readIntent(root).catch(() => null);
 
   const summary: LastTurnSummary = {
     ts: new Date(now).toISOString(),
@@ -141,6 +156,7 @@ export async function runLastTurnSummary(
     toolCounts: transcript.toolCounts,
     newProposals,
     latestSessionId: latestSession,
+    intent,
   };
 
   const outPath = opts.outPath ?? join(vault, "state", "last-turn-summary.json");

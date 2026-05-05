@@ -59,6 +59,28 @@ export function LastTurnCard({ alias }: Props) {
           {humanizeDateString(s.ts)}
         </span>
       </div>
+      {s.intent && s.intent.steps.length > 0 ? (
+        // Retrospective intent: what the agent said it would do at the start of this turn,
+        // captured by `last-turn-summary` BEFORE the Stop chain's `intent clear` ran.
+        // The user reads this against the metric line above ("X files touched · Y tool calls")
+        // and judges drift by eye — no automated heuristic, just the raw juxtaposition.
+        <div data-testid="last-turn-intent" className="text-xs space-y-0.5">
+          <span className="text-emerald-700/80 dark:text-emerald-300/80 font-medium">
+            Intent for this turn
+          </span>
+          <ol className="ml-1 space-y-0.5">
+            {s.intent.steps.map((step, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: positional, ephemeral list
+              <li key={i} className="flex gap-2">
+                <span className="font-mono text-emerald-700/70 dark:text-emerald-300/70 tabular-nums w-5 shrink-0">
+                  {i + 1}.
+                </span>
+                <span className="text-foreground/90 break-words">{step}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      ) : null}
       {narrative.length > 0 ? (
         <ul data-testid="last-turn-events" className="text-xs text-foreground/90 pl-1 space-y-0.5">
           {narrative.map((e, idx) => (

@@ -18,6 +18,7 @@ import {
   runInsightProposeFromSession,
   runInsightPull,
 } from "./commands/insight.js";
+import { runIntentClear, runIntentSet, runIntentShow } from "./commands/intent.js";
 import { runLastTurnSummary } from "./commands/lastTurnSummary.js";
 import { runMcp } from "./commands/mcp.js";
 import {
@@ -32,6 +33,7 @@ import { runSyncCmd } from "./commands/sync.js";
 import { runUi } from "./commands/ui.js";
 import { runVaultInit } from "./commands/vault.js";
 import { runPhaseSet, runTaskComplete, runTaskSwitch } from "./commands/workflow.js";
+import { runWrap } from "./commands/wrap.js";
 
 const program = new Command();
 
@@ -516,6 +518,26 @@ program
   });
 
 program
+  .command("wrap")
+  .description(
+    "Close-out report (read-only) — checks active task / next action / inbox / doctor / last session '## Next' and surfaces forward-pickup signals on one screen.",
+  )
+  .option("--cwd <path>", "Working directory", process.cwd())
+  .option("--vault <path>", "Vault root (overrides --cwd)")
+  .option("--project <id>", "Project id inside a central vault")
+  .option("--json", "Emit machine-readable JSON instead of a human report", false)
+  .action(async (opts) => {
+    const callOpts: Parameters<typeof runWrap>[0] = { cwd: opts.cwd };
+    if (opts.vault) callOpts.vaultRoot = opts.vault;
+    if (opts.project) callOpts.projectId = opts.project;
+    if (opts.json) callOpts.json = true;
+    const r = await runWrap(callOpts);
+    if (r.message) console.error(r.message);
+    if (r.body) console.log(r.body);
+    process.exit(r.exitCode);
+  });
+
+program
   .command("mcp")
   .description("Start an MCP (Model Context Protocol) server over stdio for the current vault")
   .option("--cwd <path>", "Working directory", process.cwd())
@@ -527,6 +549,80 @@ program
     if (opts.project) callOpts.projectId = opts.project;
     const r = await runMcp(callOpts);
     if (r.message) console.error(r.message);
+    process.exit(r.exitCode);
+  });
+
+// Pre-flight intent: agent declares 1–3 short steps before non-trivial work.
+// Banner prints to stdout (visible to the user inside the Claude Code conversation),
+// the file is cleared by the Stop hook so each turn writes a fresh contract.
+const intent = program
+  .command("intent")
+  .description(
+    "Pre-flight intent: agent declares 1–3 short steps before non-trivial work. The set banner appears in the Claude Code conversation; the file is cleared at end-of-turn.",
+  );
+
+intent
+  .command("set <text>")
+  .description(
+    "Record up to 3 steps for the upcoming work. Separate steps with `;`. Steps over 80 chars are truncated.",
+  )
+  .option("--cwd <path>", "Working directory", process.cwd())
+  .option("--vault <path>", "Vault root (overrides --cwd)")
+  .option("--project <id>", "Project id inside a central vault")
+  .option("--task <id>", "Override auto-detected current task id")
+  .option("--session <id>", "Override auto-detected session id")
+  .option("--silent", "Do not print the banner (still writes the file)", false)
+  .action(async (text: string, opts) => {
+    const callOpts: Parameters<typeof runIntentSet>[0] = {
+      cwd: opts.cwd,
+      text,
+      silent: opts.silent === true,
+    };
+    if (opts.vault) callOpts.vaultRoot = opts.vault;
+    if (opts.project) callOpts.projectId = opts.project;
+    if (opts.task) callOpts.taskId = opts.task;
+    if (opts.session) callOpts.sessionId = opts.session;
+    const r = await runIntentSet(callOpts);
+    if (r.message) console.error(r.message);
+    if (r.body) console.log(r.body);
+    process.exit(r.exitCode);
+  });
+
+intent
+  .command("clear")
+  .description("Remove the active intent file. Stop hook calls this with --silent at end-of-turn.")
+  .option("--cwd <path>", "Working directory", process.cwd())
+  .option("--vault <path>", "Vault root (overrides --cwd)")
+  .option("--project <id>", "Project id inside a central vault")
+  .option("--silent", "Suppress output (used by Stop hook)", false)
+  .action(async (opts) => {
+    const callOpts: Parameters<typeof runIntentClear>[0] = {
+      cwd: opts.cwd,
+      silent: opts.silent === true,
+    };
+    if (opts.vault) callOpts.vaultRoot = opts.vault;
+    if (opts.project) callOpts.projectId = opts.project;
+    const r = await runIntentClear(callOpts);
+    if (r.message) console.error(r.message);
+    if (r.body) console.log(r.body);
+    process.exit(r.exitCode);
+  });
+
+intent
+  .command("show")
+  .description("Show the active intent (if any)")
+  .option("--cwd <path>", "Working directory", process.cwd())
+  .option("--vault <path>", "Vault root (overrides --cwd)")
+  .option("--project <id>", "Project id inside a central vault")
+  .option("--json", "Emit machine-readable JSON", false)
+  .action(async (opts) => {
+    const callOpts: Parameters<typeof runIntentShow>[0] = { cwd: opts.cwd };
+    if (opts.vault) callOpts.vaultRoot = opts.vault;
+    if (opts.project) callOpts.projectId = opts.project;
+    if (opts.json) callOpts.json = true;
+    const r = await runIntentShow(callOpts);
+    if (r.message) console.error(r.message);
+    if (r.body) console.log(r.body);
     process.exit(r.exitCode);
   });
 

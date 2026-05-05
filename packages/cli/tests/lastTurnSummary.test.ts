@@ -32,6 +32,38 @@ describe("runLastTurnSummary", () => {
     expect(parsed.toolCounts).toEqual({ Edit: 0, Write: 0, Bash: 0, Read: 0 });
     expect(parsed.newProposals).toEqual([]);
     expect(parsed.latestSessionId).toBeNull();
+    // Intent is null when no current-intent.md exists — the most common case
+    // (Stop hook clears the file at every turn end).
+    expect(parsed.intent).toBeNull();
+  });
+
+  it("captures an active pre-flight intent and persists it in the summary", async () => {
+    // The Stop hook runs `last-turn-summary` BEFORE `intent clear`, so a fresh intent
+    // file written this turn must show up inside the JSON for the dashboard's
+    // LastTurnCard to render the retrospective "agent said it would do X" view.
+    const repo = seedRepo();
+    const stateDir = join(repo, ".cairndex", "state");
+    mkdirSync(stateDir, { recursive: true });
+    writeFileSync(
+      join(stateDir, "current-intent.md"),
+      [
+        "---",
+        "set_at: '2026-05-05T12:00:00.000Z'",
+        "task_id: TASK-007",
+        "---",
+        "- audit api.ts",
+        "- extract inbox hooks",
+        "- rerun tests",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    const r = await runLastTurnSummary({ cwd: repo, now: Date.now() });
+    expect(r.exitCode).toBe(0);
+    const parsed = JSON.parse(readFileSync(r.path ?? "", "utf8"));
+    expect(parsed.intent).not.toBeNull();
+    expect(parsed.intent.taskId).toBe("TASK-007");
+    expect(parsed.intent.steps).toEqual(["audit api.ts", "extract inbox hooks", "rerun tests"]);
   });
 
   it("includes the latest session id and recent proposals", async () => {

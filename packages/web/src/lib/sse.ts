@@ -16,25 +16,45 @@ export function useWatcherEvents(alias: string | undefined) {
     const onFileChanged = (e: MessageEvent<string>) => {
       try {
         const payload = JSON.parse(e.data) as { path?: string };
-        if (
-          typeof payload.path === "string" &&
-          /state[\\/]last-turn-summary\.json$/.test(payload.path)
-        ) {
-          qc.invalidateQueries({ queryKey: ["last-turn-summary", alias] });
+        if (typeof payload.path === "string") {
+          if (/state[\\/]last-turn-summary\.json$/.test(payload.path)) {
+            qc.invalidateQueries({ queryKey: ["last-turn-summary", alias] });
+          }
+          // Intent file: written by `cairndex intent set` before non-trivial work,
+          // removed by the Stop-hook `cairndex intent clear`. Both events should refresh
+          // the dashboard's IntentBar within ~1s of the file mutation.
+          if (/state[\\/]current-intent\.md$/.test(payload.path)) {
+            qc.invalidateQueries({ queryKey: ["intent", alias] });
+          }
         }
       } catch {
         // ignore malformed payloads — heartbeats and other events still flow.
       }
       onAny();
     };
+    const onArchived = (e: MessageEvent<string>) => {
+      // intent file deletion comes through as `archived` (chokidar `unlink` -> archived SSE).
+      try {
+        const payload = JSON.parse(e.data) as { path?: string };
+        if (
+          typeof payload.path === "string" &&
+          /state[\\/]current-intent\.md$/.test(payload.path)
+        ) {
+          qc.invalidateQueries({ queryKey: ["intent", alias] });
+        }
+      } catch {
+        // ignore
+      }
+      onAny();
+    };
     es.addEventListener("file-changed", onFileChanged);
-    es.addEventListener("archived", onAny);
+    es.addEventListener("archived", onArchived);
     es.onerror = () => {
       /* browser will retry */
     };
     return () => {
       es.removeEventListener("file-changed", onFileChanged);
-      es.removeEventListener("archived", onAny);
+      es.removeEventListener("archived", onArchived);
       es.close();
     };
   }, [alias, qc]);

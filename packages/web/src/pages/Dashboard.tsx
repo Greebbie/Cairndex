@@ -5,9 +5,10 @@ import { NowBar } from "@/components/NowBar";
 import { ActivePlanPanel } from "@/components/cockpit/ActivePlanPanel";
 import { AgentContextPanel } from "@/components/cockpit/AgentContextPanel";
 import { InboxPanel } from "@/components/cockpit/InboxPanel";
+import { IntentBar } from "@/components/cockpit/IntentBar";
 import { MemoryHealthPanel } from "@/components/cockpit/MemoryHealthPanel";
 import { ProjectStatePanel } from "@/components/cockpit/ProjectStatePanel";
-import { useDashboard, useProjects } from "@/lib/api";
+import { useDashboard, useIntent, useProjects } from "@/lib/api";
 import { foldChangelogForDisplay, isHeuristicProposalEvent } from "@/lib/changelogFormat";
 import { useWatcherEvents } from "@/lib/sse";
 import { humanizeDateString } from "@/lib/time";
@@ -19,6 +20,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const projects = useProjects();
   const dashboard = useDashboard(alias);
+  const intent = useIntent(alias);
   useWatcherEvents(alias);
 
   useEffect(() => {
@@ -53,6 +55,7 @@ export default function Dashboard() {
   return (
     <div className="p-4 md:p-8 space-y-4 max-w-7xl">
       {data ? <NowBar alias={alias} state={data.projectState} /> : null}
+      <IntentBar alias={alias} intent={intent.data?.intent ?? null} />
       <LastTurnCard alias={alias} />
 
       <div className="flex items-center justify-between">

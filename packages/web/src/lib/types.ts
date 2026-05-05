@@ -128,6 +128,17 @@ export const DashboardSchema = z.object({
 });
 export type Dashboard = z.infer<typeof DashboardSchema>;
 
+// Pre-flight intent: the agent's pre-work declaration of what it's about to do.
+// Written by `cairndex intent set`, cleared by the Stop hook. Surfaced live in
+// the IntentBar component, and retrospectively inside LastTurnCard.
+// Defined before LastTurnSummarySchema because that schema references it.
+export const IntentSchema = z.object({
+  setAt: z.string(),
+  taskId: z.string().nullable(),
+  sessionId: z.string().nullable(),
+  steps: z.array(z.string()),
+});
+
 const LastTurnSummarySchema = z.object({
   ts: z.string(),
   filesTouched: z.number(),
@@ -149,11 +160,23 @@ const LastTurnSummarySchema = z.object({
     .array(z.object({ date: z.string(), summary: z.string() }))
     .optional()
     .default([]),
+  /**
+   * The pre-flight intent that was active when this turn ended (captured before the
+   * Stop hook chain's `intent clear` step). Lets the LastTurnCard render "agent said
+   * it would do X" alongside the metric line. Optional / nullable for backward compat
+   * with snapshots written before this field was added.
+   */
+  intent: IntentSchema.nullable().optional(),
 });
 export const LastTurnSummaryResponseSchema = z.object({
   summary: LastTurnSummarySchema.nullable(),
 });
 export type LastTurnSummary = z.infer<typeof LastTurnSummarySchema>;
+
+export const IntentResponseSchema = z.object({
+  intent: IntentSchema.nullable(),
+});
+export type Intent = z.infer<typeof IntentSchema>;
 
 export const ClaudeCodeStatusSchema = z.object({
   wired: z.boolean(),

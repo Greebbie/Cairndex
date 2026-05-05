@@ -8,6 +8,7 @@ import {
   listProposals,
   loadProjectConfig,
   projectIdFromRoot,
+  readIntent,
   vaultExists,
   vaultPath,
 } from "@cairndex/core";
@@ -105,6 +106,7 @@ export async function runStatus(opts: StatusOptions): Promise<StatusResult> {
   const health = await buildMemoryHealth(root, cfg);
   const inbox = await listProposals(root, cfg);
   const lastChange = await lastDurableMtime(root);
+  const intent = await readIntent(root);
   const projectId = opts.projectId ?? projectIdFromRoot(root);
 
   if (opts.json) {
@@ -119,6 +121,7 @@ export async function runStatus(opts: StatusOptions): Promise<StatusResult> {
           activePlan: ctx.activePlan,
           currentTask: ctx.currentTask,
           nextAction: ctx.nextAction,
+          intent,
           memory: health.counts,
           inbox: {
             pending: inbox.pending.length,
@@ -154,6 +157,13 @@ export async function runStatus(opts: StatusOptions): Promise<StatusResult> {
     lines.push(`${pad("Active plan:", 14)}—`);
   }
   lines.push(`${pad("Next action:", 14)}${ctx.nextAction ?? "—"}`);
+  if (intent && intent.steps.length > 0) {
+    lines.push("");
+    lines.push("Intent (this turn):");
+    intent.steps.forEach((step, i) => {
+      lines.push(`  ${i + 1}. ${step}`);
+    });
+  }
   lines.push("");
   lines.push(
     `${pad("Memory:", 14)}${health.counts.green} green  ${health.counts.yellow} yellow  ${health.counts.red} red`,

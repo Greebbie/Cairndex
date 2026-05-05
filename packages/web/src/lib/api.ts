@@ -7,6 +7,7 @@ import {
   DashboardSchema,
   ImplementationLineSchema,
   InboxListSchema,
+  IntentResponseSchema,
   IssueSchema,
   LastTurnSummaryResponseSchema,
   NodeListItemSchema,
@@ -167,6 +168,16 @@ export function useLastTurnSummary(alias: string | undefined) {
     queryFn: () =>
       jsonFetch(`/api/vault/${alias}/last-turn-summary`, LastTurnSummaryResponseSchema),
     enabled: !!alias,
+  });
+}
+
+export function useIntent(alias: string | undefined) {
+  return useQuery({
+    queryKey: ["intent", alias],
+    queryFn: () => jsonFetch(`/api/vault/${alias}/intent`, IntentResponseSchema),
+    enabled: !!alias,
+    // Intent is short-lived (per-turn); keep responses fresh but rely on SSE for true liveness.
+    staleTime: 5_000,
   });
 }
 

@@ -72,19 +72,21 @@ describe("renderClaudeSettings", () => {
     }
   });
 
-  it("Stop chain runs auto-session, auto-distill, last-turn-summary, sweep, then context-if-stale — in that order", () => {
+  it("Stop chain runs auto-session, auto-distill, last-turn-summary, sweep, context-if-stale, then intent clear — in that order", () => {
     const repo = mkdtempSync(join(tmpdir(), "cairn-render-stop-chain-"));
     try {
       const json = renderClaudeSettings({ mode: "legacy" }, repo);
       const stop = json.hooks.Stop[0]?.hooks ?? [];
-      expect(stop).toHaveLength(5);
+      expect(stop).toHaveLength(6);
       expect(stop[0]?.command).toMatch(/auto-session/);
       expect(stop[1]?.command).toMatch(/insight propose-from-session/);
       expect(stop[2]?.command).toMatch(/last-turn-summary/);
       expect(stop[3]?.command).toMatch(/sweep/);
-      // Final step: rebuild the context pack if memory changed during the turn,
+      // context-if-stale: rebuild the context pack if memory changed during the turn,
       // so the next session boots with a fresh pack without the user re-running.
       expect(stop[4]?.command).toMatch(/context --if-stale/);
+      // intent clear: pre-flight intent is a per-turn contract — wipe at end-of-turn.
+      expect(stop[5]?.command).toMatch(/intent clear --silent/);
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }

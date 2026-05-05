@@ -48,15 +48,17 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Install Playwright browsers
-        if: runner.os != 'Linux'
-        run: pnpm --filter @cairndex/web exec playwright install chromium
-
+      # E2E runs only on the canonical combo (ubuntu + node 20). Playwright is the
+      # slowest, flakiest job in the matrix; running it on six combos turns a single
+      # transient browser hang on Windows/22 into a red CI for the whole PR. The
+      # other 5 combos still run typecheck/test/build, which is what catches
+      # cross-platform regressions in code we control.
       - name: Install Playwright browsers + Linux deps
-        if: runner.os == 'Linux'
+        if: matrix.os == 'ubuntu-latest' && matrix.node == 20
         run: pnpm --filter @cairndex/web exec playwright install --with-deps chromium
 
       - name: E2E
+        if: matrix.os == 'ubuntu-latest' && matrix.node == 20
         run: pnpm test:e2e
 
   coverage:

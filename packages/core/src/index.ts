@@ -47,3 +47,4 @@ export * from "./insight/extractFromSession.js";
 export * from "./userPrefs.js";
 export * from "./changelog.js";
 export * from "./claudeCodeHooks.js";
+export * from "./intent.js";

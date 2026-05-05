@@ -151,6 +151,23 @@ function contextIfStaleCommand(layout: HookLayoutMode, bin: string): string {
 }
 
 /**
+ * Clear the pre-flight intent file at end-of-turn. Intent is a per-turn contract;
+ * leaving stale steps around past Stop would mislead the next turn's status read.
+ * Silent: missing file (most turns don't set intent) is the common case, not an error.
+ */
+function intentClearCommand(layout: HookLayoutMode, bin: string): string {
+  if (layout.mode === "central") {
+    return (
+      `${bin} intent clear --silent ` +
+      `--vault ${shellQuote(layout.vaultRoot)} ` +
+      `--project ${layout.projectId} ` +
+      `# ${CAIRNDEX_HOOK_TAG}`
+    );
+  }
+  return `${bin} intent clear --silent # ${CAIRNDEX_HOOK_TAG}`;
+}
+
+/**
  * Build the MCP server entry that Claude Code will spawn over stdio.
  *
  * Resolution mirrors resolveBinCommand: when running inside the cairndex source repo we
@@ -203,6 +220,7 @@ export function renderClaudeSettings(
             { type: "command", command: lastTurnSummaryCommand(layout, bin) },
             { type: "command", command: sweepCommand(layout, bin) },
             { type: "command", command: contextIfStaleCommand(layout, bin) },
+            { type: "command", command: intentClearCommand(layout, bin) },
           ],
         },
       ],
