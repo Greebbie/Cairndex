@@ -7,6 +7,7 @@ import {
   CloseOutDraftResponseSchema,
   ComposePackResponseSchema,
   DashboardSchema,
+  HandoffRepairResultSchema,
   ImplementationLineSchema,
   InboxListSchema,
   IntentResponseSchema,
@@ -158,6 +159,39 @@ export function useDashboard(alias: string | undefined) {
   });
 }
 
+export function useRepairHandoff() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      alias: string;
+      taskId?: string;
+      createTaskTitle?: string;
+      nextAction?: string;
+      dryRun?: boolean;
+    }) => {
+      const payload: Record<string, unknown> = {};
+      if (input.taskId !== undefined) payload.taskId = input.taskId;
+      if (input.createTaskTitle !== undefined) payload.createTaskTitle = input.createTaskTitle;
+      if (input.nextAction !== undefined) payload.nextAction = input.nextAction;
+      if (input.dryRun !== undefined) payload.dryRun = input.dryRun;
+      const r = await fetch(`${API_BASE}/api/vault/${input.alias}/handoff/repair`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!r.ok) throw new Error(await readErrorMessage(r));
+      return HandoffRepairResultSchema.parse(await r.json());
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["dashboard", vars.alias] });
+      qc.invalidateQueries({ queryKey: ["resume", vars.alias] });
+      qc.invalidateQueries({ queryKey: ["packs", vars.alias] });
+      qc.invalidateQueries({ queryKey: ["vault", vars.alias] });
+      qc.invalidateQueries({ queryKey: ["nodesByType", vars.alias, "task"] });
+    },
+  });
+}
+
 export function useImplementationLine(alias: string | undefined) {
   return useQuery({
     queryKey: ["implementation", alias],
@@ -242,9 +276,7 @@ export function useSubmitCloseOut(alias: string) {
       });
       if (!r.ok) {
         const text = await r.text().catch(() => "");
-        throw new Error(
-          `submit failed: ${r.statusText}${text ? ` — ${text}` : ""}`,
-        );
+        throw new Error(`submit failed: ${r.statusText}${text ? ` — ${text}` : ""}`);
       }
       const json = await r.json();
       return SubmitCloseOutResultSchema.parse(json);

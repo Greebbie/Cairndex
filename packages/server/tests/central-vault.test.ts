@@ -25,6 +25,7 @@ describe("server with a central vault", () => {
     expect(body).toHaveProperty("projectState");
     expect(body).toHaveProperty("agentContext");
     expect(body).toHaveProperty("memoryHealth");
+    expect(body).toHaveProperty("handoffReadiness");
     expect(body).toHaveProperty("recentActivity");
     await app.close();
   });

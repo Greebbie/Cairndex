@@ -23,9 +23,7 @@ export async function runCloseOut(opts: CloseOutOptions): Promise<void> {
   // Resolve session ID: explicit --session OR latest session in vault
   const sessionId = opts.session ?? (await findLatestSession(root));
   if (!sessionId) {
-    process.stderr.write(
-      "No session found. Use --session <id> or run a session first.\n",
-    );
+    process.stderr.write("No session found. Use --session <id> or run a session first.\n");
     process.exitCode = 1;
     return;
   }
@@ -34,8 +32,8 @@ export async function runCloseOut(opts: CloseOutOptions): Promise<void> {
   if (opts.json) {
     const draft = await prefillCloseOut({
       cwd: opts.cwd,
-      vaultRoot: opts.vaultRoot,
-      projectId: opts.projectId,
+      ...(opts.vaultRoot !== undefined && { vaultRoot: opts.vaultRoot }),
+      ...(opts.projectId !== undefined && { projectId: opts.projectId }),
       sessionId,
     });
     process.stdout.write(JSON.stringify({ sessionId, draft }, null, 2) + "\n");
@@ -66,8 +64,8 @@ export async function runCloseOut(opts: CloseOutOptions): Promise<void> {
   // Mode 3: interactive
   const draft = await prefillCloseOut({
     cwd: opts.cwd,
-    vaultRoot: opts.vaultRoot,
-    projectId: opts.projectId,
+    ...(opts.vaultRoot !== undefined && { vaultRoot: opts.vaultRoot }),
+    ...(opts.projectId !== undefined && { projectId: opts.projectId }),
     sessionId,
   });
   process.stdout.write(`Closing out session ${sessionId}\n`);
@@ -85,10 +83,7 @@ export async function runCloseOut(opts: CloseOutOptions): Promise<void> {
       });
     });
 
-  const didFinish = await ask(
-    "Q1: What did this session actually finish?",
-    draft.didFinish,
-  );
+  const didFinish = await ask("Q1: What did this session actually finish?", draft.didFinish);
   if (didFinish === "skip") {
     rl.close();
     process.stdout.write("Skipped.\n");
@@ -105,10 +100,7 @@ export async function runCloseOut(opts: CloseOutOptions): Promise<void> {
     return;
   }
 
-  const nextStep = await ask(
-    "Q3: Where should the next session pick up?",
-    draft.nextStep,
-  );
+  const nextStep = await ask("Q3: Where should the next session pick up?", draft.nextStep);
   if (nextStep === "skip") {
     rl.close();
     process.stdout.write("Skipped.\n");
@@ -135,9 +127,7 @@ async function findLatestSession(root: string): Promise<string | null> {
   const sessionsDir = join(vaultPath(root), "sessions");
   try {
     const entries = await fs.readdir(sessionsDir);
-    const ids = entries
-      .filter((e) => e.endsWith(".md"))
-      .map((e) => e.replace(/\.md$/, ""));
+    const ids = entries.filter((e) => e.endsWith(".md")).map((e) => e.replace(/\.md$/, ""));
     if (ids.length === 0) return null;
     ids.sort().reverse(); // sessions are ID-sorted (date-prefixed)
     return ids[0] ?? null;

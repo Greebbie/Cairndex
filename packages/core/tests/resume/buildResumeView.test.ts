@@ -96,11 +96,11 @@ describe("buildResumeView", () => {
     root = seedFixture({
       sessions: [
         // 4 unconfirmed + 1 confirmed in last 7 days → recent-narrative=red (20% < 50%)
-        { id: "2026-05-01-1000", narrative_status: "empty" },
-        { id: "2026-05-02-1000", narrative_status: "empty" },
-        { id: "2026-05-03-1000", narrative_status: "empty" },
-        { id: "2026-05-04-1000", narrative_status: "empty" },
-        { id: "2026-05-05-1000", narrative_status: "confirmed" },
+        { id: "2026-05-01-1000", narrative_status: "confirmed" },
+        { id: "2026-05-02-1000", narrative_status: "confirmed" },
+        { id: "2026-05-03-1000", narrative_status: "confirmed" },
+        { id: "2026-05-04-1000", narrative_status: "confirmed" },
+        { id: "2026-05-05-1000", narrative_status: "empty" },
       ],
       // No currentTask → next-action-defined=red
     });

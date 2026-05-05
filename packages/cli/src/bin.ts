@@ -13,6 +13,7 @@ import {
   runInboxProposeUpdate,
   runInboxReject,
 } from "./commands/inbox.js";
+import { runHandoffRepair } from "./commands/handoff.js";
 import { runInit } from "./commands/init.js";
 import {
   runInsightPromote,
@@ -526,6 +527,37 @@ program
     process.exit(r.exitCode);
   });
 
+const handoff = program
+  .command("handoff")
+  .description("Prepare the vault so a human or agent can take over without drift");
+
+handoff
+  .command("repair")
+  .description("Apply safe handoff repairs: sync active-task state, rebuild resume, rebuild pack")
+  .option("--cwd <path>", "Working directory", process.cwd())
+  .option("--vault <path>", "Vault root (overrides --cwd)")
+  .option("--project <id>", "Project id inside a central vault")
+  .option("--task <id>", "Switch to an existing task before repairing")
+  .option("--create-task <title>", "Create a task and switch to it before repairing")
+  .option("--next <text>", "Set the selected/current task next_action")
+  .option("--dry-run", "Show what would change without writing files", false)
+  .option("--json", "Emit machine-readable JSON instead of a human report", false)
+  .action(async (opts) => {
+    const callOpts: Parameters<typeof runHandoffRepair>[0] = {
+      cwd: opts.cwd,
+      dryRun: opts.dryRun === true,
+      json: opts.json === true,
+    };
+    if (opts.vault) callOpts.vaultRoot = opts.vault;
+    if (opts.project) callOpts.projectId = opts.project;
+    if (opts.task) callOpts.taskId = opts.task;
+    if (opts.createTask) callOpts.createTaskTitle = opts.createTask;
+    if (opts.next) callOpts.nextAction = opts.next;
+    const r = await runHandoffRepair(callOpts);
+    if (r.message) (r.exitCode === 0 ? console.log : console.error)(r.message);
+    process.exit(r.exitCode);
+  });
+
 program
   .command("wrap")
   .description(
@@ -663,10 +695,7 @@ program
   .option("--did <text>", "Q1 answer (non-interactive submit)")
   .option("--learn <text>", "Q2 answer (non-interactive submit)")
   .option("--next <text>", "Q3 answer (non-interactive submit)")
-  .option(
-    "--confirm",
-    "Submit non-interactively (requires --did/--next; --learn optional)",
-  )
+  .option("--confirm", "Submit non-interactively (requires --did/--next; --learn optional)")
   .action(async (opts) => {
     await runCloseOut({
       cwd: opts.cwd,
@@ -761,7 +790,10 @@ inbox
   .description(
     "Bulk-reject pending proposals matching a provenance source (e.g. cairndex-consolidate). Useful for one-time triage of historical auto-generated noise.",
   )
-  .requiredOption("--auto-source <name>", "Match proposals where provenance.created_by equals this value")
+  .requiredOption(
+    "--auto-source <name>",
+    "Match proposals where provenance.created_by equals this value",
+  )
   .option("--cwd <path>", "Working directory", process.cwd())
   .option("--vault <path>", "Vault root (overrides --cwd)")
   .option("--project <id>", "Project id inside a central vault")

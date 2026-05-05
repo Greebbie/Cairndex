@@ -3,8 +3,10 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   buildActiveContext,
+  buildHandoffReadiness,
   buildMemoryHealth,
   findLatestPackWithStaleness,
+  scoreAllStoryCoverage,
   vaultPath,
 } from "@cairndex/core";
 import type { FastifyInstance } from "fastify";
@@ -39,6 +41,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
 
     const projectState = await buildActiveContext(project.path, cfg);
     const memoryHealth = await buildMemoryHealth(project.path, cfg);
+    const storyCoverage = await scoreAllStoryCoverage({ cwd: project.path });
 
     // Latest context pack + staleness — the UI surfaces a banner when stale so the
     // user knows to rebuild before the agent relies on the cached pack. The helper
@@ -53,6 +56,12 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
         stale: boolean;
       } | null;
     } = { latestPack: latest };
+    const handoffReadiness = buildHandoffReadiness({
+      projectState,
+      memoryHealth,
+      storyCoverage,
+      latestPack: latest,
+    });
 
     // Recent activity from changes/changelog.md (top 10).
     const changelog = join(vaultPath(project.path), "changes", "changelog.md");
@@ -60,6 +69,6 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
       ? parseRecentActivity(await readFile(changelog, "utf8"), 10)
       : [];
 
-    return { projectState, agentContext, memoryHealth, recentActivity };
+    return { projectState, agentContext, memoryHealth, handoffReadiness, recentActivity };
   });
 }

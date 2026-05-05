@@ -61,6 +61,7 @@ export async function createServer(input: CreateServerInput): Promise<CreateServ
   const { registerUserPreferencesRoutes } = await import("./routes/userPreferences.js");
   const { registerClaudeCodeRoutes } = await import("./routes/claudeCode.js");
   const { registerWorkflowRoutes } = await import("./routes/workflow.js");
+  const { registerHandoffRoutes } = await import("./routes/handoff.js");
   const { registerImplementationRoutes } = await import("./routes/implementation.js");
   const { registerResumeRoutes } = await import("./routes/resume.js");
   const { registerCloseOutRoutes } = await import("./routes/closeout.js");
@@ -82,6 +83,7 @@ export async function createServer(input: CreateServerInput): Promise<CreateServ
   await registerUserPreferencesRoutes(app);
   await registerClaudeCodeRoutes(app);
   await registerWorkflowRoutes(app);
+  await registerHandoffRoutes(app);
   await registerImplementationRoutes(app);
   await registerResumeRoutes(app);
   await registerCloseOutRoutes(app);

@@ -28,7 +28,7 @@ afterEach(() => {
 });
 
 describe("GET /api/vault/:alias/dashboard", () => {
-  it("returns aggregated DashboardDTO with projectState, agentContext, memoryHealth, recentActivity", async () => {
+  it("returns aggregated DashboardDTO with projectState, agentContext, memoryHealth, handoffReadiness, recentActivity", async () => {
     const app = await createServer({
       projects: [{ path: tmp, alias: "demo", registered_at: "2026-05-02T00:00:00Z" }],
     });
@@ -38,6 +38,7 @@ describe("GET /api/vault/:alias/dashboard", () => {
     expect(body).toHaveProperty("projectState");
     expect(body).toHaveProperty("agentContext");
     expect(body).toHaveProperty("memoryHealth");
+    expect(body).toHaveProperty("handoffReadiness");
     expect(body).toHaveProperty("recentActivity");
     const ps = body.projectState as Record<string, unknown>;
     expect(ps.phase).toBe("implementing");

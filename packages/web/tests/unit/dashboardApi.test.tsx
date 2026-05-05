@@ -37,6 +37,23 @@ const goodPayload = {
     counts: { red: 0, yellow: 0, green: 1 },
     issues: [],
   },
+  handoffReadiness: {
+    level: "attention",
+    title: "Needs attention",
+    summary: "0 blockers, 1 warning",
+    checks: [
+      {
+        id: "context-pack-missing",
+        severity: "warning",
+        label: "No context pack",
+        detail: "No generated context pack exists for this project.",
+        action: 'Run cairndex context "<task>" or compose a pack from the dashboard.',
+      },
+    ],
+    blockers: 0,
+    warnings: 1,
+    ready: false,
+  },
   recentActivity: [{ date: "2026-05-02", summary: "init" }],
 };
 
@@ -53,6 +70,7 @@ describe("useDashboard", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data?.projectState.phase).toBe("implementing");
     expect(result.current.data?.memoryHealth.counts.green).toBe(1);
+    expect(result.current.data?.handoffReadiness.level).toBe("attention");
   });
 
   it("rejects malformed dashboard payload via zod", async () => {

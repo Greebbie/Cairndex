@@ -130,8 +130,8 @@ export async function runDoctor(opts: DoctorOptions): Promise<DoctorResult> {
   if (opts.fix) {
     const migResult = await migrateNarrativeStatus({
       cwd,
-      vaultRoot: opts.vaultRoot,
-      projectId: opts.projectId,
+      ...(opts.vaultRoot !== undefined && { vaultRoot: opts.vaultRoot }),
+      ...(opts.projectId !== undefined && { projectId: opts.projectId }),
     });
     if (migResult.updated > 0 && !opts.silent) {
       console.log(`migrated ${migResult.updated} sessions: narrative_status backfilled`);

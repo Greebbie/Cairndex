@@ -4,7 +4,13 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { defaultConfig } from "../src/config.js";
 import { parseFrontmatter } from "../src/frontmatter.js";
-import { completeTask, setPhase, switchTask } from "../src/workflow/taskState.js";
+import {
+  completeTask,
+  createTask,
+  setPhase,
+  setTaskNextAction,
+  switchTask,
+} from "../src/workflow/taskState.js";
 
 describe("workflow/taskState", () => {
   const dirs: string[] = [];
@@ -42,6 +48,18 @@ describe("workflow/taskState", () => {
     return String(data.status ?? "");
   }
 
+  function readIndexCurrentTask(repo: string): string | null {
+    const raw = readFileSync(join(repo, ".cairndex", "index.md"), "utf8");
+    const { data } = parseFrontmatter<{ current_task?: string }>(raw);
+    return data.current_task ?? null;
+  }
+
+  function readIndexNextAction(repo: string): string | null {
+    const raw = readFileSync(join(repo, ".cairndex", "index.md"), "utf8");
+    const { data } = parseFrontmatter<{ next_action?: string }>(raw);
+    return data.next_action ?? null;
+  }
+
   describe("switchTask", () => {
     it("promotes the target to in_progress and demotes the previous current task", async () => {
       const { repo } = seed();
@@ -53,6 +71,8 @@ describe("workflow/taskState", () => {
       expect(r.changed.map((c) => c.id).sort()).toEqual(["TASK-001", "TASK-002"]);
       expect(r.summary).toMatch(/TASK-002/);
       expect(r.summary).toMatch(/demoted TASK-001/);
+      expect(readIndexCurrentTask(repo)).toBe("TASK-002");
+      expect(readIndexNextAction(repo)).toBeNull();
     });
 
     it("works with no prior in_progress task", async () => {
@@ -61,6 +81,7 @@ describe("workflow/taskState", () => {
       const r = await switchTask(repo, defaultConfig(), "TASK-001");
       expect(readStatus(a)).toBe("in_progress");
       expect(r.summary).toMatch(/^task switch → TASK-001$/);
+      expect(readIndexCurrentTask(repo)).toBe("TASK-001");
     });
 
     it("rejects switching to a done task", async () => {
@@ -88,22 +109,57 @@ describe("workflow/taskState", () => {
     });
   });
 
+  describe("createTask", () => {
+    it("creates a pending task with the next action and writes a changelog entry", async () => {
+      const { repo } = seed();
+      const r = await createTask(repo, defaultConfig(), {
+        title: "Repair handoff flow",
+        nextAction: "Run focused tests",
+      });
+      expect(r.id).toBe("TASK-001");
+      const raw = readFileSync(r.path, "utf8");
+      const { data } = parseFrontmatter<{ status?: string; next_action?: string }>(raw);
+      expect(data.status).toBe("pending");
+      expect(data.next_action).toBe("Run focused tests");
+      const log = readFileSync(join(repo, ".cairndex", "changes", "changelog.md"), "utf8");
+      expect(log).toMatch(/task create -> TASK-001/);
+    });
+  });
+
+  describe("setTaskNextAction", () => {
+    it("updates a task next_action and bumps updated", async () => {
+      const { repo } = seed();
+      const path = writeTask(repo, "TASK-001", "pending");
+      const r = await setTaskNextAction(repo, defaultConfig(), "TASK-001", "Ship repair panel");
+      expect(r.changed).toBe(true);
+      const raw = readFileSync(path, "utf8");
+      const { data } = parseFrontmatter<{ next_action?: string }>(raw);
+      expect(data.next_action).toBe("Ship repair panel");
+      expect(readIndexNextAction(repo)).toBe("Ship repair panel");
+    });
+  });
+
   describe("completeTask", () => {
     it("marks the explicit task as done and writes a `completed` date", async () => {
       const { repo } = seed();
       const path = writeTask(repo, "TASK-001", "in_progress");
+      await switchTask(repo, defaultConfig(), "TASK-001");
       await completeTask(repo, defaultConfig(), "TASK-001");
       const raw = readFileSync(path, "utf8");
       const { data } = parseFrontmatter<{ status?: string; completed?: string }>(raw);
       expect(data.status).toBe("done");
       expect(data.completed).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(readIndexCurrentTask(repo)).toBeNull();
+      expect(readIndexNextAction(repo)).toBeNull();
     });
 
     it("defaults to the active-context current task when no id is given", async () => {
       const { repo } = seed();
       const path = writeTask(repo, "TASK-007", "in_progress");
+      await switchTask(repo, defaultConfig(), "TASK-007");
       await completeTask(repo, defaultConfig());
       expect(readStatus(path)).toBe("done");
+      expect(readIndexCurrentTask(repo)).toBeNull();
     });
 
     it("errors clearly when there is no current task and no id given", async () => {

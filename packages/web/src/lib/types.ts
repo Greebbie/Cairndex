@@ -119,11 +119,50 @@ export const AgentContextSchema = z.object({
     .nullable(),
 });
 
+export const HandoffReadinessCheckSchema = z.object({
+  id: z.string(),
+  severity: z.enum(["info", "warning", "blocker"]),
+  label: z.string(),
+  detail: z.string(),
+  action: z.string(),
+});
+export const HandoffReadinessSchema = z.object({
+  level: z.enum(["ready", "attention", "blocked"]),
+  title: z.string(),
+  summary: z.string(),
+  checks: z.array(HandoffReadinessCheckSchema),
+  blockers: z.number(),
+  warnings: z.number(),
+  ready: z.boolean(),
+});
+export type HandoffReadiness = z.infer<typeof HandoffReadinessSchema>;
+
+export const HandoffRepairActionSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  status: z.enum(["applied", "planned", "skipped", "manual"]),
+  detail: z.string(),
+  path: z.string().optional(),
+});
+export const HandoffRepairResultSchema = z.object({
+  before: HandoffReadinessSchema,
+  after: HandoffReadinessSchema,
+  actions: z.array(HandoffRepairActionSchema),
+  applied: z.number(),
+  planned: z.number(),
+  skipped: z.number(),
+  manual: z.number(),
+  createdTaskId: z.string().nullable(),
+  packPath: z.string().nullable(),
+});
+export type HandoffRepairResult = z.infer<typeof HandoffRepairResultSchema>;
+
 export const RecentActivityEventSchema = z.object({ date: z.string(), summary: z.string() });
 export const DashboardSchema = z.object({
   projectState: ProjectStateSchema,
   agentContext: AgentContextSchema,
   memoryHealth: MemoryHealthSchema,
+  handoffReadiness: HandoffReadinessSchema,
   recentActivity: z.array(RecentActivityEventSchema),
 });
 export type Dashboard = z.infer<typeof DashboardSchema>;

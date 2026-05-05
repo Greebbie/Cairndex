@@ -38,6 +38,30 @@ const dashboardPayload = {
     counts: { red: 1, yellow: 3, green: 12 },
     issues: [],
   },
+  handoffReadiness: {
+    level: "blocked",
+    title: "Handoff blocked",
+    summary: "1 blocker, 1 warning",
+    checks: [
+      {
+        id: "memory-health-red",
+        severity: "blocker",
+        label: "Memory health has errors",
+        detail: "1 red issue",
+        action: "Run cairndex doctor --fix, then review any remaining errors.",
+      },
+      {
+        id: "context-pack-stale",
+        severity: "warning",
+        label: "Context pack is stale",
+        detail: "Latest pack is behind memory.",
+        action: "Rebuild the pack before relying on it for a new agent session.",
+      },
+    ],
+    blockers: 1,
+    warnings: 1,
+    ready: false,
+  },
   recentActivity: [{ date: "2026-05-02", summary: "SPEC-003 -> active" }],
 };
 
@@ -159,6 +183,8 @@ describe("Dashboard (smoke)", () => {
       </Wrapper>,
     );
     expect(await screen.findByText("Project State")).toBeDefined();
+    expect(await screen.findByText("Handoff blocked")).toBeDefined();
+    expect(await screen.findByText("Repair safe issues")).toBeDefined();
     // Agent Context is on the dashboard front door so stale/current context-pack
     // state is visible without asking the user to know about the Pack page.
     expect(await screen.findByText("Agent Context")).toBeDefined();

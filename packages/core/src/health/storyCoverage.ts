@@ -48,14 +48,18 @@ function parseSessionDate(id: string): Date | null {
 // ---------------------------------------------------------------------------
 
 /**
- * Score what fraction of sessions in the last 7 days have narrative_status === "confirmed".
+ * Score whether the latest recent session has enough narrative to hand off.
  *
- * Thresholds:
- *   green  ≥ 80 % confirmed
- *   yellow 50–79 %
- *   red    < 50 %
+ * Historical unconfirmed sessions are hygiene debt, but they should not keep the
+ * current project blocked forever after a busy dogfood week. Handoff readiness
+ * needs to answer a narrower question: can the next human or agent understand the
+ * last turn? Therefore:
+ *   green  latest recent session is confirmed
+ *   yellow latest recent session has an auto narrative
+ *   red    latest recent session is empty / unclosed
  *
- * Vacuously green when there are no sessions in the window (no failures to report).
+ * Detail still includes the last-7-day confirmed ratio so the backlog remains
+ * visible without becoming the hard gate.
  */
 export async function scoreRecentNarrative(opts: ScoreOptions): Promise<CoverageIndicator> {
   const today = opts.today ?? new Date();
@@ -83,26 +87,24 @@ export async function scoreRecentNarrative(opts: ScoreOptions): Promise<Coverage
     };
   }
 
-  let total = 0;
-  let confirmed = 0;
+  const recent: Array<{ id: string; status: string }> = [];
 
   for (const name of entries) {
     if (!name.endsWith(".md")) continue;
-    const idDate = parseSessionDate(name.replace(/\.md$/, ""));
+    const id = name.replace(/\.md$/, "");
+    const idDate = parseSessionDate(id);
     if (!idDate || idDate.getTime() < cutoff) continue;
-
-    total++;
 
     try {
       const raw = await fs.readFile(join(sessionsDir, name), "utf8");
       const { data } = parseFrontmatter<{ narrative_status?: string }>(raw);
-      if (data.narrative_status === "confirmed") confirmed++;
+      recent.push({ id, status: data.narrative_status ?? "empty" });
     } catch {
       // skip malformed files
     }
   }
 
-  if (total === 0) {
+  if (recent.length === 0) {
     return {
       name: "recent-narrative",
       level: "green",
@@ -111,14 +113,26 @@ export async function scoreRecentNarrative(opts: ScoreOptions): Promise<Coverage
     };
   }
 
-  const ratio = confirmed / total;
-  const level: CoverageLevel = ratio >= 0.8 ? "green" : ratio >= 0.5 ? "yellow" : "red";
+  recent.sort((a, b) => b.id.localeCompare(a.id));
+  const latest = recent[0];
+  const confirmed = recent.filter((s) => s.status === "confirmed").length;
+  const ratio = `${confirmed}/${recent.length} confirmed in last 7 days`;
+  const latestId = latest?.id ?? "(unknown)";
+  const latestStatus = latest?.status ?? "empty";
+  const level: CoverageLevel =
+    latestStatus === "confirmed" ? "green" : latestStatus === "auto" ? "yellow" : "red";
+  const latestDetail =
+    latestStatus === "confirmed"
+      ? `${latestId} confirmed`
+      : latestStatus === "auto"
+        ? `${latestId} has auto narrative`
+        : `${latestId} needs close-out`;
 
   return {
     name: "recent-narrative",
     level,
     label: "Recent narrative",
-    detail: `${confirmed}/${total} confirmed (${Math.round(ratio * 100)}%)`,
+    detail: `${latestDetail} (${ratio})`,
   };
 }
 

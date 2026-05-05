@@ -17,36 +17,7 @@ describe("scoreRecentNarrative", () => {
     if (root) rmSync(root, { recursive: true, force: true });
   });
 
-  it("green when ≥80% of last-7-day sessions are confirmed", async () => {
-    root = seedFixture({
-      sessions: [
-        { id: "2026-05-01-1000", narrative_status: "confirmed" },
-        { id: "2026-05-02-1000", narrative_status: "confirmed" },
-        { id: "2026-05-03-1000", narrative_status: "confirmed" },
-        { id: "2026-05-04-1000", narrative_status: "confirmed" },
-        { id: "2026-05-05-1000", narrative_status: "empty" },
-      ],
-    });
-    const r = await scoreRecentNarrative({ cwd: root, today: new Date("2026-05-05T12:00:00Z") });
-    expect(r.level).toBe("green");
-    expect(r.detail).toMatch(/4\/5|80%/);
-  });
-
-  it("yellow when 50-80% confirmed", async () => {
-    root = seedFixture({
-      sessions: [
-        { id: "2026-05-01-1000", narrative_status: "confirmed" },
-        { id: "2026-05-02-1000", narrative_status: "confirmed" },
-        { id: "2026-05-03-1000", narrative_status: "confirmed" },
-        { id: "2026-05-04-1000", narrative_status: "empty" },
-        { id: "2026-05-05-1000", narrative_status: "empty" },
-      ],
-    });
-    const r = await scoreRecentNarrative({ cwd: root, today: new Date("2026-05-05T12:00:00Z") });
-    expect(r.level).toBe("yellow");
-  });
-
-  it("red when <50% confirmed", async () => {
+  it("green when the latest recent session is confirmed", async () => {
     root = seedFixture({
       sessions: [
         { id: "2026-05-01-1000", narrative_status: "empty" },
@@ -57,7 +28,39 @@ describe("scoreRecentNarrative", () => {
       ],
     });
     const r = await scoreRecentNarrative({ cwd: root, today: new Date("2026-05-05T12:00:00Z") });
+    expect(r.level).toBe("green");
+    expect(r.detail).toMatch(/2026-05-05-1000 confirmed/);
+    expect(r.detail).toMatch(/1\/5 confirmed/);
+  });
+
+  it("yellow when the latest recent session has auto narrative", async () => {
+    root = seedFixture({
+      sessions: [
+        { id: "2026-05-01-1000", narrative_status: "confirmed" },
+        { id: "2026-05-02-1000", narrative_status: "confirmed" },
+        { id: "2026-05-03-1000", narrative_status: "empty" },
+        { id: "2026-05-04-1000", narrative_status: "empty" },
+        { id: "2026-05-05-1000", narrative_status: "auto" },
+      ],
+    });
+    const r = await scoreRecentNarrative({ cwd: root, today: new Date("2026-05-05T12:00:00Z") });
+    expect(r.level).toBe("yellow");
+    expect(r.detail).toMatch(/has auto narrative/);
+  });
+
+  it("red when the latest recent session is empty", async () => {
+    root = seedFixture({
+      sessions: [
+        { id: "2026-05-01-1000", narrative_status: "confirmed" },
+        { id: "2026-05-02-1000", narrative_status: "confirmed" },
+        { id: "2026-05-03-1000", narrative_status: "confirmed" },
+        { id: "2026-05-04-1000", narrative_status: "confirmed" },
+        { id: "2026-05-05-1000", narrative_status: "empty" },
+      ],
+    });
+    const r = await scoreRecentNarrative({ cwd: root, today: new Date("2026-05-05T12:00:00Z") });
     expect(r.level).toBe("red");
+    expect(r.detail).toMatch(/needs close-out/);
   });
 
   it("ignores sessions older than 7 days", async () => {
@@ -70,7 +73,7 @@ describe("scoreRecentNarrative", () => {
     });
     const r = await scoreRecentNarrative({ cwd: root, today: new Date("2026-05-05T12:00:00Z") });
     expect(r.level).toBe("green");
-    expect(r.detail).not.toMatch(/3\//); // doesn't count the old one
+    expect(r.detail).toMatch(/2\/2 confirmed/); // doesn't count the old one
   });
 
   it("green when no sessions in window (vacuously true)", async () => {
@@ -90,7 +93,13 @@ describe("scoreActiveTaskProgress", () => {
   it("green when active task updated within 3 days", async () => {
     root = seedFixture({
       tasks: [
-        { id: "TASK-A", title: "x", status: "in_progress", next_action: "y", updated: "2026-05-04" },
+        {
+          id: "TASK-A",
+          title: "x",
+          status: "in_progress",
+          next_action: "y",
+          updated: "2026-05-04",
+        },
       ],
       currentTask: "TASK-A",
     });
@@ -101,7 +110,13 @@ describe("scoreActiveTaskProgress", () => {
   it("yellow when 4-7 days stale", async () => {
     root = seedFixture({
       tasks: [
-        { id: "TASK-A", title: "x", status: "in_progress", next_action: "y", updated: "2026-05-01" },
+        {
+          id: "TASK-A",
+          title: "x",
+          status: "in_progress",
+          next_action: "y",
+          updated: "2026-05-01",
+        },
       ],
       currentTask: "TASK-A",
     });
@@ -112,7 +127,13 @@ describe("scoreActiveTaskProgress", () => {
   it("red when >7 days stale", async () => {
     root = seedFixture({
       tasks: [
-        { id: "TASK-A", title: "x", status: "in_progress", next_action: "y", updated: "2026-04-25" },
+        {
+          id: "TASK-A",
+          title: "x",
+          status: "in_progress",
+          next_action: "y",
+          updated: "2026-04-25",
+        },
       ],
       currentTask: "TASK-A",
     });

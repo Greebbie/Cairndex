@@ -64,6 +64,7 @@ describe("runStatus", () => {
     expect(text).toContain("implementing");
     expect(text).toContain("ship status verb");
     expect(text).toContain("Memory:");
+    expect(text).toContain("Handoff:");
     expect(text).toContain("Inbox:");
     expect(text).toContain("Last change:");
     expect(text).toContain("SPEC-001");
@@ -109,6 +110,7 @@ describe("runStatus", () => {
     expect(r.exitCode).toBe(0);
     const parsed = JSON.parse(r.body ?? "{}") as {
       storyCoverage?: Array<{ name: string; level: string }>;
+      handoffReadiness?: { level: string; checks: unknown[] };
     };
     expect(Array.isArray(parsed.storyCoverage)).toBe(true);
     const sc = parsed.storyCoverage ?? [];
@@ -117,5 +119,7 @@ describe("runStatus", () => {
       expect(typeof entry.name).toBe("string");
       expect(["green", "yellow", "red"]).toContain(entry.level);
     }
+    expect(parsed.handoffReadiness?.level).toBeDefined();
+    expect(Array.isArray(parsed.handoffReadiness?.checks)).toBe(true);
   });
 });

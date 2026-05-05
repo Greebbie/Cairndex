@@ -100,6 +100,37 @@ describe("buildActiveContext", () => {
     const ctx = await buildActiveContext(tmp, defaultConfig());
     expect(ctx.currentTask?.id).toBe("TASK-002");
   });
+
+  it("uses the current task next_action as the handoff next action", async () => {
+    setup({
+      "index.md": baseIndex,
+      "tasks/TASK-002.md":
+        "---\nid: TASK-002\ntitle: In progress\nstatus: in_progress\nnext_action: Ship the repair flow\ncreated: 2026-05-02\nupdated: 2026-05-02\n---\n",
+    });
+    const ctx = await buildActiveContext(tmp, defaultConfig());
+    expect(ctx.nextAction).toBe("Ship the repair flow");
+    expect(ctx.warnings).toContain(
+      "index.md next_action differs from TASK-002 next_action; workflow should sync them",
+    );
+  });
+
+  it("warns when index current_task points at a completed task", async () => {
+    setup({
+      "index.md": `---
+phase: implementing
+current_task: TASK-001
+---
+# Project Index
+`,
+      "tasks/TASK-001.md":
+        "---\nid: TASK-001\ntitle: Already done\nstatus: done\ncreated: 2026-05-01\nupdated: 2026-05-02\ncompleted: 2026-05-02\n---\n",
+    });
+    const ctx = await buildActiveContext(tmp, defaultConfig());
+    expect(ctx.currentTask).toBeNull();
+    expect(ctx.warnings).toContain(
+      "index.md current_task points at TASK-001, but that task is done",
+    );
+  });
 });
 
 describe("regenerateActiveContext", () => {

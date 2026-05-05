@@ -3,8 +3,10 @@ import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import {
   buildActiveContext,
+  buildHandoffReadiness,
   buildMemoryHealth,
   defaultConfig,
+  findLatestPackWithStaleness,
   listProposals,
   loadProjectConfig,
   projectIdFromRoot,
@@ -103,15 +105,22 @@ export async function runStatus(opts: StatusOptions): Promise<StatusResult> {
   const cfg = existsSync(`${vaultPath(root)}/config.yaml`)
     ? loadProjectConfig(root)
     : defaultConfig();
-  const [ctx, health, inbox, lastChange, intent, storyCoverage] = await Promise.all([
+  const [ctx, health, inbox, lastChange, intent, storyCoverage, latestPack] = await Promise.all([
     buildActiveContext(root, cfg),
     buildMemoryHealth(root, cfg),
     listProposals(root, cfg),
     lastDurableMtime(root),
     readIntent(root),
     scoreAllStoryCoverage({ cwd: root }),
+    findLatestPackWithStaleness(root),
   ]);
   const projectId = opts.projectId ?? projectIdFromRoot(root);
+  const handoffReadiness = buildHandoffReadiness({
+    projectState: ctx,
+    memoryHealth: health,
+    storyCoverage,
+    latestPack,
+  });
 
   if (opts.json) {
     return {
@@ -128,6 +137,7 @@ export async function runStatus(opts: StatusOptions): Promise<StatusResult> {
           intent,
           memory: health.counts,
           storyCoverage: storyCoverage.map((i) => ({ name: i.name, level: i.level })),
+          handoffReadiness,
           inbox: {
             pending: inbox.pending.length,
             accepted: inbox.accepted.length,
@@ -173,11 +183,10 @@ export async function runStatus(opts: StatusOptions): Promise<StatusResult> {
   lines.push(
     `${pad("Memory:", 14)}${health.counts.green} green  ${health.counts.yellow} yellow  ${health.counts.red} red`,
   );
+  lines.push(`${pad("Handoff:", 14)}${handoffReadiness.level} — ${handoffReadiness.summary}`);
   const storyFlags = storyCoverage.filter((i) => i.level !== "green");
   if (storyFlags.length > 0) {
-    lines.push(
-      `${pad("Story:", 14)}${storyFlags.map((f) => `${f.name}: ${f.level}`).join(", ")}`,
-    );
+    lines.push(`${pad("Story:", 14)}${storyFlags.map((f) => `${f.name}: ${f.level}`).join(", ")}`);
   } else {
     lines.push(`${pad("Story:", 14)}all green`);
   }

@@ -34,6 +34,7 @@ interface IndexFrontmatter {
   phase?: string;
   phase_since?: string;
   next_action?: string;
+  current_task?: string;
 }
 
 async function readIndexFrontmatter(repoRoot: string): Promise<IndexFrontmatter> {
@@ -106,6 +107,43 @@ export async function buildActiveContext(repoRoot: string, cfg: Config): Promise
   const inProgress = pickActive(tasks, new Set(["in_progress"]));
   const pending = pickActive(tasks, new Set(["pending"]));
   const currentTaskNode = inProgress[0] ?? pending[0] ?? null;
+  const currentTaskNextAction =
+    typeof currentTaskNode?.frontmatter.next_action === "string" &&
+    currentTaskNode.frontmatter.next_action.trim().length > 0
+      ? currentTaskNode.frontmatter.next_action.trim()
+      : null;
+  const indexNextAction =
+    typeof idx.next_action === "string" && idx.next_action.trim().length > 0
+      ? idx.next_action.trim()
+      : null;
+
+  const declaredCurrentTaskId =
+    typeof idx.current_task === "string" && idx.current_task.trim().length > 0
+      ? idx.current_task.trim()
+      : null;
+  if (declaredCurrentTaskId) {
+    const declared = tasks.find((t) => t.id === declaredCurrentTaskId);
+    if (!declared) {
+      warnings.push(`index.md current_task points at missing task ${declaredCurrentTaskId}`);
+    } else {
+      const status = String(declared.frontmatter.status ?? "");
+      if (status !== "in_progress" && status !== "pending") {
+        warnings.push(
+          `index.md current_task points at ${declaredCurrentTaskId}, but that task is ${status || "statusless"}`,
+        );
+      } else if (currentTaskNode && currentTaskNode.id !== declaredCurrentTaskId) {
+        warnings.push(
+          `index.md current_task points at ${declaredCurrentTaskId}, but active task resolution picked ${currentTaskNode.id}`,
+        );
+      }
+    }
+  }
+
+  if (currentTaskNextAction && indexNextAction && currentTaskNextAction !== indexNextAction) {
+    warnings.push(
+      `index.md next_action differs from ${currentTaskNode?.id} next_action; workflow should sync them`,
+    );
+  }
 
   const activePlan = activePlans[0]
     ? {
@@ -121,7 +159,7 @@ export async function buildActiveContext(repoRoot: string, cfg: Config): Promise
     activeSpec: activeSpecs[0] ? nodeRef(activeSpecs[0]) : null,
     activePlan,
     currentTask: currentTaskNode ? nodeRef(currentTaskNode) : null,
-    nextAction: idx.next_action ?? null,
+    nextAction: currentTaskNextAction ?? indexNextAction,
     warnings,
     generatedAt: new Date().toISOString(),
   };

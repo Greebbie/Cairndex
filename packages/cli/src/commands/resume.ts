@@ -11,18 +11,18 @@ export interface ResumeOptions {
 export async function runResume(opts: ResumeOptions): Promise<void> {
   const root = resolveMemoryRoot({
     cwd: opts.cwd,
-    vaultRoot: opts.vaultRoot,
-    projectId: opts.projectId,
+    ...(opts.vaultRoot !== undefined && { vaultRoot: opts.vaultRoot }),
+    ...(opts.projectId !== undefined && { projectId: opts.projectId }),
   });
   const view = await buildResumeView({
     cwd: root,
-    vaultRoot: opts.vaultRoot,
-    projectId: opts.projectId,
+    ...(opts.vaultRoot !== undefined && { vaultRoot: opts.vaultRoot }),
+    ...(opts.projectId !== undefined && { projectId: opts.projectId }),
   });
   await writeResumeCache({
     cwd: root,
-    vaultRoot: opts.vaultRoot,
-    projectId: opts.projectId,
+    ...(opts.vaultRoot !== undefined && { vaultRoot: opts.vaultRoot }),
+    ...(opts.projectId !== undefined && { projectId: opts.projectId }),
     view,
   });
   if (opts.json) {

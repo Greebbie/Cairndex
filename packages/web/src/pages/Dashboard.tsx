@@ -5,12 +5,21 @@ import { NowBar } from "@/components/NowBar";
 import { ActivePlanPanel } from "@/components/cockpit/ActivePlanPanel";
 import { AgentContextPanel } from "@/components/cockpit/AgentContextPanel";
 import { CloseOutCard } from "@/components/cockpit/CloseOutCard";
+import { HandoffReadinessPanel } from "@/components/cockpit/HandoffReadinessPanel";
 import { InboxPanel } from "@/components/cockpit/InboxPanel";
 import { IntentBar } from "@/components/cockpit/IntentBar";
 import { MemoryHealthPanel } from "@/components/cockpit/MemoryHealthPanel";
 import { ProjectStatePanel } from "@/components/cockpit/ProjectStatePanel";
 import { ResumeCard } from "@/components/cockpit/ResumeCard";
-import { useCloseOutDraft, useDashboard, useIntent, useProjects, useResume, useSubmitCloseOut } from "@/lib/api";
+import {
+  useCloseOutDraft,
+  useDashboard,
+  useIntent,
+  useProjects,
+  useRepairHandoff,
+  useResume,
+  useSubmitCloseOut,
+} from "@/lib/api";
 import { foldChangelogForDisplay, isHeuristicProposalEvent } from "@/lib/changelogFormat";
 import { useWatcherEvents } from "@/lib/sse";
 import { humanizeDateString } from "@/lib/time";
@@ -24,6 +33,7 @@ export default function Dashboard() {
   const dashboard = useDashboard(alias);
   const intent = useIntent(alias);
   const resume = useResume(alias);
+  const repairHandoff = useRepairHandoff();
   useWatcherEvents(alias);
 
   // Close-out card: show when the most recent session has narrativeStatus === "empty".
@@ -72,11 +82,17 @@ export default function Dashboard() {
         <CloseOutCard
           sessionId={lastSession.id}
           draft={draft.data.draft}
-          onSubmit={(answers) =>
-            submitCloseOut.mutate({ sessionId: lastSession.id, answers })
-          }
+          onSubmit={(answers) => submitCloseOut.mutate({ sessionId: lastSession.id, answers })}
           onSkip={() => setSkippedSessionId(lastSession.id)}
           submitting={submitCloseOut.isPending}
+        />
+      ) : null}
+      {data ? (
+        <HandoffReadinessPanel
+          readiness={data.handoffReadiness}
+          onRepair={() => repairHandoff.mutate({ alias })}
+          repairing={repairHandoff.isPending}
+          repairError={repairHandoff.error instanceof Error ? repairHandoff.error.message : null}
         />
       ) : null}
       {resume.data?.view ? <ResumeCard view={resume.data.view} /> : null}
