@@ -1,3 +1,4 @@
+import { AgentIntegrationPanel } from "@/components/AgentIntegrationPanel";
 import { DoctorBadge } from "@/components/DoctorBadge";
 import { EventLine } from "@/components/EventLine";
 import { LastTurnCard } from "@/components/LastTurnCard";
@@ -142,6 +143,7 @@ export default function Dashboard() {
             </div>
             <div className="min-w-0 space-y-4 xl:sticky xl:top-14">
               <AgentContextPanel alias={alias} agentContext={data.agentContext} />
+              <AgentIntegrationPanel alias={alias} />
               <MemoryHealthPanel alias={alias} health={data.memoryHealth} />
               <InboxPanel alias={alias} />
             </div>

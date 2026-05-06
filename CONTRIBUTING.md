@@ -1,82 +1,110 @@
-# Contributing to cairndex
+# Contributing to Cairndex
 
-Thanks for your interest. This document explains how to set up the repo, the coding/testing conventions we follow, and how to propose changes.
+Thanks for your interest in Cairndex. This document explains how to set up the
+repository, run checks, and make changes that fit the project.
+
+## Requirements
+
+- Node.js 20 or newer
+- pnpm 9 or newer
 
 ## Setup
 
-Requirements: **Node 20+** and **pnpm 9+**.
+```bash
+git clone https://github.com/Greebbie/Cairndex.git
+cd Cairndex
+pnpm install
+pnpm -r build
+pnpm typecheck
+pnpm test
+```
+
+## Repository layout
+
+```text
+packages/
+  core/      vault model, validation, indexes, context packs, hooks
+  cli/       cairndex command line interface
+  server/    Fastify API, SSE, static GUI hosting
+  web/       React dashboard and browse UI
+templates/   default vault templates and rules
+docs/        user-facing and development documentation
+```
+
+## Development workflow
+
+1. Read the relevant package code before changing behavior.
+2. Add or update tests for behavior changes.
+3. Keep changes scoped to the feature or bug being addressed.
+4. Run targeted tests while developing.
+5. Before opening a pull request, run the standard checks below.
+
+## Standard checks
 
 ```bash
-git clone https://github.com/<org>/cairndex.git
-cd cairndex
-pnpm install
-pnpm test         # run all tests
-pnpm typecheck    # strict TS
-pnpm lint         # biome
-pnpm build        # build all packages
+pnpm typecheck
+pnpm test
+pnpm lint
+pnpm -r build
 ```
 
-## Repo layout
+For focused work, run package-level checks:
 
-This is a pnpm monorepo:
-
+```bash
+pnpm -F @cairndex/core typecheck
+pnpm -F cairndex typecheck
+pnpm -F @cairndex/server typecheck
+pnpm -F @cairndex/web typecheck
 ```
-packages/
-  core/      @cairndex/core   — vault read/write, schema, validate, sync, watcher
-  cli/       @cairndex/cli    — `cairndex` binary
-  server/    @cairndex/server — Fastify HTTP + SSE
-  web/       @cairndex/web    — React app
-templates/   default rules + 10 node templates shipped with the package
-docs/        public-facing user docs (e.g. QUICKSTART.md)
-```
-
-Each package has its own `package.json`, `tsconfig.json`, and tests.
-
-Architectural decisions are recorded as ADRs inside the project's vault under
-`projects/cairndex/decisions/`; the README's [Architecture](./README.md#architecture)
-section is the public-facing entry point.
-
-## Workflow
-
-1. **Understand the architecture first.** The README's
-   [Architecture](./README.md#architecture) section names the four packages and
-   their responsibilities. Open ADRs in the project vault carry the design
-   history when more context is needed.
-2. **TDD.** Every feature or fix follows: write the failing test → run it and
-   confirm failure → implement minimal code → run test and confirm pass →
-   commit.
-3. **Small commits, conventional messages.** `<type>(<scope>): <short description>`,
-   types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `ci`.
-   Bodies wrap at 72 characters.
-4. **No `--no-verify`.** If a hook fails, fix the underlying issue.
 
 ## Coding style
 
-- TypeScript strict mode + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes`.
-- Immutability by default — return new objects, don't mutate.
-- Many small files, each with one clear responsibility (~200-400 lines typical, 800 max).
-- No deep nesting (>4 levels). Extract.
-- Validate at system boundaries (user input, file I/O, API requests). Trust internal code.
-- No comments unless the **why** is non-obvious. Code should explain **what** through naming.
-- biome handles formatting (`pnpm format`).
+- TypeScript is strict.
+- Prefer small, direct modules over broad abstractions.
+- Validate data at file, CLI, API, and agent boundaries.
+- Keep canonical memory writes reviewable.
+- Avoid unrelated formatting churn.
+- Let Biome handle formatting.
 
-## Testing
+## Testing guidelines
 
-- Unit tests: vitest, colocated under `packages/<pkg>/tests/`.
-- Use `tmpdir` for any test that touches the filesystem; never the real `~/.cairndex/` or current repo.
-- Set `CAIRNDEX_HOME` env var to override the global directory in tests.
-- Coverage target: ≥80% for `packages/core/src`, ≥70% for `packages/cli/src`, smoke-only for `packages/web/src`.
+- Use Vitest for unit and integration tests.
+- Use temporary directories for filesystem tests.
+- Do not read or write the real user vault from tests.
+- Set `CAIRNDEX_HOME` when tests need an isolated global config directory.
+- Web tests should cover user-visible behavior, not implementation details.
 
 ## Memory model
 
-cairndex is itself a cairndex project. Once `packages/cli` ships, the repo will have its own `.cairndex/` for tracking specs, decisions, and sessions related to cairndex's development.
+Cairndex is itself managed as a Cairndex project during development. Durable
+project memory lives in the configured vault, not in chat history. Agent-written
+memory changes should flow through the inbox unless the code path is explicitly
+responsible for generated state such as resume caches, indexes, or context
+packs.
 
-Until then, design decisions live in `docs/superpowers/specs/` and `docs/superpowers/plans/`.
+## Pull requests
+
+Good pull requests include:
+
+- a short description of the user-facing change;
+- tests or a clear explanation of why tests were not added;
+- notes on any migration or compatibility impact;
+- screenshots for dashboard or browse UI changes.
+
+Do not include generated local vault data unless it is intentionally part of the
+change.
 
 ## Reporting issues
 
-Open a GitHub issue. For bugs: include `cairndex doctor` output, `node --version`, OS, and steps to reproduce.
+For bugs, include:
+
+- operating system;
+- Node and pnpm versions;
+- the command or UI flow that failed;
+- relevant `cairndex status` or `cairndex doctor` output;
+- whether the project uses a central vault or legacy repo-local vault.
 
 ## License
 
-By contributing, you agree your contributions are licensed under the MIT License (see `LICENSE`).
+By contributing, you agree that your contribution is licensed under the MIT
+License. See [LICENSE](./LICENSE).

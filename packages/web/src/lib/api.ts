@@ -5,6 +5,7 @@ import {
   ClaudeCodeStatusSchema,
   type CloseOutAnswers,
   CloseOutDraftResponseSchema,
+  CodexStatusSchema,
   ComposePackResponseSchema,
   DashboardSchema,
   HandoffRepairResultSchema,
@@ -334,6 +335,30 @@ export function useWireClaudeCode() {
     },
     onSuccess: (_, alias) => {
       qc.invalidateQueries({ queryKey: ["claude-code-status", alias] });
+    },
+  });
+}
+
+export function useCodexStatus(alias: string | undefined) {
+  return useQuery({
+    queryKey: ["codex-status", alias],
+    queryFn: () => jsonFetch(`/api/projects/${alias}/codex-status`, CodexStatusSchema),
+    enabled: !!alias,
+  });
+}
+
+export function useWireCodex() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (alias: string) => {
+      const r = await fetch(`${API_BASE}/api/projects/${alias}/codex-wire`, {
+        method: "POST",
+      });
+      if (!r.ok) throw new Error(`${r.status}`);
+      return CodexStatusSchema.parse(await r.json());
+    },
+    onSuccess: (_, alias) => {
+      qc.invalidateQueries({ queryKey: ["codex-status", alias] });
     },
   });
 }

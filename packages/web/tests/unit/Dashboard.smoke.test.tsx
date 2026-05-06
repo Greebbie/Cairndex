@@ -87,6 +87,24 @@ const inboxPayload = {
   duplicate: [],
 };
 
+const codexStatusPayload = {
+  wired: false,
+  hooksPath: "/repo/.codex/hooks.json",
+  hooksExists: false,
+  hookEvents: [],
+  agentsMdPath: "/repo/AGENTS.md",
+  agentsMdExists: false,
+  agentsBlockPresent: false,
+};
+
+const claudeCodeStatusPayload = {
+  wired: false,
+  settingsPath: "/repo/.claude/settings.json",
+  settingsExists: false,
+  hookEvents: [],
+  mcpRegistered: false,
+};
+
 // jsdom doesn't ship EventSource; the Dashboard subscribes to /api/events via SSE so
 // we install a no-op stub that satisfies the constructor without opening a connection.
 class StubEventSource {
@@ -121,6 +139,8 @@ beforeEach(() => {
     else if (u.endsWith("/implementation"))
       body = { generatedAt: "2026-05-02T00:00:00Z", entries: [], byPlan: {} };
     else if (u.endsWith("/last-turn-summary")) body = { summary: null };
+    else if (u.endsWith("/codex-status")) body = codexStatusPayload;
+    else if (u.endsWith("/claude-code-status")) body = claudeCodeStatusPayload;
     else if (u.endsWith("/resume"))
       body = {
         generated: true,
@@ -184,11 +204,13 @@ describe("Dashboard (smoke)", () => {
     );
     expect(await screen.findByText("Project State")).toBeDefined();
     expect(await screen.findByText("Handoff blocked")).toBeDefined();
-    expect(await screen.findByText("Repair safe issues")).toBeDefined();
+    expect(await screen.findByText("Fix safe handoff issues")).toBeDefined();
     // Agent Context is on the dashboard front door so stale/current context-pack
     // state is visible without asking the user to know about the Pack page.
     expect(await screen.findByText("Agent Context")).toBeDefined();
     expect(await screen.findByText("pack-fix-web-e2e-abc12345")).toBeDefined();
+    expect(await screen.findByText("Agent Integration")).toBeDefined();
+    expect(await screen.findByText("Codex")).toBeDefined();
     // Memory Health panel renders only when red+yellow > 0 (this fixture has
     // red:1, yellow:3). The heading is now "Vault status" — humans don't
     // think of their project notes as "memory."
@@ -224,6 +246,8 @@ describe("Dashboard (smoke)", () => {
       else if (u.endsWith("/implementation"))
         body = { generatedAt: "2026-05-02T00:00:00Z", entries: [], byPlan: {} };
       else if (u.endsWith("/last-turn-summary")) body = { summary: null };
+      else if (u.endsWith("/codex-status")) body = codexStatusPayload;
+      else if (u.endsWith("/claude-code-status")) body = claudeCodeStatusPayload;
       else if (u.endsWith("/api/vault/demo/task")) body = [];
       else body = {};
       return new Response(JSON.stringify(body), {
@@ -327,6 +351,8 @@ describe("Dashboard (smoke)", () => {
       else if (u.endsWith("/implementation"))
         body = { generatedAt: "2026-05-02T00:00:00Z", entries: [], byPlan: {} };
       else if (u.endsWith("/last-turn-summary")) body = { summary: null };
+      else if (u.endsWith("/codex-status")) body = codexStatusPayload;
+      else if (u.endsWith("/claude-code-status")) body = claudeCodeStatusPayload;
       else if (u.endsWith("/resume")) body = resumeWithEmptySession;
       else if (u.includes("/closeout/draft")) body = closeOutDraftPayload;
       else if (u.endsWith("/api/vault/demo/task")) body = [];

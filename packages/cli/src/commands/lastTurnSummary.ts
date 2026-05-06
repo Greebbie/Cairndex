@@ -12,6 +12,7 @@ import {
 } from "@cairndex/core";
 import { missingVaultMessage } from "../utils/missingVaultMessage.js";
 import { resolveMemoryRoot } from "../utils/resolveMemoryRoot.js";
+import { collectFallbackTurnTouchedPaths } from "../utils/turnActivity.js";
 
 export interface LastTurnSummaryOptions {
   cwd: string;
@@ -130,17 +131,30 @@ export async function runLastTurnSummary(
   const windowMs = opts.newProposalWindowMs ?? DEFAULT_WINDOW_MS;
 
   const hasTranscript = opts.transcriptPath !== undefined && existsSync(opts.transcriptPath);
-  if (opts.requireTranscript && !hasTranscript) {
+  const fallbackTouchedPaths =
+    !hasTranscript && opts.requireTranscript
+      ? await collectFallbackTurnTouchedPaths({
+          memoryRoot: root,
+          sourceRoot: opts.cwd,
+          now,
+        })
+      : [];
+
+  if (opts.requireTranscript && !hasTranscript && fallbackTouchedPaths.length === 0) {
     return {
       exitCode: 1,
       message:
-        "last-turn-summary requires a Claude Code Stop-hook transcript payload; pass --allow-empty for manual/debug zero-activity summaries.",
+        "last-turn-summary requires a Claude Code Stop-hook transcript payload or detectable source activity; pass --allow-empty for manual/debug zero-activity summaries.",
     };
   }
 
   const transcript = hasTranscript
     ? await parseTranscriptJsonl(opts.transcriptPath as string)
-    : { touchedPaths: [], idsReferenced: [], toolCounts: { Edit: 0, Write: 0, Bash: 0, Read: 0 } };
+    : {
+        touchedPaths: fallbackTouchedPaths,
+        idsReferenced: [],
+        toolCounts: { Edit: 0, Write: 0, Bash: 0, Read: 0 },
+      };
 
   const newProposals = await recentProposals(vault, windowMs, now);
   const latestSession = await latestSessionId(vault);

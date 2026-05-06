@@ -56,10 +56,10 @@ export function HandoffReadinessPanel({
             disabled={repairing}
             className="rounded bg-background px-3 py-1 text-xs font-medium text-foreground border disabled:opacity-50"
           >
-            {repairing ? "Repairing..." : "Repair safe issues"}
+            {repairing ? "Fixing..." : "Fix safe handoff issues"}
           </button>
           <span className="text-xs text-muted-foreground">
-            Syncs task pointer, rebuilds resume, and refreshes the context pack.
+            Syncs safe drift in task state, resume cache, and agent context.
           </span>
         </div>
       ) : null}

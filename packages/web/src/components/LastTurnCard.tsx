@@ -14,10 +14,12 @@ function summarize(s: Metrics): string {
   const parts: string[] = [];
   const totalToolCalls =
     s.toolCounts.Edit + s.toolCounts.Write + s.toolCounts.Bash + s.toolCounts.Read;
-  if (s.filesTouched > 0)
+  if (s.filesTouched > 0) {
     parts.push(`${s.filesTouched} file${s.filesTouched === 1 ? "" : "s"} touched`);
-  if (totalToolCalls > 0)
+  }
+  if (totalToolCalls > 0) {
     parts.push(`${totalToolCalls} tool call${totalToolCalls === 1 ? "" : "s"}`);
+  }
   if (s.newProposals.length > 0) {
     parts.push(`${s.newProposals.length} proposal${s.newProposals.length === 1 ? "" : "s"}`);
   }
@@ -26,24 +28,19 @@ function summarize(s: Metrics): string {
 
 /**
  * "This turn" card. Renders the last-turn metric line plus a narrative list of
- * changelog events that happened during the turn — proposals accepted/rejected,
+ * changelog events that happened during the turn: proposals accepted/rejected,
  * task switch/complete, phase change. Fetched via React Query and invalidated by
- * SSE in `useWatcherEvents`, so it refreshes within ~1s of session end.
- *
- * The events list answers "what did Claude actually accomplish?" without falling
- * back to "see metrics, hope they map to outcomes." Falls back gracefully to the
- * metric-only display when events are empty (e.g. fresh project, parse failure).
+ * SSE in `useWatcherEvents`, so it refreshes within about a second of session end.
  */
 export function LastTurnCard({ alias }: Props) {
   const { data } = useLastTurnSummary(alias);
   const s = data?.summary ?? null;
   if (!s) return null;
-  // events is added by the server route; the schema makes it optional with default
-  // []. foldChangelogForDisplay drops session-receipts and heuristic proposals
-  // (system housekeeping, not project narrative), AND collapses runs of ≥3
-  // accept/reject events into a single batch row — without this, an auto-accept
-  // sweep buries the actual narrative under 20 routing-id lines.
+
+  // The server adds events. foldChangelogForDisplay drops session receipts and
+  // heuristic proposals, then collapses long accept/reject runs into one row.
   const narrative = foldChangelogForDisplay(s.events ?? []);
+
   return (
     <div
       data-testid="last-turn-card"
@@ -59,11 +56,8 @@ export function LastTurnCard({ alias }: Props) {
           {humanizeDateString(s.ts)}
         </span>
       </div>
+
       {s.intent && s.intent.steps.length > 0 ? (
-        // Retrospective intent: what the agent said it would do at the start of this turn,
-        // captured by `last-turn-summary` BEFORE the Stop chain's `intent clear` ran.
-        // The user reads this against the metric line above ("X files touched · Y tool calls")
-        // and judges drift by eye — no automated heuristic, just the raw juxtaposition.
         <div data-testid="last-turn-intent" className="text-xs space-y-0.5">
           <span className="text-emerald-700/80 dark:text-emerald-300/80 font-medium">
             Intent for this turn
@@ -81,6 +75,7 @@ export function LastTurnCard({ alias }: Props) {
           </ol>
         </div>
       ) : null}
+
       {narrative.length > 0 ? (
         <ul data-testid="last-turn-events" className="text-xs text-foreground/90 pl-1 space-y-0.5">
           {narrative.map((e, idx) => (

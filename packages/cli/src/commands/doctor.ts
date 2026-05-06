@@ -1,10 +1,11 @@
 import { existsSync, statSync } from "node:fs";
-import { mkdir, readdir } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import {
   type CoverageLevel,
   type ValidationIssue,
   applyAutoFixes,
+  buildActiveContext,
   defaultConfig,
   generateAutoSession,
   loadProjectConfig,
@@ -20,6 +21,7 @@ import kleur from "kleur";
 import { logger, silent as makeSilent } from "../utils/logger.js";
 import { readMtimeStore, writeMtimeStore } from "../utils/mtimeStore.js";
 import { resolveMemoryRoot } from "../utils/resolveMemoryRoot.js";
+import { collectFallbackTurnTouchedPaths } from "../utils/turnActivity.js";
 
 export interface DoctorOptions {
   cwd: string;
@@ -69,29 +71,6 @@ function coverageGlyph(level: CoverageLevel): string {
     case "red":
       return kleur.red("●");
   }
-}
-
-async function collectMtimeTouched(cwd: string): Promise<string[]> {
-  const touched: string[] = [];
-  const vault = vaultPath(cwd);
-  if (!existsSync(vault)) return touched;
-  const cutoff = Date.now() - 60 * 60 * 1000;
-  const stack = [vault];
-  while (stack.length) {
-    const cur = stack.pop();
-    if (!cur) continue;
-    const entries = await readdir(cur, { withFileTypes: true });
-    for (const e of entries) {
-      const full = join(cur, e.name);
-      if (e.isDirectory() && e.name !== "archive" && !e.name.startsWith(".")) {
-        stack.push(full);
-      } else if (e.isFile() && e.name.endsWith(".md")) {
-        const m = statSync(full).mtimeMs;
-        if (m >= cutoff) touched.push(full);
-      }
-    }
-  }
-  return touched;
 }
 
 export async function runDoctor(opts: DoctorOptions): Promise<DoctorResult> {
@@ -173,7 +152,21 @@ export async function runDoctor(opts: DoctorOptions): Promise<DoctorResult> {
       touchedPaths = parsed.touchedPaths;
       toolCounts = parsed.toolCounts;
     } else {
-      touchedPaths = await collectMtimeTouched(cwd);
+      touchedPaths = await collectFallbackTurnTouchedPaths({
+        memoryRoot: cwd,
+        sourceRoot: opts.cwd,
+      });
+    }
+
+    const autoSummary =
+      touchedPaths.length > 0
+        ? `Auto-organized ${touchedPaths.length} changed ${touchedPaths.length === 1 ? "file" : "files"}`
+        : "Auto-organized turn; no changed files detected";
+    let nextAction: string | undefined;
+    try {
+      nextAction = (await buildActiveContext(cwd, cfg)).nextAction ?? undefined;
+    } catch {
+      nextAction = undefined;
     }
 
     await generateAutoSession({
@@ -181,8 +174,9 @@ export async function runDoctor(opts: DoctorOptions): Promise<DoctorResult> {
       cfg,
       now: new Date(),
       touchedPaths,
-      summary: "",
+      summary: autoSummary,
       agentName: "cairndex-auto-session",
+      ...(nextAction ? { next: nextAction } : {}),
       ...(toolCounts ? { toolCounts } : {}),
     });
     // Update index.md "Recent changes" with the new session entry.

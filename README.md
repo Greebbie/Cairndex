@@ -1,75 +1,72 @@
 # Cairndex
 
-> **A context managing layer for your AI coding agent.** Persistent, reviewable project
-> memory that survives the chat window.
+> A handoff cockpit for AI coding agents. Cairndex keeps project memory in a
+> structured Markdown vault, summarizes it for humans in a dashboard, and feeds
+> the next agent enough context to continue without drifting.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org/)
 [![pnpm](https://img.shields.io/badge/pnpm-%3E%3D9-orange.svg)](https://pnpm.io/)
 
-Think **Structured Markdown vault** + **Claude Code / MCP** + the
-**Building a Second Brain** methodology, fused for AI-assisted coding.
+Cairndex is built for vibe coding and long-running AI-assisted projects where
+chat history is not enough. It gives you an Obsidian-style vault for specs,
+decisions, plans, tasks, sessions, insights, and change history, then connects
+that vault to Codex and Claude Code.
 
-Your project's goals, specs, decisions, plans, tasks, sessions, and insights
-live as structured Markdown files in a central vault. AI agents (Claude Code,
-Cursor, …) read this memory before they start work and propose updates after.
-Every change passes through a review inbox before it lands — the agent
-proposes, the human accepts.
+The core idea is simple:
 
-```
-┌──────────────┐    reads    ┌──────────────┐   proposes    ┌──────────────┐
-│  AI agent    │────────────▶│ Cairndex     │──────────────▶│ Dashboard │
-│ (Claude Code)│             │ vault        │               │  (you)       │
-└──────────────┘             │ (Markdown)   │◀──────────────└──────────────┘
-        ▲                    └──────────────┘    action
-        │                            │
-        └─── context pack (MCP) ─────┘
+```text
+AI session
+  -> Cairndex hooks record what changed
+  -> Markdown vault stays organized
+  -> Dashboard summarizes the state for humans
+  -> Next agent starts from AGENTS.md / bootstrap / context pack
 ```
 
-## Why
+## Why Cairndex
 
-LLM coding agents have goldfish memory. Every new session starts from zero,
-re-reads the same files, re-asks the same clarifying questions, and makes
-decisions the team has already made twice. Chat transcripts are not memory:
-they are a hostile place to store project knowledge.
+AI coding agents reset. They lose context, repeat discovery work, miss prior
+decisions, and leave important knowledge buried in chat transcripts.
 
-Cairndex flips it: durable memory lives outside the chat, structured as the
-kind of artifacts engineers already write — specs, ADRs, plans, tasks,
-session notes — but with typed cross-links, provenance, and verification
-rules a machine can enforce. The agent reads it, the agent proposes changes
-to it, and a human stays in the loop on what becomes canonical.
+Cairndex moves durable project memory out of the chat window and into a
+reviewable, structured vault. The agent can read the current task and context
+before it starts, and Cairndex can automatically record each session when it
+ends. Humans keep the final say through the dashboard and inbox.
 
-## Table of contents
+## What it does
 
-- [Features](#features)
-- [Quickstart](#quickstart)
-- [Vault layout](#vault-layout)
-- [Agent integration](#agent-integration)
-- [CLI reference](#cli-reference)
-- [Architecture](#architecture)
-- [Roadmap](#roadmap)
-- [Contributing](#contributing)
-- [License](#license)
+- **Organized Markdown vault.** Stores project memory as typed Markdown files:
+  specs, decisions, plans, tasks, sessions, changes, insights, and questions.
+- **Automatic session organization.** Agent hooks record each session, capture
+  changed files, refresh the resume surface, and keep the context pack current.
+- **Human dashboard.** Shows active work, next action, handoff readiness,
+  recent activity, memory health, inbox proposals, and agent integration status.
+- **Browseable memory.** The vault remains plain Markdown, so it can be read in
+  the GUI, searched with normal tools, versioned with Git, or opened in an
+  editor like Obsidian.
+- **Agent handoff surface.** Codex reads `AGENTS.md`; Claude Code reads
+  `CLAUDE.md` and MCP. Both can start with the current project state instead of
+  rediscovering it from scratch.
+- **Review inbox.** Agents propose durable memory changes; humans accept or
+  reject what becomes canonical.
+- **Health checks.** `cairndex doctor` validates links, provenance, completion
+  rules, stale context, and other memory integrity issues.
 
-## Features
+## Current status
 
-- **Typed Markdown vault** — goals, intents, specs, decisions, plans, tasks,
-  sessions, changes, insights, and questions. Each node has frontmatter,
-  typed cross-links, and lives in plain `.md` files you can `grep` and commit.
-- **Inbox-first writes** — agents propose, humans accept or reject. Canonical
-  memory is never edited directly, so AI changes are always reviewable and
-  reversible.
-- **Claude Code / MCP integration** — first-class MCP server exposing
-  `context_pack`, `propose_memory_update`, `inbox_list`, and workflow tools.
-  One `cairndex init` wires hooks + MCP into `.claude/settings.json`.
-- **Web dashboard** — project state, review inbox, context pack composer,
-  plan progress, and a chronological implementation timeline. Quick-action
-  buttons for switching tasks and advancing phase without dropping to a CLI.
-- **Token-budgeted context packs** — prioritized assembly so the agent reads
-  the right slice of memory under a configurable token budget.
-- **Health doctor** — validation rules across the vault: staleness, broken
-  links, missing provenance, verification-bound completion. Runs on every
-  edit via PostToolUse hook.
+Cairndex is pre-release and actively dogfooded on this repository. The core
+loop is usable:
+
+- central vault registration
+- dashboard and browse views
+- Codex and Claude Code wiring
+- automatic session notes and last-turn summaries
+- context pack generation
+- inbox proposal workflow
+- handoff readiness checks
+
+Published packages and pre-built GitHub release binaries are not available yet.
+For now, build and run from source.
 
 ## Quickstart
 
@@ -78,177 +75,197 @@ to it, and a human stays in the loop on what becomes canonical.
 - Node.js 20 or newer
 - pnpm 9 or newer
 
-### Build and run
+### Install and build
 
 ```bash
 git clone https://github.com/Greebbie/Cairndex.git
 cd Cairndex
 pnpm install
 pnpm -r build
-pnpm -F cairndex package:sea
 ```
 
-The build produces `Cairndex.exe` at the repo root with Node.js embedded
-(approximately 84 MB, zero runtime dependencies). Launch the GUI by
-double-clicking the executable; the server starts on `http://localhost:7777`
-and the browser opens automatically.
-
-For redistribution, the same build emits a portable bundle under
-`packages/cli/dist-sea/`. Copy the folder anywhere — keep the executable with
-its sibling `web/` and `templates/` directories.
-
-### First run
-
-The GUI walks through three steps the first time it opens:
-
-1. Choose a vault folder. It is created if it does not exist (typically
-   `~/CairndexVault`).
-2. Register a code repository as a project.
-3. Run `cairndex doctor` to validate the vault.
-
-The wizard ends on the project dashboard.
-
-### Wire Claude Code
-
-Inside any registered project's repo:
+### Launch the GUI from source
 
 ```bash
-cairndex init
+node packages/cli/bin/cairndex ui
 ```
 
-This injects three idempotent entries into `.claude/settings.json`:
+The local server starts on `http://localhost:7777` and opens the browser by
+default. On first run, the GUI walks you through:
 
-- A `PostToolUse` hook that runs `cairndex doctor --fix` after every
-  Write/Edit.
-- A `Stop` hook that records the session note and refreshes the context pack.
-- An MCP server registration so the agent can call Cairndex tools directly.
+1. choosing or creating a vault folder;
+2. registering a code repository as a project;
+3. validating the vault with `cairndex doctor`.
 
-For the deeper walkthrough see [docs/QUICKSTART.md](./docs/QUICKSTART.md).
+See [docs/QUICKSTART.md](./docs/QUICKSTART.md) for a fuller walkthrough.
+
+## Connect an agent
+
+Run this inside a registered repository:
+
+```bash
+node packages/cli/bin/cairndex init
+```
+
+That command wires agent hooks for the current project. In the GUI, the
+Dashboard and Settings pages also show an **Agent Integration** panel where you
+can connect or refresh Codex and Claude Code wiring.
+
+### Codex
+
+Cairndex writes:
+
+- `.codex/hooks.json` for session start, edit, and stop hooks;
+- `AGENTS.md` with a generated Cairndex handoff block.
+
+At session start, Codex sees the current phase, active task, next action,
+pending memory, and handoff rules. At session end, hooks organize the turn into
+the vault.
+
+### Claude Code
+
+Cairndex writes:
+
+- `.claude/settings.json` hooks;
+- an MCP server entry for `cairndex mcp`;
+- `CLAUDE.md` with the same Cairndex handoff block.
+
+Claude Code can also call MCP tools for context packs, inbox proposals, and
+workflow state.
 
 ## Vault layout
 
-A vault holds many projects. Each project is a tree of typed Markdown files:
+A central vault can hold many projects:
 
-```
+```text
 CairndexVault/
-├── vault.yaml
-├── projects/
-│   └── my-app/
-│       ├── project.yaml
-│       ├── index.md
-│       ├── goals/  intents/  specs/  decisions/  plans/  tasks/
-│       ├── sessions/  changes/  insights/  questions/
-│       ├── indexes/
-│       └── inbox/proposed-memory-updates/
-├── shared/                # cross-project rules, templates, insights
-└── indexes/               # vault-wide rollups
+  vault.yaml
+  projects/
+    my-app/
+      project.yaml
+      index.md
+      goals/
+      intents/
+      specs/
+      decisions/
+      plans/
+      tasks/
+      sessions/
+      changes/
+      insights/
+      questions/
+      indexes/
+        context-packs/
+        memory-health.json
+        active-context.json
+      inbox/
+        proposed-memory-updates/
+      state/
+        resume.md
+        resume.json
+  shared/
+    rules/
 ```
 
-A repo opts in via a one-line pointer file:
+The code repository points at its vault project with:
 
 ```yaml
 # <repo>/.cairndex-project.yaml
-vault: "C:/Users/<you>/CairndexVault"
+vault: "C:/Users/you/Documents/CairndexVault"
 project: "my-app"
 ```
 
-The pointer is metadata; the vault is memory.
+The pointer is metadata. The vault is the source of truth for project memory.
 
-### Node types
+## Daily workflow
 
-| Folder       | Role                                  | Mutability               |
-| ------------ | ------------------------------------- | ------------------------ |
-| `goals/`     | Project north stars                   | living                   |
-| `intents/`   | User asks captured verbatim           | immutable                |
-| `specs/`     | What we are building                  | living, history-tracked  |
-| `decisions/` | ADR-style decisions                   | immutable once accepted  |
-| `plans/`     | How we will build                     | living, supersedable     |
-| `tasks/`     | Current work breakdown                | living                   |
-| `sessions/`  | Per-session work narrative            | immutable                |
-| `changes/`   | Project event stream                  | append-only              |
-| `insights/`  | Lessons; promotable to shared memory  | append-only              |
-| `questions/` | Open uncertainties                    | living, status-tracked   |
+1. Open a wired repo in Codex or Claude Code.
+2. Start working normally.
+3. Cairndex hooks keep the vault clean while the agent works.
+4. At session end, Cairndex records a session note, updates the latest turn
+   summary, refreshes the resume, and rebuilds stale context packs.
+5. Review the Dashboard and Inbox to decide what should become durable memory.
+6. The next agent starts from the updated handoff surface.
 
-Every node carries:
+For high-quality handoff, close out important sessions with:
 
-- **Typed edges** — `links: [{type: supersedes, target: ADR-002}]` plus
-  `[[wikilinks]]` in body content.
-- **Provenance** — who created the node, in which session, with what
-  confidence.
-- **Verification-bound completion** — marking `status: done` requires a
-  `verification` block; `cairndex doctor` enforces it.
+```bash
+node packages/cli/bin/cairndex wrap
+```
 
-## Agent integration
-
-The contract between Cairndex and any agent is small and enforceable:
-
-1. Resolve the current repo to `{ vaultRoot, projectId }`.
-2. Read `projects/<id>/index.md`, `shared/rules/`, and a generated context
-   pack.
-3. Propose memory changes by writing to
-   `projects/<id>/inbox/proposed-memory-updates/`.
-4. The user accepts or rejects from the GUI's *Review Inbox* page or via
-   `cairndex inbox`.
-5. Never edit canonical memory directly.
-
-Agents read the vault three ways:
-
-- **Files.** Grep or read the Markdown directly.
-- **CLAUDE.md region.** An auto-generated `<!-- cairndex:start -->` block in
-  the repo's `CLAUDE.md` summarising current phase, active task, and pointers.
-- **MCP.** `cairndex mcp` exposes tools and resources over stdio for
-  protocol-aware agents.
+The close-out flow captures what finished, what was learned, and where the next
+agent should continue.
 
 ## CLI reference
 
 ```bash
-# Vault and project setup
-cairndex vault init <path>
-cairndex project register --vault <path> --project <id> --repo <repo>
-cairndex project import-repo-vault ...
-
-# Run the GUI
+# Launch the GUI
 cairndex ui [--vault <path>] [--port 7777]
 
-# Daily usage
-cairndex context [task] [--vault <path>] [--project <id>]
+# Project setup
+cairndex vault init <path>
+cairndex project register --vault <path> --project <id> --repo <repo>
+cairndex init
+
+# Context and health
+cairndex status
 cairndex doctor [--fix]
-cairndex inbox list | accept <id> | reject <id> | propose ...
-cairndex task switch <id>
-cairndex task complete [<id>]
+cairndex context [task]
+cairndex resume
+
+# Workflow
+cairndex task switch <TASK-id>
+cairndex task complete [<TASK-id>]
 cairndex phase set <name>
-cairndex sweep
-cairndex mcp
+cairndex wrap
+
+# Memory review
+cairndex inbox list
+cairndex inbox accept <PROP-id>
+cairndex inbox reject <PROP-id>
+```
+
+When running from source, prefix commands with:
+
+```bash
+node packages/cli/bin/cairndex <command>
 ```
 
 ## Architecture
 
-`cairndex` is a pnpm monorepo:
+This repository is a pnpm monorepo:
 
-```
+```text
 packages/
-├── core/      @cairndex/core    # vault primitives, validation, MCP, indexes
-├── cli/       @cairndex/cli     # the cairndex command
-├── server/    @cairndex/server  # Fastify API + SSE
-└── web/       @cairndex/web     # React GUI
+  core/      vault model, validation, indexes, context packs, hooks
+  cli/       cairndex command line interface
+  server/    Fastify API, SSE, static GUI hosting
+  web/       React dashboard and browse UI
+templates/   default vault templates and rules
+docs/        user-facing and development documentation
 ```
 
-Build with `pnpm -r build`. Test with `pnpm test`. Type-check with
-`pnpm typecheck`. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full
-development setup.
+Useful development commands:
+
+```bash
+pnpm install
+pnpm -r build
+pnpm typecheck
+pnpm test
+pnpm lint
+```
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup and contribution
+guidelines.
 
 ## Roadmap
 
-- Pre-built binaries published to GitHub Releases.
-- Desktop packaging (Tauri) for a one-click install.
-- Cross-vault search and read-only project sharing.
-- Richer graph views and timeline visualisations in the GUI.
-
-## Contributing
-
-Issues and pull requests are welcome. See
-[CONTRIBUTING.md](./CONTRIBUTING.md) for development setup, coding style, and
-testing conventions.
+- pre-built GitHub release binaries;
+- stronger semantic session summaries;
+- richer browse and graph views;
+- cross-project search;
+- more agent adapters beyond Codex and Claude Code;
+- live multi-agent progress views.
 
 ## License
 

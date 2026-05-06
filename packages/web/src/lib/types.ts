@@ -226,6 +226,17 @@ export const ClaudeCodeStatusSchema = z.object({
 });
 export type ClaudeCodeStatus = z.infer<typeof ClaudeCodeStatusSchema>;
 
+export const CodexStatusSchema = z.object({
+  wired: z.boolean(),
+  hooksPath: z.string(),
+  hooksExists: z.boolean(),
+  hookEvents: z.array(z.string()),
+  agentsMdPath: z.string(),
+  agentsMdExists: z.boolean(),
+  agentsBlockPresent: z.boolean(),
+});
+export type CodexStatus = z.infer<typeof CodexStatusSchema>;
+
 export const UserPreferencesSchema = z
   .object({
     schemaVersion: z.literal(1).default(1),

@@ -1,169 +1,187 @@
 # Cairndex Quickstart
 
-Five minutes from clone to a working AI memory layer wired into Claude Code.
+This guide gets you from a fresh clone to a running Cairndex dashboard wired to
+an AI coding agent.
 
-## What is Cairndex?
+## 1. Prerequisites
 
-A **vault** for your AI coding sessions. Specs, decisions, plans, sessions, and
-insights live as typed Markdown files outside any single repo. Your AI agent
-reads the vault before it works and proposes updates after — every change goes
-through a review inbox before it lands in canonical memory. The vault survives
-chat-window resets and is human-readable / Git-versionable.
+Install:
 
-## Prerequisites
+- Node.js 20 or newer
+- pnpm 9 or newer
 
-| Tool | Minimum | Why |
-|---|---|---|
-| Node.js | 20.0+ | Runtime for the CLI, Fastify server, and Vite build |
-| pnpm | 9.0+ | Package manager (the launcher script will activate it via corepack if missing) |
+Optional agent integrations:
 
-Optional but recommended:
+- Codex
+- Claude Code
 
-- **Claude Code CLI** ([install guide](https://docs.claude.com/en/docs/claude-code/setup)) — the agent that reads/writes the vault.
-
-## Two install paths
-
-Path 1 is the recommended one for end users: build the exe once, double-click forever.
-
-### Path 1 — Build a single .exe, then double-click (recommended)
+## 2. Build from source
 
 ```bash
 git clone https://github.com/Greebbie/Cairndex.git
 cd Cairndex
 pnpm install
 pnpm -r build
-pnpm -F cairndex package:sea
 ```
 
-This produces **`Cairndex.exe`** at the repo root (so it's visible right next
-to the README), plus a portable `packages/cli/dist-sea/` bundle for
-redistribution. The exe is ~84 MB with Node.js embedded — zero runtime
-dependencies.
-
-- **Just want to run it locally?** Double-click `Cairndex.exe` at the repo
-  root. It locates `packages/web/dist/` and `templates/` automatically.
-- **Want to share/move it?** Take the whole `packages/cli/dist-sea/` folder
-  (exe + sibling `web/` + sibling `templates/`) anywhere — USB stick,
-  `~/Applications/`, etc. Keep the three siblings together; the exe finds
-  resources by relative path.
-
-Either way: double-click → server starts on http://localhost:7777 → browser
-auto-opens to the GUI.
-
-> Once we publish releases, you'll be able to skip the build step and grab
-> a pre-built bundle from
-> [GitHub Releases](https://github.com/Greebbie/Cairndex/releases).
-
-### Path 2 — Global CLI install (for advanced users; future)
-
-> Note: `@cairndex/cli` is not yet published to the npm registry. Use Path 1
-> until the first release.
+## 3. Start the GUI
 
 ```bash
-pnpm add -g @cairndex/cli   # or:  npm i -g @cairndex/cli
-cairndex ui
+node packages/cli/bin/cairndex ui
 ```
 
-> Hacking on Cairndex itself? Re-run `pnpm -F cairndex package:sea` after
-> source changes to refresh `Cairndex.exe`, or run `node packages/cli/bin/cairndex ui`
-> directly against your live source build for fastest iteration (no SEA repack).
+The GUI starts at:
 
-## First-run wizard
+```text
+http://localhost:7777
+```
 
-When the GUI opens with no projects registered, you're walked through three steps:
+The browser opens automatically unless you pass `--no-open`.
 
-1. **Choose a vault folder.** Created if it doesn't exist. A typical path is
-   `C:\Users\<you>\CairndexVault` on Windows or `~/CairndexVault` elsewhere.
-   The vault is your home for project memory across all repos.
+## 4. Create or choose a vault
 
-2. **Register a code repo as a project.** Point at the repo on disk; Cairndex
-   creates `<vault>/projects/<id>/` and writes a one-line `.cairndex-project.yaml`
-   pointer file inside the repo. The pointer is metadata, not memory — the
-   vault stays the source of truth.
+On first run, the GUI asks for a vault folder. A typical Windows path is:
 
-3. **Run doctor.** Validates your vault structure, suggests safe auto-fixes,
-   then drops you on the project Dashboard.
+```text
+C:/Users/you/Documents/CairndexVault
+```
 
-## Wiring Claude Code
+The vault is where Cairndex stores durable project memory. It is separate from
+your code repository so one vault can manage many projects.
 
-In a repo that has been registered as a project, run once:
+## 5. Register a project
+
+Choose a code repository. Cairndex creates:
+
+```text
+<vault>/projects/<project-id>/
+```
+
+and writes this pointer file into the repo:
+
+```yaml
+# <repo>/.cairndex-project.yaml
+vault: "C:/Users/you/Documents/CairndexVault"
+project: "my-app"
+```
+
+The pointer lets CLI commands and agent hooks resolve the correct project.
+
+## 6. Connect Codex or Claude Code
+
+From inside the registered repo, run:
 
 ```bash
-cairndex init
+node packages/cli/bin/cairndex init
 ```
 
-This injects three things into `.claude/settings.json` (idempotent — safe to
-re-run, only `cairndex-managed` entries are replaced):
+You can also use the **Agent Integration** panel in the Dashboard or Settings
+page.
 
-- **PostToolUse hook** — after every Write/Edit, runs `cairndex doctor --fix`
-  to validate vault state and apply safe auto-fixes.
-- **Stop hook** — at session end, writes a session note + sweeps for stale
-  proposals.
-- **MCP server registration** — exposes the four `cairndex` tools to the agent:
-  `context_pack`, `propose_memory_update`, `update_living_doc`, `inbox_list`.
+### Codex wiring
 
-Open Claude Code in that repo. The agent now reads your vault on entry and
-proposes updates to your inbox without manual prompting.
+Cairndex creates or refreshes:
 
-## Where things live
-
-```
-<repo>/
-├── .cairndex-project.yaml      ← pointer to vault (not memory itself)
-├── .claude/settings.json       ← hooks + MCP wiring (cairndex-managed)
-└── ...
-
-<vault>/
-├── vault.yaml
-├── projects/<project-id>/
-│   ├── project.yaml
-│   ├── index.md
-│   ├── goals/  intents/  specs/  decisions/  plans/  tasks/
-│   ├── sessions/  changes/  insights/  questions/
-│   ├── indexes/
-│   └── inbox/proposed-memory-updates/
-└── shared/                     ← cross-project rules, templates, insights
+```text
+.codex/hooks.json
+AGENTS.md
 ```
 
-## Daily flow
+Codex receives the current project handoff at session start and Cairndex
+organizes the session when the turn ends.
 
-1. Open Claude Code in your wired repo. Agent's first turn already has the
-   active task and pending proposals via the SessionStart bootstrap.
-2. Code as usual. Hooks capture session activity in the background.
-3. At session end, review proposals in the GUI's *Review Inbox* page (or
-   `cairndex inbox list` from the terminal). Accept the ones that should
-   land in canonical memory; reject the rest.
-4. Run `cairndex status` any time you want a one-screen summary of phase /
-   active task / pending proposal count / vault health.
+### Claude Code wiring
 
-## Settings & user preferences
+Cairndex creates or refreshes:
 
-The GUI's *Settings* page edits two scopes:
+```text
+.claude/settings.json
+CLAUDE.md
+```
 
-- **Project (vault scope)** — `<vault>/projects/<id>/.../config.yaml` and
-  `rules/`. Shared with anyone using this vault.
-- **User (machine scope)** — `~/.cairndex/preferences.yaml`. Personal — your
-  UI theme, default freshness threshold, custom rules.
+The settings file includes hooks and an MCP server entry.
 
-Project rules win where they overlap with user prefs — the vault is the
-source of truth for everyone working off it.
+## 7. Work normally
 
-## Common issues
+Once connected, the loop is:
 
-- **`pnpm install` fails on first run.** Make sure you have Node 20+. If
-  you're behind a corporate proxy, set `npm_config_proxy` and
-  `npm_config_https_proxy` before running.
-- **GUI doesn't auto-open the browser.** Visit `http://localhost:7777`
-  manually. The server runs even when the browser doesn't open.
-- **Claude Code doesn't see the MCP tools.** Confirm `.claude/settings.json`
-  has an `mcpServers.cairndex` block, then restart Claude Code (it loads MCP
-  servers at session start).
-- **Windows path issues.** Use forward slashes (`C:/Users/you/CairndexVault`)
-  in vault.yaml and pointer files; backslashes work in CLI args but YAML
-  prefers forward slashes.
+1. Start a Codex or Claude Code session in the repo.
+2. Work normally.
+3. Cairndex hooks validate memory while files change.
+4. At the end of the session, Cairndex writes a session note, updates the
+   last-turn summary, refreshes the resume, and rebuilds stale context packs.
+5. Open the Dashboard to review project state, memory health, handoff readiness,
+   and pending inbox proposals.
 
-## Where to next
+For important sessions, run:
 
-- [README.md](../README.md) — project overview and architecture
-- [CONTRIBUTING.md](../CONTRIBUTING.md) — development setup
-- `cairndex --help` — full CLI reference
+```bash
+node packages/cli/bin/cairndex wrap
+```
+
+This captures a human-readable close-out: what finished, what was learned, and
+where the next agent should continue.
+
+## Useful commands
+
+```bash
+# Open the GUI
+node packages/cli/bin/cairndex ui --vault "C:/Users/you/Documents/CairndexVault"
+
+# Check project status
+node packages/cli/bin/cairndex status
+
+# Validate and apply safe fixes
+node packages/cli/bin/cairndex doctor --fix
+
+# Build a context pack for the current task
+node packages/cli/bin/cairndex context "current task"
+
+# Print the current handoff resume
+node packages/cli/bin/cairndex resume
+
+# Review proposed memory updates
+node packages/cli/bin/cairndex inbox list
+```
+
+## Troubleshooting
+
+### The GUI cannot find the web build
+
+Run:
+
+```bash
+pnpm -r build
+node packages/cli/bin/cairndex ui
+```
+
+### The browser does not open
+
+Visit the URL manually:
+
+```text
+http://localhost:7777
+```
+
+### The agent does not see Cairndex context
+
+Check that the project has been connected:
+
+```bash
+node packages/cli/bin/cairndex init
+```
+
+Then restart the agent session. Hooks and MCP entries are loaded at session
+start.
+
+### Handoff is blocked
+
+Open the Dashboard and read the Handoff Readiness panel. Common blockers are:
+
+- latest session lacks a close-out narrative;
+- context pack is stale;
+- active task or next action is missing;
+- inbox has unresolved memory proposals.
+
+Run `cairndex wrap` for the latest important session, then refresh the
+dashboard.

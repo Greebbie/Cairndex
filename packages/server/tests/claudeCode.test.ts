@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { listVaultProjects } from "@cairndex/core";
@@ -115,6 +115,114 @@ describe("claude-code-status route", () => {
       const body = r.json() as { wired: boolean; settingsPath: string };
       expect(body.wired).toBe(true);
       expect(body.settingsPath).toBe(join(repoRoot, ".claude", "settings.json"));
+    } finally {
+      await app.close();
+    }
+  });
+});
+
+describe("codex integration routes", () => {
+  const fixtures: Array<{ cleanup: () => void }> = [];
+  afterEach(() => {
+    for (const f of fixtures.splice(0)) f.cleanup();
+  });
+
+  function writePointer(repoRoot: string, vaultRoot: string, projectId = "demo"): void {
+    writeFileSync(
+      join(repoRoot, ".cairndex-project.yaml"),
+      `vault: ${JSON.stringify(vaultRoot)}\nproject: ${projectId}\n`,
+      "utf8",
+    );
+  }
+
+  it("status reads Codex hooks and AGENTS.md from the repo root", async () => {
+    const repoRoot = mkdtempSync(join(tmpdir(), "cairn-codex-"));
+    const fx = makeCentralVaultFixture("demo", { repoRoot });
+    fixtures.push(fx);
+    writePointer(repoRoot, fx.vaultRoot);
+    mkdirSync(join(repoRoot, ".codex"), { recursive: true });
+    writeFileSync(
+      join(repoRoot, ".codex", "hooks.json"),
+      JSON.stringify(
+        {
+          hooks: {
+            PostToolUse: [
+              { hooks: [{ type: "command", command: "cairndex doctor # cairndex-managed" }] },
+            ],
+            SessionStart: [
+              { hooks: [{ type: "command", command: "cairndex bootstrap # cairndex-managed" }] },
+            ],
+            Stop: [
+              { hooks: [{ type: "command", command: "cairndex context # cairndex-managed" }] },
+            ],
+          },
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    writeFileSync(
+      join(repoRoot, "AGENTS.md"),
+      "<!-- cairndex:start v1 -->\nLast session: none\n<!-- cairndex:end -->\n",
+      "utf8",
+    );
+
+    const projects = await listVaultProjects(fx.vaultRoot);
+    const app = await createServer({ projects, logger: false });
+    try {
+      const r = await app.inject({ method: "GET", url: "/api/projects/demo/codex-status" });
+      expect(r.statusCode).toBe(200);
+      const body = r.json() as {
+        wired: boolean;
+        hooksPath: string;
+        hookEvents: string[];
+        agentsBlockPresent: boolean;
+      };
+      expect(body.wired).toBe(true);
+      expect(body.hooksPath).toBe(join(repoRoot, ".codex", "hooks.json"));
+      expect(body.hookEvents.sort()).toEqual(["PostToolUse", "SessionStart", "Stop"].sort());
+      expect(body.agentsBlockPresent).toBe(true);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("wire creates Codex hooks and AGENTS.md at the repo root for central-vault projects", async () => {
+    const repoRoot = mkdtempSync(join(tmpdir(), "cairn-codex-wire-"));
+    const fx = makeCentralVaultFixture("demo", { repoRoot });
+    fixtures.push(fx);
+    writePointer(repoRoot, fx.vaultRoot);
+
+    const projects = await listVaultProjects(fx.vaultRoot);
+    const app = await createServer({ projects, logger: false });
+    try {
+      const r = await app.inject({ method: "POST", url: "/api/projects/demo/codex-wire" });
+      expect(r.statusCode).toBe(200);
+      const body = r.json() as {
+        wired: boolean;
+        hookEvents: string[];
+        agentsBlockPresent: boolean;
+      };
+      expect(body.wired).toBe(true);
+      expect(body.hookEvents.sort()).toEqual(["PostToolUse", "SessionStart", "Stop"].sort());
+      expect(body.agentsBlockPresent).toBe(true);
+
+      const hooksPath = join(repoRoot, ".codex", "hooks.json");
+      const agentsPath = join(repoRoot, "AGENTS.md");
+      expect(existsSync(hooksPath)).toBe(true);
+      expect(existsSync(agentsPath)).toBe(true);
+      const hooks = JSON.parse(readFileSync(hooksPath, "utf8")) as {
+        hooks: { SessionStart: Array<{ hooks: Array<{ command: string }> }> };
+      };
+      const sessionStart =
+        hooks.hooks.SessionStart[0]?.hooks.map((h) => h.command).join("\n") ?? "";
+      expect(sessionStart).toContain("bootstrap");
+      expect(sessionStart).toContain("--vault");
+      expect(sessionStart).toContain(fx.vaultRoot);
+      expect(sessionStart).toContain("--project");
+      expect(sessionStart).toContain("demo");
+      expect(readFileSync(agentsPath, "utf8")).toContain("<!-- cairndex:start v1 -->");
     } finally {
       await app.close();
     }

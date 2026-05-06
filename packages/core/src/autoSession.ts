@@ -27,6 +27,7 @@ export interface GenerateAutoSessionInput {
   now: Date;
   touchedPaths: readonly string[];
   summary?: string;
+  next?: string;
   agentName?: string;
   /** Optional structured tool-call summary. When provided, rendered as a "Tool calls" line. */
   toolCounts?: ToolCounts;
@@ -234,11 +235,19 @@ export async function generateAutoSession(
     : "- (no files touched)";
 
   const idsList = links.length ? links.map((l) => `- [[${l.target}]]`).join("\n") : "- (none)";
+  const whatIDid =
+    input.summary && input.summary.trim().length > 0
+      ? `- ${input.summary.trim()}`
+      : "(TODO: describe the work in 1-3 bullets.)";
+  const next =
+    input.next && input.next.trim().length > 0
+      ? input.next.trim()
+      : "Continue from the dashboard active task and next action.";
 
   const sections = [
     "## What I did",
     "",
-    "(TODO: describe the work in 1–3 bullets.)",
+    whatIDid,
     "",
     "## Files touched",
     "",
@@ -254,7 +263,7 @@ export async function generateAutoSession(
     sections.push("## Tool calls", "", renderToolCounts(input.toolCounts), "");
   }
 
-  sections.push("## Next", "", "(TODO: one-line next action.)");
+  sections.push("## Next", "", next);
 
   const body = sections.join("\n");
 

@@ -68,6 +68,43 @@ describe("doctor", () => {
     expect(sessions.some((f) => f.endsWith(".md"))).toBe(true);
   });
 
+  it("--auto-session without transcript records recent source changes for central projects", async () => {
+    const repoRoot = mkdtempSync(join(tmpdir(), "cairn-dr-repo-"));
+    const vaultRoot = mkdtempSync(join(tmpdir(), "cairn-dr-vault-"));
+    try {
+      const projectRoot = join(vaultRoot, "projects", "demo");
+      mkdirSync(join(projectRoot, "sessions"), { recursive: true });
+      writeFileSync(join(vaultRoot, "vault.yaml"), "version: 1\n", "utf8");
+      writeFileSync(join(projectRoot, "project.yaml"), "id: demo\n", "utf8");
+      mkdirSync(join(projectRoot, "state"), { recursive: true });
+      writeFileSync(join(projectRoot, "state", "resume.md"), "# Generated resume\n", "utf8");
+      mkdirSync(join(repoRoot, "src"), { recursive: true });
+      writeFileSync(join(repoRoot, "src", "feature.ts"), "export const feature = true;\n", "utf8");
+
+      await runDoctor({
+        cwd: repoRoot,
+        vaultRoot,
+        projectId: "demo",
+        silent: true,
+        autoSession: true,
+      });
+
+      const { readdirSync } = await import("node:fs");
+      const sessions = readdirSync(join(projectRoot, "sessions"));
+      const sessionFile = sessions.find((f) => f.endsWith(".md"));
+      expect(sessionFile).toBeDefined();
+      if (!sessionFile) return;
+      const body = readFileSync(join(projectRoot, "sessions", sessionFile), "utf8");
+      expect(body).toContain("src/feature.ts");
+      expect(body).toContain("Auto-organized 1 changed file");
+      expect(body).not.toContain("resume.md");
+      expect(body).not.toContain("TODO");
+    } finally {
+      rmSync(repoRoot, { recursive: true, force: true });
+      rmSync(vaultRoot, { recursive: true, force: true });
+    }
+  });
+
   it("--auto-session with transcriptPath uses tool-call data and renders Tool calls section", async () => {
     mkdirSync(join(tmp, ".cairndex/sessions"), { recursive: true });
     const transcript = join(tmp, "transcript.jsonl");

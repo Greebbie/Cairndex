@@ -1,4 +1,4 @@
-import { ClaudeCodeIntegrationPanel } from "@/components/ClaudeCodeIntegrationPanel";
+import { AgentIntegrationPanel } from "@/components/AgentIntegrationPanel";
 import { useConfig, useUpdateConfig } from "@/lib/api";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -118,12 +118,10 @@ export default function Settings() {
     <div className="p-8 space-y-6 max-w-3xl">
       <h2 className="text-xl font-semibold">Settings</h2>
 
-      {/* Claude Code wiring is project-scoped and the most common reason a user
-          opens Settings, so surface it above the tabs rather than hiding it inside
-          one. The panel is self-contained — it shows current wiring status and
-          offers a one-click refresh that runs the same applyClaudeHooks logic
-          `cairndex init` does from the terminal. */}
-      {alias && <ClaudeCodeIntegrationPanel alias={alias} />}
+      {/* Agent wiring is project-scoped and often the fastest way to make the
+          dashboard useful, so surface it above the tabs instead of burying it in
+          config. */}
+      {alias && <AgentIntegrationPanel alias={alias} />}
 
       <div className="flex gap-2 border-b border-border">
         {(["config", "rules", "user"] as const).map((t) => (

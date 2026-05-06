@@ -105,6 +105,22 @@ describe("runLastTurnSummary", () => {
     expect(r.summary?.filesTouched).toBe(2); // a.ts + b.ts deduped
   });
 
+  it("falls back to recent source activity when a Stop hook has no transcript payload", async () => {
+    const repo = seedRepo();
+    mkdirSync(join(repo, "src"), { recursive: true });
+    writeFileSync(join(repo, "src", "app.ts"), "export const app = true;\n", "utf8");
+
+    const r = await runLastTurnSummary({
+      cwd: repo,
+      requireTranscript: true,
+      now: Date.now(),
+    });
+
+    expect(r.exitCode).toBe(0);
+    expect(r.summary?.filesTouched).toBe(1);
+    expect(r.summary?.toolCounts).toEqual({ Edit: 0, Write: 0, Bash: 0, Read: 0 });
+  });
+
   it("can refuse to overwrite the summary when a required transcript is missing", async () => {
     const repo = seedRepo();
     const r = await runLastTurnSummary({ cwd: repo, requireTranscript: true });

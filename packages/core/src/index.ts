@@ -46,6 +46,7 @@ export * from "./insight/extractFromSession.js";
 export * from "./userPrefs.js";
 export * from "./changelog.js";
 export * from "./claudeCodeHooks.js";
+export * from "./codexHooks.js";
 export * from "./intent.js";
 export * from "./signals/index.js";
 export * from "./migrations/narrativeStatus.js";
